@@ -1,0 +1,47 @@
+.trick {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  padding: 1rem;
+  margin: 1rem 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.trick.empty {
+  text-align: center;
+  color: #999;
+  font-style: italic;
+  padding: 2rem;
+}
+
+.trick h3 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.trick-plays {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.trick-play {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.play-player {
+  font-weight: bold;
+  min-width: 120px;
+  color: #667eea;
+}
+
+.play-cards {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}

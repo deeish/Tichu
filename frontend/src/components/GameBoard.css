@@ -1,0 +1,332 @@
+.game-board {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.game-area {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.opponents-area {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.opponent {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.opponent-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.player-name {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.team-badge {
+  background: #667eea;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+}
+
+.card-count {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.turn-indicator {
+  color: #f59e0b;
+  font-weight: bold;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.center-area {
+  display: flex;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.player-area {
+  margin-top: 2rem;
+}
+
+.my-hand-section {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.hand-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.hand-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.your-turn {
+  background: #10b981;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: bold;
+  animation: pulse 1.5s infinite;
+}
+
+.action-buttons {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+  min-width: 200px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #667eea;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #5568d3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #4b5563;
+  transform: translateY(-2px);
+}
+
+.btn-grand-tichu {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+}
+
+.btn-grand-tichu:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
+}
+
+.btn-tichu {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.btn-tichu:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.btn-bomb {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  font-weight: bold;
+  animation: pulse 2s infinite;
+}
+
+.btn-bomb:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(239, 68, 68, 0.4);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+}
+
+.bomb-notice {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  background: #fee2e2;
+  border-radius: 8px;
+  border: 2px solid #ef4444;
+  text-align: center;
+}
+
+.bomb-notice p {
+  margin: 0;
+  color: #991b1b;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.btn-skip {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.btn-skip:hover:not(:disabled) {
+  background: #d1d5db;
+}
+
+.phase-hint {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 0.5rem;
+  text-align: center;
+  font-style: italic;
+}
+
+.waiting-message {
+  color: #666;
+  font-style: italic;
+  margin: 0;
+}
+
+.wish-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 1rem;
+  background: #fef3c7;
+  border-radius: 8px;
+  border: 2px solid #f59e0b;
+  margin-bottom: 1rem;
+}
+
+.wish-input-section p {
+  margin: 0;
+  font-weight: bold;
+  color: #92400e;
+}
+
+.wish-select {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  border: 2px solid #d97706;
+  border-radius: 6px;
+  background: white;
+  min-width: 150px;
+}
+
+.wish-status {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: #fef3c7;
+  border-radius: 8px;
+  border: 2px solid #f59e0b;
+}
+
+.wish-message {
+  margin: 0;
+  color: #92400e;
+  font-weight: bold;
+  text-align: center;
+}
+
+.hand-controls {
+  margin-bottom: 1rem;
+}
+
+.sort-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-sort {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  background: #e5e7eb;
+  color: #374151;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.btn-sort:hover {
+  background: #d1d5db;
+}
+
+.btn-sort.active {
+  background: #667eea;
+  color: white;
+  border-color: #5568d3;
+}
+
+.grouped-hand {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem;
+}
+
+.combination-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.combination-group h4 {
+  margin: 0 0 0.5rem 0;
+  color: #667eea;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.combination-set {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  padding: 0.5rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
