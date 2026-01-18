@@ -66,6 +66,11 @@ function initializeGame(game) {
   game.mahJongPlayed = false; // Track if Mah Jong has been played this round
   game.playersOut = []; // Track players who have gone out, in order
   game.roundEnded = false; // Track if round has ended
+  // Track per-player stacks (cards won in tricks) - only awarded at round end unless last place
+  game.playerStacks = {}; // { playerId: { cards: [...], points: number } }
+  game.players.forEach(player => {
+    game.playerStacks[player.id] = { cards: [], points: 0 };
+  });
   
   // Phase 1: Grand Tichu declarations (after seeing 8 cards)
   game.state = 'grand-tichu';
@@ -138,7 +143,26 @@ function declareTichu(game, playerId) {
 }
 
 /**
+ * Returns the 3 recipients for a giver during exchange, in a fixed order:
+ * the other 3 players in turn order (clockwise: next, then next, then next).
+ * Each recipient includes isPartner: true if same team as giver.
+ */
+function getExchangeRecipients(game, giverId) {
+  const order = game.turnOrder || [];
+  const idx = order.findIndex(p => p && p.id === giverId);
+  if (idx === -1 || order.length !== 4) return [];
+  const giver = order[idx];
+  return [
+    { ...order[(idx + 1) % 4], isPartner: order[(idx + 1) % 4].team === giver.team },
+    { ...order[(idx + 2) % 4], isPartner: order[(idx + 2) % 4].team === giver.team },
+    { ...order[(idx + 3) % 4], isPartner: order[(idx + 3) % 4].team === giver.team }
+  ];
+}
+
+/**
  * Handles card exchange
+ * cardsToExchange: [card0, card1, card2] where card0 → 1st recipient, card1 → 2nd, card2 → 3rd
+ * (order matches getExchangeRecipients)
  */
 function exchangeCards(game, playerId, cardsToExchange) {
   if (game.state !== 'exchanging') {
@@ -166,70 +190,44 @@ function exchangeCards(game, playerId, cardsToExchange) {
     }
   }
   
-  // Store exchange cards
+  // Store exchange cards (order matches getExchangeRecipients: [for 1st, 2nd, 3rd])
   game.exchangeCards[playerId] = cardsToExchange;
-  game.exchangeComplete[playerId] = false;
-  
+
   return { success: true, game };
 }
 
 /**
- * Completes the card exchange phase
+ * Completes the card exchange phase.
+ * Each giver's cards[i] goes to getExchangeRecipients(...)[i].
  */
 function completeExchange(game) {
-  // First, collect all cards to be given (before removing from hands)
   const exchanges = [];
   const players = game.players;
-  
+
   for (let i = 0; i < players.length; i++) {
     const giver = players[i];
     if (!game.exchangeCards[giver.id] || game.exchangeCards[giver.id].length !== 3) {
       return { success: false, error: 'All players must exchange 3 cards' };
     }
-    
-    const cardsToGive = [...game.exchangeCards[giver.id]];
-    const opponents = players.filter(p => p.id !== giver.id && p.team !== giver.team);
-    const partner = players.find(p => p.team === giver.team && p.id !== giver.id);
-    
-    exchanges.push({
-      giver: giver.id,
-      cards: cardsToGive,
-      opponents: opponents.map(p => p.id),
-      partner: partner?.id
-    });
+    exchanges.push({ giver: giver.id, cards: [...game.exchangeCards[giver.id]] });
   }
-  
-  // Now perform the exchanges
+
   for (const exchange of exchanges) {
     const giverHand = game.hands[exchange.giver];
-    let cardIndex = 0;
-    
-    // Give to opponents (2 cards)
-    for (const opponentId of exchange.opponents) {
-      if (cardIndex >= exchange.cards.length) break;
-      const card = exchange.cards[cardIndex++];
-      
-      // Remove from giver's hand
-      const cardPos = giverHand.findIndex(c => 
-        c.type === card.type && 
-        (c.type === 'standard' ? c.suit === card.suit && c.rank === card.rank : c.name === card.name)
-      );
-      if (cardPos !== -1) {
-        giverHand.splice(cardPos, 1);
-        game.hands[opponentId].push(card);
-      }
+    const recipients = getExchangeRecipients(game, exchange.giver);
+    if (recipients.length !== 3) {
+      return { success: false, error: 'Invalid turn order for exchange' };
     }
-    
-    // Give to partner (1 card)
-    if (exchange.partner && cardIndex < exchange.cards.length) {
-      const card = exchange.cards[cardIndex];
-      const cardPos = giverHand.findIndex(c => 
-        c.type === card.type && 
+    for (let i = 0; i < 3; i++) {
+      const card = exchange.cards[i];
+      const recipientId = recipients[i].id;
+      const cardPos = giverHand.findIndex(c =>
+        c.type === card.type &&
         (c.type === 'standard' ? c.suit === card.suit && c.rank === card.rank : c.name === card.name)
       );
       if (cardPos !== -1) {
         giverHand.splice(cardPos, 1);
-        game.hands[exchange.partner].push(card);
+        game.hands[recipientId].push(card);
       }
     }
   }
@@ -237,9 +235,61 @@ function completeExchange(game) {
   // Clear exchange data
   game.exchangeCards = {};
   game.exchangeComplete = {};
+  
+  // After exchange, find who has Mah Jong now (it may have been passed)
+  let newMahJongPlayer = null;
+  for (const player of game.players) {
+    const hand = game.hands[player.id] || [];
+    if (hand.some(card => card.name === 'mahjong')) {
+      newMahJongPlayer = player;
+      break;
+    }
+  }
+  
+  // If Mah Jong not found (shouldn't happen), keep current lead player
+  if (!newMahJongPlayer) {
+    console.warn('Mah Jong not found after exchange, keeping current lead player');
+    newMahJongPlayer = game.players.find(p => p.id === game.leadPlayer);
+    if (!newMahJongPlayer) {
+      newMahJongPlayer = game.players[0];
+    }
+  }
+  
+  // Update lead player and turn order to start with new Mah Jong holder
+  game.leadPlayer = newMahJongPlayer.id;
+  const mahJongIndex = game.players.findIndex(p => p.id === newMahJongPlayer.id);
+  game.turnOrder = [
+    ...game.players.slice(mahJongIndex),
+    ...game.players.slice(0, mahJongIndex)
+  ];
+  game.currentPlayerIndex = 0;
+  
   game.state = 'playing';
   
   return { success: true, game };
+}
+
+/**
+ * Finds the current winning (highest) play in the trick.
+ * You must beat the last card played (current highest), not the lead card.
+ * @param {Array} currentTrick - Array of { playerId, cards, combination }
+ * @returns {Object|null} The play entry with the highest combination, or null if trick is empty
+ */
+function getCurrentWinningPlay(currentTrick) {
+  if (!currentTrick || currentTrick.length === 0) return null;
+  
+  let winningPlay = currentTrick[0];
+  
+  for (let i = 1; i < currentTrick.length; i++) {
+    const play = currentTrick[i];
+    const comparison = compareCombinations(play.combination, winningPlay.combination);
+    // If this play beats the current winning play, it becomes the new leader
+    if (comparison === 1) {
+      winningPlay = play;
+    }
+  }
+  
+  return winningPlay;
 }
 
 /**
@@ -279,9 +329,23 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     // The wish stays active for the next player
     game.passedPlayers.push(playerId);
     
-    // Check if all players passed
-    if (game.passedPlayers.length === game.players.length) {
-      // Start new trick
+    // Check if all players who haven't played have passed
+    // If all non-playing players have passed, the current highest play wins the trick
+    // passedPlayers.length should equal: total players - players who have played
+    const playersWhoPlayed = game.currentTrick.length;
+    const playersWhoShouldPass = game.players.length - playersWhoPlayed;
+    if (game.currentTrick.length > 0 && game.passedPlayers.length === playersWhoShouldPass) {
+      const winningPlay = getCurrentWinningPlay(game.currentTrick);
+      if (winningPlay) {
+        const result = winTrick(game, winningPlay.playerId);
+        return { ...result, newTrick: true };
+      }
+      // Fallback: if no winning play found, use the lead player
+      const leadPlayerId = game.currentTrick[0]?.playerId;
+      if (leadPlayerId) {
+        const result = winTrick(game, leadPlayerId);
+        return { ...result, newTrick: true };
+      }
       startNewTrick(game);
       return { success: true, game, newTrick: true };
     }
@@ -322,18 +386,16 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
     
     // If there's already a bomb in the trick, the new bomb must beat it
-    // Only bombs can beat bombs
+    // Only bombs can beat bombs - compare against current HIGHEST play, not the lead
     if (game.currentTrick.length > 0) {
-      const currentTrickCombo = game.currentTrick[0].combination;
-      
-      // If current trick has a bomb, new bomb must beat it
-      if (currentTrickCombo.type === 'bomb') {
-        const comparison = compareCombinations(validation, currentTrickCombo);
+      const winningPlay = getCurrentWinningPlay(game.currentTrick);
+      if (winningPlay && winningPlay.combination.type === 'bomb') {
+        const comparison = compareCombinations(validation, winningPlay.combination);
         if (comparison === null || comparison <= 0) {
           return { success: false, error: 'Must play a higher bomb to beat the current bomb' };
         }
       }
-      // If current trick doesn't have a bomb, any bomb can beat it (bomb beats everything)
+      // If current highest isn't a bomb, any bomb can beat it (bomb beats everything)
     }
     
     // Remove cards from hand first
@@ -348,7 +410,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
     
     // Bomb can be played out of turn - add to current trick (interrupts it)
-    // The bomb wins the trick immediately, including all previous cards in the trick
+    // After a bomb is played, other players still have a chance to play a higher bomb
     game.currentTrick.push({
       playerId,
       cards,
@@ -358,10 +420,10 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     // Clear passed players (bomb interrupts)
     game.passedPlayers = [];
     
-    // Set bomb player as new lead
+    // Set bomb player as new lead (for next trick, if this bomb wins)
     game.leadPlayer = playerId;
     
-    // Update turn order to start from bomb player for next trick
+    // Update turn order to start from bomb player
     const bombPlayerIndex = game.turnOrder.findIndex(p => p.id === playerId);
     if (bombPlayerIndex !== -1) {
       game.turnOrder = [
@@ -370,14 +432,31 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       ];
     }
     
-    // Check if player won (empty hand)
-    if (hand.length === 0) {
-      return handlePlayerWin(game, playerId);
+    // Mark that player has played their first card (can no longer declare Tichu)
+    if (!game.firstCardPlayed[playerId]) {
+      game.firstCardPlayed[playerId] = true;
     }
     
-    // Bomb wins the trick immediately - includes all cards in current trick (previous cards + bomb)
-    const trickResult = winTrick(game, playerId);
-    return { ...trickResult, bombPlayed: true };
+    // Check if player went out (empty hand)
+    if (hand.length === 0) {
+      // Player went out but trick continues (others can still play higher bomb)
+      const winResult = handlePlayerWin(game, playerId);
+      if (!game.roundEnded) {
+        // Advance to next player to give others a chance to play a higher bomb
+        // Bomb player is now at index 0, set to 0 and advanceTurn will skip to next valid player
+        game.currentPlayerIndex = 0;
+        advanceTurn(game); // This will skip the bomb player (who went out) and find next valid player
+        return { ...winResult, success: true, game, bombPlayed: true, playerWon: true };
+      }
+      return { ...winResult, bombPlayed: true, playerWon: true };
+    }
+    
+    // Advance to next player to give others a chance to play a higher bomb
+    // Bomb player is now at index 0, set to 0 and advanceTurn will move to next player (index 1)
+    game.currentPlayerIndex = 0;
+    advanceTurn(game); // This will move to index 1 (next player after bomb player)
+    
+    return { success: true, game, bombPlayed: true };
   }
   
   // Normal turn validation (not a bomb)
@@ -397,16 +476,22 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
   }
   
-  // If there's a current trick, validate the move beats it
+  // If there's a current trick, validate the move beats the CURRENT HIGHEST play
+  // (not the lead card - you must beat the last card played / current leader)
   if (game.currentTrick.length > 0) {
-    const currentTrickCombo = game.currentTrick[0].combination;
+    const winningPlay = getCurrentWinningPlay(game.currentTrick);
+    const currentWinningCombo = winningPlay ? winningPlay.combination : null;
+    
+    if (!currentWinningCombo) {
+      return { success: false, error: 'Invalid trick state' };
+    }
     
     // Only bombs can beat bombs
-    if (currentTrickCombo.type === 'bomb' && validation.type !== 'bomb') {
+    if (currentWinningCombo.type === 'bomb' && validation.type !== 'bomb') {
       return { success: false, error: 'Only a bomb can beat a bomb. You must play a bomb or pass' };
     }
     
-    const comparison = compareCombinations(validation, currentTrickCombo);
+    const comparison = compareCombinations(validation, currentWinningCombo);
     
     if (comparison === null || comparison <= 0) {
       return { success: false, error: 'Must play a higher combination or pass' };
@@ -502,31 +587,58 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     combination: validation
   });
   
-  // Handle wish fulfillment - wish is cleared when the wished card is played as a single
+  // Handle wish fulfillment - wish is cleared when:
+  // 1. The exact wished card is played as a single, OR
+  // 2. Any card is played that beats Mah Jong (value 1)
   if (game.mahJongWish && game.mahJongWish.mustPlay) {
-    // Check if the played card fulfills the wish
+    // Check if the exact wished card is played
     if (validation.type === 'single' && cards[0].type === 'standard' && 
         cards[0].rank === game.mahJongWish.wishedRank) {
-      // Wish fulfilled, clear it
+      // Exact wished card played, clear wish
       game.mahJongWish = null;
+    } else {
+      // Check if the played card beats Mah Jong (value 1)
+      // Mah Jong is the first card in the trick when wish is active
+      // Note: currentTrick already includes the new card at this point
+      if (game.currentTrick.length >= 1) {
+        const mahJongPlay = game.currentTrick.find(play => 
+          play.combination.type === 'single' && play.cards[0].name === 'mahjong'
+        );
+        if (mahJongPlay) {
+          // Compare the played card with Mah Jong
+          const comparison = compareCombinations(validation, mahJongPlay.combination);
+          if (comparison === 1) {
+            // Played card beats Mah Jong, wish is fulfilled/cleared
+            game.mahJongWish = null;
+          }
+        }
+      }
     }
   }
   
-  // Check if player won (empty hand)
+  // Check if player went out (empty hand) - handle this first
   if (hand.length === 0) {
-    return handlePlayerWin(game, playerId);
-  }
-  
-  // Check if this is the only play in the trick (all others passed)
-  if (game.passedPlayers.length === game.players.length - 1) {
-    // Current player wins the trick
-    return winTrick(game, playerId);
+    // Check if all others passed before going out
+    if (game.passedPlayers.length === game.players.length - 1) {
+      // Win the trick first, then handle going out
+      const trickResult = winTrick(game, playerId);
+      const winResult = handlePlayerWin(game, playerId);
+      return { ...trickResult, ...winResult, playerWon: true };
+    }
+    // Player went out but trick continues
+    const winResult = handlePlayerWin(game, playerId);
+    if (!game.roundEnded) {
+      advanceTurn(game);
+      return { ...winResult, success: true, game, playerWon: true };
+    }
+    return winResult;
   }
   
   // Clear passed players (new play resets passes)
   game.passedPlayers = [];
   
-  // Move to next player
+  // Move to next player (skips those who have gone out)
+  // Note: If all others pass, the check happens in the pass handler, not here
   advanceTurn(game);
   
   // Wish stays active until the wished card is played
@@ -569,61 +681,138 @@ function handleSpecialCards(game, playerId, cards, combination) {
 
 /**
  * Advances to the next player's turn
+ * Skips players who have passed AND players who have gone out (no cards left)
  */
 function advanceTurn(game) {
   game.currentPlayerIndex = (game.currentPlayerIndex + 1) % game.turnOrder.length;
   
-  // Skip players who have passed
-  while (game.passedPlayers.includes(game.turnOrder[game.currentPlayerIndex].id)) {
-    game.currentPlayerIndex = (game.currentPlayerIndex + 1) % game.turnOrder.length;
+  const turnOrder = game.turnOrder;
+  let attempts = 0;
+  const maxAttempts = turnOrder.length; // Prevent infinite loop
+  
+  while (attempts < maxAttempts) {
+    const currentId = turnOrder[game.currentPlayerIndex].id;
+    const hasPassed = game.passedPlayers.includes(currentId);
+    const hasGoneOut = game.playersOut && game.playersOut.includes(currentId);
+    const hasNoCards = !game.hands[currentId] || game.hands[currentId].length === 0;
+    
+    if (!hasPassed && !hasGoneOut && !hasNoCards) {
+      break; // Found a player who can act
+    }
+    game.currentPlayerIndex = (game.currentPlayerIndex + 1) % turnOrder.length;
+    attempts++;
   }
+}
+
+/**
+ * Gets the next player in turn order who still has cards (not in playersOut)
+ * Used when lead player has gone out - lead passes to next player with cards
+ */
+function getNextPlayerWithCards(game, startPlayerId) {
+  const turnOrder = game.turnOrder;
+  const startIndex = turnOrder.findIndex(p => p.id === startPlayerId);
+  
+  for (let i = 1; i <= turnOrder.length; i++) {
+    const idx = (startIndex + i) % turnOrder.length;
+    const playerId = turnOrder[idx].id;
+    const hasGoneOut = game.playersOut && game.playersOut.includes(playerId);
+    const hasNoCards = !game.hands[playerId] || game.hands[playerId].length === 0;
+    
+    if (!hasGoneOut && !hasNoCards) {
+      return turnOrder[idx];
+    }
+  }
+  return null; // All players have gone out
 }
 
 /**
  * Starts a new trick
+ * If the lead player has gone out (no cards), lead passes to next player with cards
  */
 function startNewTrick(game) {
   game.currentTrick = [];
   game.passedPlayers = [];
+  
+  // If lead player has gone out, pass lead to next player with cards (rulebook)
+  const leadHasNoCards = !game.hands[game.leadPlayer] || game.hands[game.leadPlayer].length === 0;
+  if (leadHasNoCards) {
+    const nextPlayer = getNextPlayerWithCards(game, game.leadPlayer);
+    if (nextPlayer) {
+      game.leadPlayer = nextPlayer.id;
+    }
+  }
+  
   game.currentPlayerIndex = game.turnOrder.findIndex(p => p.id === game.leadPlayer);
+  
+  // If current player has gone out (edge case), advance to next with cards
+  const currentId = game.turnOrder[game.currentPlayerIndex]?.id;
+  if (currentId && (game.playersOut?.includes(currentId) || !game.hands[currentId]?.length)) {
+    const nextPlayer = getNextPlayerWithCards(game, currentId);
+    if (nextPlayer) {
+      game.currentPlayerIndex = game.turnOrder.findIndex(p => p.id === nextPlayer.id);
+    }
+  }
+  
   // Wish persists across tricks until the wished card is played
-  // Don't clear wish here - it will be cleared when the wished card is actually played
 }
 
 /**
  * Handles when a player wins a trick
+ * Cards are added to player's stack (not immediately scored)
  */
 function winTrick(game, winnerId) {
   const winner = game.players.find(p => p.id === winnerId);
   
-  // Calculate points from trick
+  // Collect all cards from the trick
+  const trickCards = [];
   let trickPoints = 0;
   for (const play of game.currentTrick) {
     for (const card of play.cards) {
+      trickCards.push(card);
       trickPoints += getCardPoints(card);
     }
   }
   
-  // Handle Dragon special rule
+  // Handle Dragon special rule: winner must give trick to opponent
+  let actualWinnerId = winnerId;
   if (game.dragonPlayed && game.dragonPlayed.playerId === winnerId) {
-    // Dragon winner must give trick to opponent
     const opponents = game.players.filter(p => p.team !== winner.team);
-    const opponent = opponents[0]; // Give to first opponent
-    game.roundScores[`team${opponent.team}`] += trickPoints;
-  } else {
-    game.roundScores[`team${winner.team}`] += trickPoints;
+    actualWinnerId = opponents[0]?.id || winnerId; // Give to first opponent
   }
+  
+  // Add cards to winner's stack (not immediately scored - scored at round end)
+  if (!game.playerStacks[actualWinnerId]) {
+    game.playerStacks[actualWinnerId] = { cards: [], points: 0 };
+  }
+  game.playerStacks[actualWinnerId].cards.push(...trickCards);
+  game.playerStacks[actualWinnerId].points += trickPoints;
   
   // Store trick
   game.trickHistory.push({
     plays: [...game.currentTrick],
     winner: winnerId,
+    actualWinner: actualWinnerId, // May differ if Dragon was played
     points: trickPoints
   });
   
   // Set winner as new lead player
   game.leadPlayer = winnerId;
   game.dragonPlayed = null; // Clear dragon flag
+  
+  // Clear Mah Jong wish if Mah Jong didn't win the trick
+  // (If Mah Jong won, the wish would have been cleared when the wished card was played)
+  if (game.mahJongWish && game.mahJongWish.mustPlay) {
+    const mahJongInTrick = game.currentTrick.some(play => 
+      play.cards.some(c => c.name === 'mahjong')
+    );
+    if (mahJongInTrick && winnerId !== game.currentTrick.find(play => 
+      play.cards.some(c => c.name === 'mahjong')
+    )?.playerId) {
+      // Mah Jong was in the trick but didn't win, so wish is cleared
+      game.mahJongWish = null;
+    }
+  }
+  
   startNewTrick(game);
   
   return { success: true, game, trickWon: true, winner: winnerId };
@@ -646,8 +835,45 @@ function handlePlayerWin(game, playerId) {
     const secondPlayer = game.players.find(p => p.id === game.playersOut[1]);
     
     if (firstPlayer && secondPlayer && firstPlayer.team === secondPlayer.team) {
-      // Double victory! Team gets 200 points, skip counting
+      // Double victory! Team gets 200 points, skip counting cards
+      // Add remaining players to playersOut (they're last)
+      const remainingPlayers = game.players.filter(p => !game.playersOut.includes(p.id));
+      remainingPlayers.forEach(p => {
+        if (!game.playersOut.includes(p.id)) {
+          game.playersOut.push(p.id);
+        }
+        // Add their remaining cards to stack (0 points)
+        const remainingCards = game.hands[p.id] || [];
+        if (!game.playerStacks[p.id]) {
+          game.playerStacks[p.id] = { cards: [], points: 0 };
+        }
+        game.playerStacks[p.id].cards.push(...remainingCards);
+      });
+      
+      // Double victory: winning team gets 200 points, losing team gets 0 (card points don't count)
+      game.roundScores = { team1: 0, team2: 0 };
+      
+      // Set winning team to 200 points (base for double victory)
       game.roundScores[`team${firstPlayer.team}`] = 200;
+      
+      // Apply Tichu bonuses/penalties
+      for (const p of game.players) {
+        // Successful Tichu declarations (winning team only, since they finished)
+        if (game.tichuDeclarations[p.id] && game.playersOut.includes(p.id)) {
+          game.roundScores[`team${p.team}`] += 100;
+        }
+        if (game.grandTichuDeclarations[p.id] && game.playersOut.includes(p.id)) {
+          game.roundScores[`team${p.team}`] += 200;
+        }
+        // Failed Tichu declarations (losing team only, since they didn't finish)
+        if (game.tichuDeclarations[p.id] && !game.playersOut.includes(p.id)) {
+          game.roundScores[`team${p.team}`] -= 100;
+        }
+        if (game.grandTichuDeclarations[p.id] && !game.playersOut.includes(p.id)) {
+          game.roundScores[`team${p.team}`] -= 200;
+        }
+      }
+      
       game.roundEnded = true;
       game.state = 'round-ended';
       
@@ -668,58 +894,79 @@ function handlePlayerWin(game, playerId) {
     }
   }
   
-  // Check if round should end (only one player has cards left)
-  const playersWithCards = game.players.filter(p => 
-    (game.hands[p.id] && game.hands[p.id].length > 0) || 
-    !game.playersOut.includes(p.id)
-  );
+  // Check if round should end (only one player has cards left = tailender)
+  const playersWithCards = game.players.filter(p => !game.playersOut.includes(p.id));
   
   if (playersWithCards.length === 1) {
-    // Round ends - handle last player penalty
+    // Round ends - add last player to playersOut
     const lastPlayer = playersWithCards[0];
-    const lastPlayerObj = game.players.find(p => p.id === lastPlayer.id);
-    const winner = game.players.find(p => p.id === game.playersOut[0]);
+    if (!game.playersOut.includes(lastPlayer.id)) {
+      game.playersOut.push(lastPlayer.id);
+    }
     
-    // Last player gives remaining cards to opponents and tricks to winner
-    // (This is handled in scoring - remaining cards count as 0 points, but go to opponents)
-    // Tricks are already scored, but we need to ensure they go to the winner's team
+    // Add last player's remaining cards to their stack (they go to opponents, but count as 0 points)
+    const remainingCards = game.hands[lastPlayer.id] || [];
+    if (!game.playerStacks[lastPlayer.id]) {
+      game.playerStacks[lastPlayer.id] = { cards: [], points: 0 };
+    }
+    game.playerStacks[lastPlayer.id].cards.push(...remainingCards);
+    // Remaining cards count as 0 points (already initialized)
+    
     game.roundEnded = true;
     game.state = 'round-ended';
   }
   
-  // Check Tichu declarations
-  let tichuBonus = 0;
-  if (game.tichuDeclarations[playerId]) {
-    tichuBonus = 100;
-    game.roundScores[`team${player.team}`] += tichuBonus;
-  }
-  if (game.grandTichuDeclarations[playerId]) {
-    tichuBonus = 200;
-    game.roundScores[`team${player.team}`] += tichuBonus;
-  }
-  
-  // Check if other players failed Tichu
-  for (const [pid, declared] of Object.entries(game.tichuDeclarations)) {
-    if (declared && pid !== playerId) {
-      const failedPlayer = game.players.find(p => p.id === pid);
-      game.roundScores[`team${failedPlayer.team}`] -= 100;
-    }
-  }
-  for (const [pid, declared] of Object.entries(game.grandTichuDeclarations)) {
-    if (declared && pid !== playerId) {
-      const failedPlayer = game.players.find(p => p.id === pid);
-      game.roundScores[`team${failedPlayer.team}`] -= 200;
-    }
-  }
-  
   // If round hasn't ended yet, continue playing
   if (!game.roundEnded) {
-    return { success: true, game, playerWon: true, tichuBonus };
+    return { success: true, game, playerWon: true };
   }
   
   // Round ended - finalize scoring
-  // Last player's remaining cards go to opponents (count as 0 points but are given to opponents)
-  // Last player's tricks go to winner (already scored in winTrick)
+  // Finish order: playersOut[0] = 1st, playersOut[1] = 2nd, playersOut[2] = 3rd, playersOut[3] = 4th (last)
+  
+  // Last place penalty: last player gives all their points to first place
+  if (game.playersOut.length === 4) {
+    const firstPlaceId = game.playersOut[0];
+    const lastPlaceId = game.playersOut[3];
+    
+    if (game.playerStacks[lastPlaceId] && game.playerStacks[lastPlaceId].points > 0) {
+      const lastPlacePoints = game.playerStacks[lastPlaceId].points;
+      // Transfer points from last to first
+      if (!game.playerStacks[firstPlaceId]) {
+        game.playerStacks[firstPlaceId] = { cards: [], points: 0 };
+      }
+      game.playerStacks[firstPlaceId].points += lastPlacePoints;
+      game.playerStacks[lastPlaceId].points = 0; // Last place gets 0 points
+    }
+  }
+  
+  // Calculate team scores from player stacks
+  game.roundScores = { team1: 0, team2: 0 };
+  for (const player of game.players) {
+    const stack = game.playerStacks[player.id];
+    if (stack) {
+      game.roundScores[`team${player.team}`] += stack.points;
+    }
+  }
+  
+  // Apply Tichu bonuses/penalties
+  for (const player of game.players) {
+    // Successful Tichu declarations
+    if (game.tichuDeclarations[player.id] && game.playersOut.includes(player.id)) {
+      game.roundScores[`team${player.team}`] += 100;
+    }
+    if (game.grandTichuDeclarations[player.id] && game.playersOut.includes(player.id)) {
+      game.roundScores[`team${player.team}`] += 200;
+    }
+    
+    // Failed Tichu declarations (declared but didn't finish)
+    if (game.tichuDeclarations[player.id] && !game.playersOut.includes(player.id)) {
+      game.roundScores[`team${player.team}`] -= 100;
+    }
+    if (game.grandTichuDeclarations[player.id] && !game.playersOut.includes(player.id)) {
+      game.roundScores[`team${player.team}`] -= 200;
+    }
+  }
   
   // Update total scores
   game.scores.team1 += game.roundScores.team1;
@@ -734,7 +981,7 @@ function handlePlayerWin(game, playerId) {
     initializeGame(game);
   }
   
-  return { success: true, game, playerWon: true, tichuBonus, roundEnded: true };
+  return { success: true, game, playerWon: true, roundEnded: true };
 }
 
 /**
@@ -742,11 +989,11 @@ function handlePlayerWin(game, playerId) {
  */
 function getPlayerView(game, playerId) {
   const view = { ...game };
-  
+
   // Only show this player's hand
   view.hands = {};
   view.hands[playerId] = game.hands[playerId];
-  
+
   // Hide other players' hands but show count
   view.handCounts = {};
   game.players.forEach(player => {
@@ -754,7 +1001,12 @@ function getPlayerView(game, playerId) {
       view.handCounts[player.id] = game.hands[player.id]?.length || 0;
     }
   });
-  
+
+  // During exchange, include who you pass each card to (order: 1st, 2nd, 3rd recipient)
+  if (game.state === 'exchanging') {
+    view.exchangeRecipients = getExchangeRecipients(game, playerId);
+  }
+
   return view;
 }
 

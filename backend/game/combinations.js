@@ -164,18 +164,20 @@ function validateSequenceOfPairs(cards) {
     }
   }
   
-  // Get the highest rank for comparison
-  const highestRank = ranks
-    .filter(r => r !== 'phoenix')
-    .map(r => getCardValue(r))
-    .sort((a, b) => b - a)[0];
+  // Highest value for comparison: when Phoenix is the top of the sequence, it's max+1
+  const maxVal = Math.max(...rankValues);
+  const highestValue = hasPhoenix ? maxVal + 1 : maxVal;
+  // Rank string for compareRanks (when no Phoenix, or when we have the rank)
+  const rankKeys = Object.keys(rankGroups).filter(r => r !== 'phoenix');
+  const highestRank = rankKeys.find(r => getCardValue(r) === maxVal) || rankKeys[rankKeys.length - 1];
   
   return { 
     valid: true, 
     type: 'sequence-of-pairs', 
     cards, 
     numPairs,
-    highestRank: Object.keys(rankGroups).find(r => getCardValue(r) === highestRank) || ranks[ranks.length - 1]
+    highestRank,
+    highestValue  // Use for comparison when Phoenix is present (covers rank not in hand)
   };
 }
 
@@ -196,7 +198,21 @@ function validateFullHouse(cards) {
   // With Phoenix: can help form either the triple or pair
   if (counts.length === 2 && ((counts[0] === 3 && counts[1] === 2) || 
       (counts[0] === 2 && counts[1] === 2 && phoenixCount === 1))) {
-    return { valid: true, type: 'fullhouse', cards };
+    // Rulebook: "in full houses the value of the trio is what counts"
+    // Find the triple rank (the one that appears 3 times, or with Phoenix: the higher of the two when 2+2+P)
+    let tripleRank = null;
+    for (const [rank, count] of Object.entries(rankCounts)) {
+      if (count === 3) {
+        tripleRank = rank;
+        break;
+      }
+    }
+    // 2+2+Phoenix: Phoenix completes one to 3; use the higher rank as the triple for comparison
+    if (!tripleRank && phoenixCount === 1) {
+      const pairRanks = Object.entries(rankCounts).filter(([, c]) => c === 2).map(([r]) => r);
+      tripleRank = pairRanks.sort((a, b) => getCardValue(b) - getCardValue(a))[0];
+    }
+    return { valid: true, type: 'fullhouse', cards, tripleRank };
   }
   
   return { valid: false };
@@ -236,13 +252,29 @@ function validateStraight(cards) {
     }
   }
   
-  return { valid: true, type: 'straight', cards, length: cards.length, hasMahJong };
+  // Highest card in straight (for comparison): rulebook says compare by highest card
+  // When Phoenix is present, it can fill the top slot ONLY if max+1 <= 14 (Ace is highest)
+  // e.g. Phoenix,A,K,Q,J can only form 10-J-Q-K-A (Phoenix=10); cannot beat A,K,Q,J,10
+  const ACE_VALUE = 14;
+  const hasPhoenix = cards.some(c => c.name === 'phoenix');
+  const maxVal = Math.max(...values);
+  let highestValue = maxVal;
+  if (hasPhoenix && values.length === cards.length - 1 && maxVal < ACE_VALUE) {
+    highestValue = maxVal + 1;  // Phoenix can be the top only when it's not above Ace
+  }
+  
+  return { valid: true, type: 'straight', cards, length: cards.length, hasMahJong, highestValue };
 }
 
 function validateBomb(cards) {
   if (cards.length !== 4) return { valid: false };
   
-  const ranks = cards.map(c => c.rank || c.name).filter(r => r !== 'phoenix');
+  // Phoenix cannot be used to make a bomb (rulebook: "may not be used to make a bomb!")
+  if (cards.some(c => c.name === 'phoenix')) {
+    return { valid: false };
+  }
+  
+  const ranks = cards.map(c => c.rank || c.name);
   const uniqueRanks = new Set(ranks);
   
   if (uniqueRanks.size === 1) {
@@ -325,14 +357,22 @@ function compareCombinations(combo1, combo2) {
     case 'triple':
       return compareRanks(combo1.rank, combo2.rank);
     case 'sequence-of-pairs':
-      // Must have same number of pairs
+      // Must have same number of pairs: "sequence of two pairs only by a sequence of two higher pairs"
       if (combo1.numPairs !== combo2.numPairs) return null;
-      return compareRanks(combo1.highestRank, combo2.highestRank);
+      // Use highestValue when present (handles Phoenix as top); else fall back to highestRank
+      const seqHigh1 = combo1.highestValue != null ? combo1.highestValue : getCardValue(combo1.highestRank);
+      const seqHigh2 = combo2.highestValue != null ? combo2.highestValue : getCardValue(combo2.highestRank);
+      return seqHigh1 > seqHigh2 ? 1 : seqHigh1 < seqHigh2 ? -1 : 0;
     case 'straight':
+      // Must be same length: "a sequence of eight cards only by a higher sequence of exactly eight cards"
       if (combo1.length !== combo2.length) return null;
-      return compareStraights(combo1.cards, combo2.cards);
+      // Compare by highest card in the straight (includes Mah Jong=1, Phoenix as top when applicable)
+      const high1 = combo1.highestValue != null ? combo1.highestValue : getStraightHighFallback(combo1.cards);
+      const high2 = combo2.highestValue != null ? combo2.highestValue : getStraightHighFallback(combo2.cards);
+      return high1 > high2 ? 1 : high1 < high2 ? -1 : 0;
     case 'fullhouse':
-      return compareFullHouses(combo1.cards, combo2.cards);
+      // Rulebook: "in full houses the value of the trio is what counts" - pair is irrelevant
+      return compareRanks(combo1.tripleRank, combo2.tripleRank);
     default:
       return null;
   }
@@ -410,18 +450,25 @@ function compareRanks(rank1, rank2) {
   return val1 > val2 ? 1 : val1 < val2 ? -1 : 0;
 }
 
-function compareStraights(cards1, cards2) {
-  // Compare highest card in straight
-  const high1 = Math.max(...cards1.filter(c => c.type === 'standard').map(c => getCardValue(c.rank)));
-  const high2 = Math.max(...cards2.filter(c => c.type === 'standard').map(c => getCardValue(c.rank)));
-  return high1 > high2 ? 1 : high1 < high2 ? -1 : 0;
+/**
+ * Fallback to compute highest card value in a straight when highestValue not on combo.
+ * Handles Mah Jong (1), Phoenix (as top when it fills the high end), and standard cards.
+ */
+function getStraightHighFallback(cards) {
+  const ACE_VALUE = 14;
+  const vals = cards
+    .map(c => c.name === 'mahjong' ? 1 : (c.type === 'standard' ? getCardValue(c.rank) : null))
+    .filter(v => v != null);
+  if (vals.length === 0) return 0;
+  const maxVal = Math.max(...vals);
+  const hasPhoenix = cards.some(c => c.name === 'phoenix');
+  // Phoenix cannot be above Ace: Phoenix,A,K,Q,J only forms 10-J-Q-K-A, cannot beat A,K,Q,J,10
+  if (hasPhoenix && vals.length === cards.length - 1 && maxVal < ACE_VALUE) {
+    return maxVal + 1;
+  }
+  return maxVal;
 }
 
-function compareFullHouses(cards1, cards2) {
-  // Compare the triple rank
-  // TODO: Implement full house comparison
-  return 0;
-}
 
 module.exports = {
   validateCombination,
