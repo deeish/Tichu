@@ -307,6 +307,17 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   
   // Handle pass action (cannot be a bomb)
   if (action === 'pass') {
+    // Check turn order for pass
+    const currentPlayer = game.turnOrder[game.currentPlayerIndex];
+    if (currentPlayer.id !== playerId) {
+      return { success: false, error: 'Not your turn' };
+    }
+    
+    // Lead player cannot pass - they must play a card to start the trick
+    if (game.currentTrick.length === 0 && game.leadPlayer === playerId) {
+      return { success: false, error: 'You are the lead player and must play a card to start the trick (cannot pass)' };
+    }
+    
     // Check if there's an active wish that must be fulfilled
     if (game.mahJongWish && game.mahJongWish.mustPlay) {
       const hand = game.hands[playerId];
@@ -319,21 +330,18 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       }
     }
     
-    // Check turn order for pass
-    const currentPlayer = game.turnOrder[game.currentPlayerIndex];
-    if (currentPlayer.id !== playerId) {
-      return { success: false, error: 'Not your turn' };
-    }
-    
     // If there's a wish but player doesn't have the card, they can pass
     // The wish stays active for the next player
     game.passedPlayers.push(playerId);
     
     // Check if all players who haven't played have passed
     // If all non-playing players have passed, the current highest play wins the trick
-    // passedPlayers.length should equal: total players - players who have played
+    // Need to exclude players who have gone out from the calculation
     const playersWhoPlayed = game.currentTrick.length;
-    const playersWhoShouldPass = game.players.length - playersWhoPlayed;
+    const playersWhoHaveGoneOut = (game.playersOut && game.playersOut.length) || 0;
+    const playersWhoCanStillAct = game.players.length - playersWhoHaveGoneOut;
+    const playersWhoShouldPass = playersWhoCanStillAct - playersWhoPlayed;
+    
     if (game.currentTrick.length > 0 && game.passedPlayers.length === playersWhoShouldPass) {
       const winningPlay = getCurrentWinningPlay(game.currentTrick);
       if (winningPlay) {
@@ -341,6 +349,33 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
         return { ...result, newTrick: true };
       }
       // Fallback: if no winning play found, use the lead player
+      const leadPlayerId = game.currentTrick[0]?.playerId;
+      if (leadPlayerId) {
+        const result = winTrick(game, leadPlayerId);
+        return { ...result, newTrick: true };
+      }
+      startNewTrick(game);
+      return { success: true, game, newTrick: true };
+    }
+    
+    // Additional safety check: if all remaining players have passed, end the trick
+    // This prevents infinite loops when advanceTurn can't find a valid player
+    const remainingPlayers = game.players.filter(p => 
+      !game.playersOut?.includes(p.id) && 
+      game.hands[p.id] && 
+      game.hands[p.id].length > 0
+    );
+    const allRemainingHavePassed = remainingPlayers.length > 0 && 
+      remainingPlayers.every(p => game.passedPlayers.includes(p.id) || 
+        game.currentTrick.some(play => play.playerId === p.id));
+    
+    if (game.currentTrick.length > 0 && allRemainingHavePassed) {
+      const winningPlay = getCurrentWinningPlay(game.currentTrick);
+      if (winningPlay) {
+        const result = winTrick(game, winningPlay.playerId);
+        return { ...result, newTrick: true };
+      }
+      // Fallback: use lead player
       const leadPlayerId = game.currentTrick[0]?.playerId;
       if (leadPlayerId) {
         const result = winTrick(game, leadPlayerId);
@@ -390,9 +425,18 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     if (game.currentTrick.length > 0) {
       const winningPlay = getCurrentWinningPlay(game.currentTrick);
       if (winningPlay && winningPlay.combination.type === 'bomb') {
-        const comparison = compareCombinations(validation, winningPlay.combination);
+        const currentBomb = winningPlay.combination;
+        const comparison = compareCombinations(validation, currentBomb);
+        
         if (comparison === null || comparison <= 0) {
-          return { success: false, error: 'Must play a higher bomb to beat the current bomb' };
+          // Provide specific error message based on current bomb type
+          if (currentBomb.bombType === 'four-of-a-kind') {
+            return { success: false, error: 'Must play a higher four-of-a-kind or a straight flush to beat the current bomb' };
+          } else if (currentBomb.bombType === 'straight-flush') {
+            return { success: false, error: 'Must play a higher straight flush (longer or same length with higher value) to beat the current bomb' };
+          } else {
+            return { success: false, error: 'Must play a higher bomb to beat the current bomb' };
+          }
         }
       }
       // If current highest isn't a bomb, any bomb can beat it (bomb beats everything)
@@ -589,7 +633,10 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   
   // Handle wish fulfillment - wish is cleared when:
   // 1. The exact wished card is played as a single, OR
-  // 2. Any card is played that beats Mah Jong (value 1)
+  // 2. Any card is played after Mah Jong (as a single)
+  // Note: When Mah Jong is played as a single, it has NO value - its only role is to make a wish.
+  // The wish is for "the next card to be played" - once someone plays any card after Mah Jong,
+  // the wish is fulfilled/cleared, regardless of what card they played.
   if (game.mahJongWish && game.mahJongWish.mustPlay) {
     // Check if the exact wished card is played
     if (validation.type === 'single' && cards[0].type === 'standard' && 
@@ -597,20 +644,16 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       // Exact wished card played, clear wish
       game.mahJongWish = null;
     } else {
-      // Check if the played card beats Mah Jong (value 1)
-      // Mah Jong is the first card in the trick when wish is active
+      // Check if Mah Jong was played as a single in this trick (meaning someone is playing after it)
       // Note: currentTrick already includes the new card at this point
-      if (game.currentTrick.length >= 1) {
+      if (game.currentTrick.length >= 2) {
         const mahJongPlay = game.currentTrick.find(play => 
           play.combination.type === 'single' && play.cards[0].name === 'mahjong'
         );
         if (mahJongPlay) {
-          // Compare the played card with Mah Jong
-          const comparison = compareCombinations(validation, mahJongPlay.combination);
-          if (comparison === 1) {
-            // Played card beats Mah Jong, wish is fulfilled/cleared
-            game.mahJongWish = null;
-          }
+          // Someone played a card after Mah Jong (as a single) - wish is fulfilled/cleared
+          // Mah Jong as a single has no value, so any card played after it fulfills the wish
+          game.mahJongWish = null;
         }
       }
     }
@@ -662,10 +705,28 @@ function handleSpecialCards(game, playerId, cards, combination) {
     const player = game.players.find(p => p.id === playerId);
     const partner = game.players.find(p => p.team === player.team && p.id !== playerId);
     if (partner) {
-      game.leadPlayer = partner.id;
-      // Set turn to partner
-      const partnerIndex = game.turnOrder.findIndex(p => p.id === partner.id);
-      game.currentPlayerIndex = partnerIndex;
+      // Check if partner has cards and hasn't gone out
+      const partnerHasCards = game.hands[partner.id] && game.hands[partner.id].length > 0;
+      const partnerHasGoneOut = game.playersOut && game.playersOut.includes(partner.id);
+      
+      if (partnerHasCards && !partnerHasGoneOut) {
+        game.leadPlayer = partner.id;
+        // Set turn to partner
+        const partnerIndex = game.turnOrder.findIndex(p => p.id === partner.id);
+        if (partnerIndex !== -1) {
+          game.currentPlayerIndex = partnerIndex;
+        }
+      } else {
+        // Partner has no cards or has gone out, find next player with cards
+        const nextPlayer = getNextPlayerWithCards(game, partner.id);
+        if (nextPlayer) {
+          game.leadPlayer = nextPlayer.id;
+          const nextIndex = game.turnOrder.findIndex(p => p.id === nextPlayer.id);
+          if (nextIndex !== -1) {
+            game.currentPlayerIndex = nextIndex;
+          }
+        }
+      }
     }
   }
   
@@ -691,7 +752,12 @@ function advanceTurn(game) {
   const maxAttempts = turnOrder.length; // Prevent infinite loop
   
   while (attempts < maxAttempts) {
-    const currentId = turnOrder[game.currentPlayerIndex].id;
+    const currentId = turnOrder[game.currentPlayerIndex]?.id;
+    if (!currentId) {
+      // Safety check: if currentId is undefined, break to prevent errors
+      break;
+    }
+    
     const hasPassed = game.passedPlayers.includes(currentId);
     const hasGoneOut = game.playersOut && game.playersOut.includes(currentId);
     const hasNoCards = !game.hands[currentId] || game.hands[currentId].length === 0;
@@ -701,6 +767,30 @@ function advanceTurn(game) {
     }
     game.currentPlayerIndex = (game.currentPlayerIndex + 1) % turnOrder.length;
     attempts++;
+  }
+  
+  // Safety check: if we've exhausted all attempts and still can't find a valid player,
+  // it means all remaining players have passed or gone out
+  // This should be handled by the pass detection logic, but this prevents infinite loops
+  if (attempts >= maxAttempts) {
+    const currentId = turnOrder[game.currentPlayerIndex]?.id;
+    const hasPassed = currentId && game.passedPlayers.includes(currentId);
+    const hasGoneOut = currentId && game.playersOut && game.playersOut.includes(currentId);
+    const hasNoCards = !currentId || !game.hands[currentId] || game.hands[currentId].length === 0;
+    
+    // If we're stuck on a player who can't act, try to find any valid player
+    if (hasPassed || hasGoneOut || hasNoCards) {
+      for (let i = 0; i < turnOrder.length; i++) {
+        const playerId = turnOrder[i].id;
+        const canAct = !game.passedPlayers.includes(playerId) &&
+          (!game.playersOut || !game.playersOut.includes(playerId)) &&
+          game.hands[playerId] && game.hands[playerId].length > 0;
+        if (canAct) {
+          game.currentPlayerIndex = i;
+          break;
+        }
+      }
+    }
   }
 }
 
@@ -742,14 +832,25 @@ function startNewTrick(game) {
     }
   }
   
-  game.currentPlayerIndex = game.turnOrder.findIndex(p => p.id === game.leadPlayer);
-  
-  // If current player has gone out (edge case), advance to next with cards
-  const currentId = game.turnOrder[game.currentPlayerIndex]?.id;
-  if (currentId && (game.playersOut?.includes(currentId) || !game.hands[currentId]?.length)) {
-    const nextPlayer = getNextPlayerWithCards(game, currentId);
-    if (nextPlayer) {
-      game.currentPlayerIndex = game.turnOrder.findIndex(p => p.id === nextPlayer.id);
+  // Set current player index to lead player, but ensure they have cards
+  const leadPlayerIndex = game.turnOrder.findIndex(p => p.id === game.leadPlayer);
+  if (leadPlayerIndex !== -1) {
+    const leadPlayerId = game.turnOrder[leadPlayerIndex].id;
+    const leadHasCards = game.hands[leadPlayerId] && game.hands[leadPlayerId].length > 0;
+    const leadHasGoneOut = game.playersOut && game.playersOut.includes(leadPlayerId);
+    
+    if (leadHasCards && !leadHasGoneOut) {
+      game.currentPlayerIndex = leadPlayerIndex;
+    } else {
+      // Lead player has no cards or has gone out, find next player with cards
+      const nextPlayer = getNextPlayerWithCards(game, leadPlayerId);
+      if (nextPlayer) {
+        game.leadPlayer = nextPlayer.id;
+        const nextIndex = game.turnOrder.findIndex(p => p.id === nextPlayer.id);
+        if (nextIndex !== -1) {
+          game.currentPlayerIndex = nextIndex;
+        }
+      }
     }
   }
   

@@ -305,7 +305,9 @@ function validateStraightFlush(cards) {
   // Check if it's also a straight (but Phoenix is already excluded above)
   const straight = validateStraight(cards);
   if (straight.valid) {
-    return { valid: true, type: 'bomb', cards, bombType: 'straight-flush', length: cards.length };
+    // Store highestValue for comparison when straight flushes have same length
+    const highestValue = Math.max(...cards.filter(c => c.type === 'standard').map(c => getCardValue(c.rank)));
+    return { valid: true, type: 'bomb', cards, bombType: 'straight-flush', length: cards.length, highestValue };
   }
   
   return { valid: false };
@@ -335,11 +337,14 @@ function compareCombinations(combo1, combo2) {
     
     // Both are straight flush: compare by length first, then by highest card
     if (combo1.bombType === 'straight-flush' && combo2.bombType === 'straight-flush') {
+      // Length has priority: longer straight flush beats shorter one
       if (combo1.length > combo2.length) return 1;
       if (combo1.length < combo2.length) return -1;
-      // Same length: compare by highest card
-      const high1 = Math.max(...combo1.cards.filter(c => c.type === 'standard').map(c => getCardValue(c.rank)));
-      const high2 = Math.max(...combo2.cards.filter(c => c.type === 'standard').map(c => getCardValue(c.rank)));
+      // Same length: compare by highest card value
+      const high1 = combo1.highestValue != null ? combo1.highestValue : 
+        Math.max(...combo1.cards.filter(c => c.type === 'standard').map(c => getCardValue(c.rank)));
+      const high2 = combo2.highestValue != null ? combo2.highestValue : 
+        Math.max(...combo2.cards.filter(c => c.type === 'standard').map(c => getCardValue(c.rank)));
       return high1 > high2 ? 1 : high1 < high2 ? -1 : 0;
     }
   }

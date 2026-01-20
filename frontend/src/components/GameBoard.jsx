@@ -1,23 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Hand from './Hand';
 import Trick from './Trick';
 import GameInfo from './GameInfo';
+import Card from './Card';
 import { sortCardsByRank } from '../utils/cardUtils';
 import './GameBoard.css';
 
 function GameBoard({ game, socket, playerId }) {
   const [selectedCards, setSelectedCards] = useState([]);
   const [isMyTurn, setIsMyTurn] = useState(false);
-  const [sortMode, setSortMode] = useState('none'); // 'none', 'asc', 'desc', 'combinations'
+  const [sortMode, setSortMode] = useState('none'); // 'none', 'asc', 'desc'
   const [mahJongWish, setMahJongWish] = useState('');
   const [showWishInput, setShowWishInput] = useState(false);
+  // Exchange: [card for 1st recipient, 2nd, 3rd] – order matches game.exchangeRecipients
+  const [exchangeAssignments, setExchangeAssignments] = useState([null, null, null]);
 
   useEffect(() => {
     if (!game || !game.turnOrder) return;
-    
+
     const currentPlayer = game.turnOrder[game.currentPlayerIndex];
     setIsMyTurn(currentPlayer && currentPlayer.id === playerId);
   }, [game, playerId]);
+
+  // Reset exchange assignments when leaving exchange phase
+  useEffect(() => {
+    if (game?.state !== 'exchanging') {
+      setExchangeAssignments([null, null, null]);
+    }
+  }, [game?.state]);
 
   // Check if selected cards form a bomb (4 of a kind OR straight flush)
   const isBomb = () => {
@@ -47,32 +57,47 @@ function GameBoard({ game, socket, playerId }) {
   };
 
   const handleCardClick = (card) => {
-    // Allow card selection during exchange phase or playing phase
-    // During playing phase, allow selection even if not your turn (for bombs)
-    const canSelect = game.state === 'exchanging' || game.state === 'playing';
+    // Exchange: clicking a card assigns it to the first empty "To [recipient]" slot
+    if (game.state === 'exchanging') {
+      setExchangeAssignments(prev => {
+        const i = prev.findIndex(x => !x);
+        if (i === -1) return prev;
+        const n = [...prev];
+        n[i] = card;
+        return n;
+      });
+      return;
+    }
+
+    // Playing: allow selection (and bombs out of turn)
+    const canSelect = game.state === 'playing';
     if (!canSelect) return;
 
-    const isSelected = selectedCards.some(selected => 
+    const isSelected = selectedCards.some(selected =>
       selected.type === card.type &&
-      (selected.type === 'standard' 
+      (selected.type === 'standard'
         ? selected.suit === card.suit && selected.rank === card.rank
         : selected.name === card.name)
     );
 
     if (isSelected) {
-      setSelectedCards(selectedCards.filter(selected => 
+      setSelectedCards(selectedCards.filter(selected =>
         !(selected.type === card.type &&
-          (selected.type === 'standard' 
+          (selected.type === 'standard'
             ? selected.suit === card.suit && selected.rank === card.rank
             : selected.name === card.name))
       ));
     } else {
-      // During exchange, limit to 3 cards
-      if (game.state === 'exchanging' && selectedCards.length >= 3) {
-        return; // Can't select more than 3 cards for exchange
-      }
       setSelectedCards([...selectedCards, card]);
     }
+  };
+
+  const handleRemoveFromSlot = (i) => {
+    setExchangeAssignments(prev => {
+      const n = [...prev];
+      n[i] = null;
+      return n;
+    });
   };
 
   const handlePlayCards = () => {
@@ -122,13 +147,12 @@ function GameBoard({ game, socket, playerId }) {
   };
 
   const handleExchangeCards = () => {
-    if (selectedCards.length !== 3) {
-      alert('You must select exactly 3 cards to exchange');
+    if (exchangeAssignments.some(x => !x)) {
+      alert('Assign 1 card to each recipient: click cards from your hand for each "To" slot.');
       return;
     }
-    
-    socket.emit('exchange-cards', selectedCards);
-    setSelectedCards([]);
+    socket.emit('exchange-cards', exchangeAssignments);
+    setExchangeAssignments([null, null, null]);
   };
 
   if (!game) {
@@ -136,21 +160,25 @@ function GameBoard({ game, socket, playerId }) {
   }
 
   const myHand = game.hands[playerId] || [];
-  
-  // Apply sorting based on sortMode
-  let displayHand = myHand;
-  
-  try {
-    if (sortMode === 'asc' && myHand.length > 0) {
-      displayHand = sortCardsByRank(myHand, true);
-    } else if (sortMode === 'desc' && myHand.length > 0) {
-      displayHand = sortCardsByRank(myHand, false);
+  const exchangeRecipients = game.exchangeRecipients || [];
+
+  // During exchange, exclude cards already assigned to "To" slots
+  const displayHand = useMemo(() => {
+    if (!myHand || myHand.length === 0) return myHand || [];
+    let base = myHand;
+    if (game.state === 'exchanging' && exchangeAssignments.some(Boolean)) {
+      const assigned = exchangeAssignments.filter(Boolean);
+      base = myHand.filter(c => !assigned.includes(c));
     }
-  } catch (error) {
-    console.error('Error sorting cards:', error);
-    // Fall back to original hand if there's an error
-    displayHand = myHand;
-  }
+    try {
+      if (sortMode === 'asc') return sortCardsByRank(base, true);
+      if (sortMode === 'desc') return sortCardsByRank(base, false);
+      return base;
+    } catch (error) {
+      console.error('Error sorting cards:', error);
+      return base;
+    }
+  }, [myHand, sortMode, game?.state, exchangeAssignments]);
   
   const currentPlayer = game.turnOrder?.[game.currentPlayerIndex];
   const selectedIsBomb = isBomb();
@@ -171,20 +199,41 @@ function GameBoard({ game, socket, playerId }) {
         <div className="opponents-area">
           {game.players
             .filter(p => p.id !== playerId)
-            .map((player, index) => (
-              <div key={player.id} className="opponent">
-                <div className="opponent-info">
-                  <span className="player-name">{player.name}</span>
-                  <span className="team-badge">Team {player.team}</span>
-                  <span className="card-count">
-                    {game.handCounts?.[player.id] || 0} cards
-                  </span>
-                  {currentPlayer?.id === player.id && (
-                    <span className="turn-indicator">👈 Their turn</span>
+            .map((player, index) => {
+              const stack = game.playerStacks?.[player.id];
+              const stackCount = stack?.cards?.length || 0;
+              const stackPoints = stack?.points || 0;
+              return (
+                <div key={player.id} className="opponent">
+                  <div className="opponent-info">
+                    <span className="player-name">{player.name}</span>
+                    <span className="team-badge">Team {player.team}</span>
+                    <span className="card-count">
+                      {game.handCounts?.[player.id] || 0} cards
+                    </span>
+                    {currentPlayer?.id === player.id && game.state === 'playing' && (
+                      <span className="turn-indicator">👈 Their turn</span>
+                    )}
+                  </div>
+                  {stackCount > 0 && (
+                    <div className="player-stack">
+                      <div className="stack-header">
+                        <span className="stack-label">Stack: {stackCount} cards</span>
+                        <span className="stack-points">{stackPoints} pts</span>
+                      </div>
+                      <div className="stack-cards">
+                        {Array.from({ length: Math.min(stackCount, 10) }).map((_, i) => (
+                          <div key={i} className="stack-card-back" />
+                        ))}
+                        {stackCount > 10 && (
+                          <span className="stack-more">+{stackCount - 10}</span>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
 
         <div className="center-area">
@@ -199,6 +248,23 @@ function GameBoard({ game, socket, playerId }) {
                 <span className="your-turn">Your Turn!</span>
               )}
             </div>
+            
+            {game.playerStacks?.[playerId] && game.playerStacks[playerId].cards.length > 0 && (
+              <div className="my-stack">
+                <div className="stack-header">
+                  <span className="stack-label">Your Stack: {game.playerStacks[playerId].cards.length} cards</span>
+                  <span className="stack-points">{game.playerStacks[playerId].points} pts</span>
+                </div>
+                <div className="stack-cards">
+                  {Array.from({ length: Math.min(game.playerStacks[playerId].cards.length, 10) }).map((_, i) => (
+                    <div key={i} className="stack-card-back" />
+                  ))}
+                  {game.playerStacks[playerId].cards.length > 10 && (
+                    <span className="stack-more">+{game.playerStacks[playerId].cards.length - 10}</span>
+                  )}
+                </div>
+              </div>
+            )}
             
             <div className="hand-controls">
               <div className="sort-buttons">
@@ -226,7 +292,7 @@ function GameBoard({ game, socket, playerId }) {
             <Hand
               cards={displayHand}
               onCardClick={handleCardClick}
-              selectedCards={selectedCards}
+              selectedCards={game.state === 'exchanging' ? [] : selectedCards}
               playable={game.state === 'exchanging' || game.state === 'playing'}
             />
 
@@ -251,16 +317,40 @@ function GameBoard({ game, socket, playerId }) {
               </div>
             )}
 
-            {game.state === 'exchanging' && (
-              <div className="action-buttons">
-                <p>Select 3 cards to exchange (1 to each opponent, 1 to partner)</p>
-                <button 
+            {game.state === 'exchanging' && !game.exchangeCards?.[playerId] && (
+              <div className="exchange-section">
+                <p className="exchange-instruction">
+                  Assign 1 card to each player: click a card from your hand, then it goes to the first empty slot. Click a card in a slot to return it.
+                </p>
+                <div className="exchange-slots">
+                  {exchangeRecipients.map((rec, i) => (
+                    <div key={rec.id} className="exchange-slot">
+                      <span className="exchange-slot-label">
+                        To {rec.name} ({rec.isPartner ? 'Partner' : 'Opponent'})
+                      </span>
+                      {exchangeAssignments[i] ? (
+                        <div className="exchange-slot-card">
+                          <Card card={exchangeAssignments[i]} onClick={() => handleRemoveFromSlot(i)} playable selected={false} />
+                        </div>
+                      ) : (
+                        <div className="exchange-slot-empty">—</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
                   onClick={handleExchangeCards}
-                  disabled={selectedCards.length !== 3}
+                  disabled={exchangeAssignments.some(x => !x)}
                   className="btn btn-primary"
                 >
-                  Exchange Cards ({selectedCards.length}/3)
+                  Exchange Cards ({exchangeAssignments.filter(Boolean).length}/3)
                 </button>
+              </div>
+            )}
+
+            {game.state === 'exchanging' && game.exchangeCards?.[playerId] && (
+              <div className="action-buttons">
+                <p className="waiting-message">Waiting for other players to exchange cards...</p>
               </div>
             )}
 
