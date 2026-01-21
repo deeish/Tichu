@@ -113,45 +113,57 @@ function validateSequenceOfPairs(cards) {
   
   const numPairs = cards.length / 2;
   
-  // Group cards by rank
+  // Group cards by rank (Phoenix is handled separately)
   const rankGroups = {};
+  let phoenixCount = 0;
   cards.forEach(card => {
     if (card.type === 'special' && card.name !== 'phoenix') {
       return; // Special cards (except Phoenix) can't be in sequence of pairs
     }
     
-    const rank = card.rank || (card.name === 'phoenix' ? 'phoenix' : card.name);
+    if (card.name === 'phoenix') {
+      phoenixCount++;
+      return; // Phoenix handled separately
+    }
+    
+    const rank = card.rank;
     if (!rankGroups[rank]) {
       rankGroups[rank] = [];
     }
     rankGroups[rank].push(card);
   });
   
-  // Check that each rank appears exactly 2 times (no 3 of a kind)
+  // Get ranks and their counts
   const ranks = Object.keys(rankGroups);
-  for (const rank of ranks) {
-    if (rankGroups[rank].length !== 2) {
+  const rankCounts = ranks.map(r => ({ rank: r, count: rankGroups[r].length }));
+  
+  // Phoenix can substitute for a missing card in a pair
+  // We need to determine which rank Phoenix should substitute for
+  // Strategy: Find ranks that have only 1 card and can form a consecutive sequence
+  
+  // Check for ranks with wrong counts (not 1 or 2)
+  for (const rankCount of rankCounts) {
+    if (rankCount.count !== 1 && rankCount.count !== 2) {
       return { valid: false, error: 'Sequence of pairs cannot have 3 of a kind' };
     }
   }
   
-  // Check that we have the right number of pairs
-  if (ranks.length !== numPairs) {
-    return { valid: false };
+  // Count how many ranks need Phoenix to complete a pair (have 1 card)
+  const ranksNeedingPhoenix = rankCounts.filter(rc => rc.count === 1).length;
+  
+  // Phoenix count must match ranks needing completion
+  if (phoenixCount !== ranksNeedingPhoenix) {
+    return { valid: false, error: 'Phoenix must complete pairs in sequence of pairs' };
   }
   
-  // Check that ranks are consecutive (adjacent values)
-  // Convert ranks to values for comparison
+  // Convert ranks to values for checking consecutive sequence
   const rankValues = ranks
-    .filter(r => r !== 'phoenix')
     .map(r => getCardValue(r))
     .sort((a, b) => a - b);
   
-  // If we have Phoenix, we need to handle it specially
-  const hasPhoenix = ranks.includes('phoenix');
-  
-  if (hasPhoenix && rankValues.length !== numPairs - 1) {
-    // Phoenix can substitute for one rank, but we need exactly numPairs-1 other ranks
+  // Check that we have the right number of unique ranks (should be numPairs)
+  // If Phoenix is present, it will substitute for one rank, so we need numPairs unique ranks
+  if (ranks.length !== numPairs) {
     return { valid: false };
   }
   
@@ -164,12 +176,35 @@ function validateSequenceOfPairs(cards) {
     }
   }
   
-  // Highest value for comparison: when Phoenix is the top of the sequence, it's max+1
+  // Determine Phoenix value for comparison
+  // Phoenix substitutes for a rank that needs completion (has only 1 card)
+  // For comparison purposes, we need to determine if Phoenix is at the top, bottom, or middle
   const maxVal = Math.max(...rankValues);
-  const highestValue = hasPhoenix ? maxVal + 1 : maxVal;
-  // Rank string for compareRanks (when no Phoenix, or when we have the rank)
-  const rankKeys = Object.keys(rankGroups).filter(r => r !== 'phoenix');
-  const highestRank = rankKeys.find(r => getCardValue(r) === maxVal) || rankKeys[rankKeys.length - 1];
+  const minVal = Math.min(...rankValues);
+  
+  // Find which rank Phoenix is substituting for (ranks with count 1)
+  const phoenixSubstituteRanks = rankCounts.filter(rc => rc.count === 1).map(rc => rc.rank);
+  
+  // Determine Phoenix's position and value
+  let highestValue = maxVal;
+  let highestRank = ranks.find(r => getCardValue(r) === maxVal) || ranks[ranks.length - 1];
+  
+  if (phoenixCount > 0 && phoenixSubstituteRanks.length > 0) {
+    // Phoenix is substituting for one of these ranks
+    // Check if Phoenix could be at the top (substituting for max rank)
+    const maxRank = ranks.find(r => getCardValue(r) === maxVal);
+    const phoenixAtTop = phoenixSubstituteRanks.includes(maxRank);
+    
+    if (phoenixAtTop && maxVal < 14) {
+      // Phoenix is at the top, value is max+1
+      highestValue = maxVal + 1;
+      highestRank = maxRank; // Still use the rank for comparison
+    } else {
+      // Phoenix is substituting for a rank that's not at the top
+      // Use the actual max rank value
+      highestValue = maxVal;
+    }
+  }
   
   return { 
     valid: true, 
@@ -244,6 +279,12 @@ function validateStraight(cards) {
     })
     .filter(v => v !== null)
     .sort((a, b) => a - b);
+  
+  // Check for duplicate ranks (straights require unique consecutive ranks)
+  const uniqueValues = new Set(values);
+  if (uniqueValues.size !== values.length) {
+    return { valid: false, error: 'Straights cannot have duplicate ranks' };
+  }
   
   // Check for consecutive sequence
   for (let i = 1; i < values.length; i++) {

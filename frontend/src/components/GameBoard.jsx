@@ -354,6 +354,30 @@ function GameBoard({ game, socket, playerId }) {
               </div>
             )}
 
+            {game.dragonOpponentSelection && game.dragonOpponentSelection.playerId === playerId && (
+              <div className="dragon-opponent-selection">
+                <p className="dragon-selection-instruction">
+                  You played the Dragon and won the trick! Choose which opponent receives the trick:
+                </p>
+                <div className="opponent-selection-buttons">
+                  {game.players
+                    .filter(p => p.id !== playerId && p.team !== game.players.find(pl => pl.id === playerId)?.team)
+                    .map(opponent => (
+                      <button
+                        key={opponent.id}
+                        onClick={() => socket.emit('select-dragon-opponent', opponent.id)}
+                        className="btn btn-opponent-select"
+                      >
+                        Give to {opponent.name} (Team {opponent.team})
+                      </button>
+                    ))}
+                </div>
+                <p className="dragon-selection-hint">
+                  Trick points: {game.dragonOpponentSelection.trickPoints}
+                </p>
+              </div>
+            )}
+
             {game.state === 'playing' && (
               <div className="action-buttons">
                 {/* Show Tichu button only if it's your turn and you haven't played first card */}

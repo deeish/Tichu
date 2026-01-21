@@ -16,9 +16,16 @@ function Hand({ cards, onCardClick, selectedCards = [], playable = false }) {
             : selected.name === card.name)
         );
         
+        // Use card properties + index to create a unique key
+        // Index ensures uniqueness even with duplicate cards (e.g., two 5 of hearts)
+        // This key is stable per card instance in the array
+        const cardKey = card.type === 'standard' 
+          ? `card-${card.suit}-${card.rank}-${index}`
+          : `card-${card.name}-${index}`;
+        
         return (
           <Card
-            key={index}
+            key={cardKey}
             card={card}
             onClick={onCardClick}
             selected={isSelected}
