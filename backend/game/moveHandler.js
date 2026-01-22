@@ -32,13 +32,21 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     
     // Lead player cannot pass - they must play a card (they have priority from winning the previous trick)
     // This applies both when starting a new trick (currentTrick.length === 0) and during a trick
+    // BUGS.md line 27: when a player gets priority they are never allowed to pass
     if (game.leadPlayer === playerId) {
       return { success: false, error: 'You are the lead player and must play a card (cannot pass)' };
     }
     
     // Player with Dog priority cannot pass - they must play a card
+    // BUGS.md line 27: when a player gets priority they are never allowed to pass
     if (game.dogPriorityPlayer === playerId) {
       return { success: false, error: 'You have priority from Dog and must play a card (cannot pass)' };
+    }
+    
+    // Additional check: If current trick is empty and player is the lead, they cannot pass
+    // This handles edge case where lead player might try to pass at start of new trick
+    if (game.currentTrick.length === 0 && game.leadPlayer === playerId) {
+      return { success: false, error: 'You are the lead player and must play a card to start the trick (cannot pass)' };
     }
     
     // Check if there's an active wish that must be fulfilled
@@ -92,14 +100,33 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     const nextPlayer = game.turnOrder[game.currentPlayerIndex];
     const nextPlayerId = nextPlayer?.id;
     
-    // Check if we've cycled back to or past the lead player (meaning everyone has had a turn)
-    // We need to check if we've gone through all players after the lead in turn order
+    // Improved cycle detection: Check if we've gone through ALL players after the lead
+    // Count how many players after the lead have acted
     let cycledBackToLead = false;
-    if (leadPlayerIndex !== -1) {
-      // Check if we've wrapped around: if current index is <= lead index and we were after lead before
+    if (leadPlayerIndex !== -1 && playersWhoShouldHaveTurn.length > 0) {
+      // Get all players after the lead in turn order (excluding lead and those who went out)
+      const playersAfterLead = [];
+      for (let i = 1; i < game.turnOrder.length; i++) {
+        const idx = (leadPlayerIndex + i) % game.turnOrder.length;
+        const player = game.turnOrder[idx];
+        if (player && playersWhoShouldHaveTurn.includes(player.id)) {
+          playersAfterLead.push(player.id);
+        }
+      }
+      
+      // Check if all players after lead have acted
+      const allAfterLeadActed = playersAfterLead.length > 0 && 
+        playersAfterLead.every(id => 
+          game.passedPlayers.includes(id) || 
+          game.currentTrick.some(play => play.playerId === id)
+        );
+      
+      // Also check if we've wrapped around to or past the lead player
       const wasAfterLead = currentIndexBeforeAdvance > leadPlayerIndex;
       const isAtOrBeforeLead = currentIndexAfterAdvance <= leadPlayerIndex;
-      cycledBackToLead = wasAfterLead && isAtOrBeforeLead && nextPlayerId === leadPlayerId;
+      const wrappedAround = wasAfterLead && isAtOrBeforeLead;
+      
+      cycledBackToLead = allAfterLeadActed || (wrappedAround && nextPlayerId === leadPlayerId);
     }
     
     // End trick if: all remaining players have acted OR we've cycled back to lead
@@ -196,12 +223,16 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     game.leadPlayer = playerId;
     
     // Update turn order to start from bomb player
+    // This ensures that if the bomb wins, the bomb player gets priority for the next trick
     const bombPlayerIndex = game.turnOrder.findIndex(p => p.id === playerId);
     if (bombPlayerIndex !== -1) {
       game.turnOrder = [
         ...game.turnOrder.slice(bombPlayerIndex),
         ...game.turnOrder.slice(0, bombPlayerIndex)
       ];
+      // Update currentPlayerIndex to reflect the new turn order
+      // Bomb player is now at index 0, so we'll advance to index 1 next
+      game.currentPlayerIndex = 0;
     }
     
     // Mark that player has played their first card (can no longer declare Tichu)
@@ -250,7 +281,13 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   
   // If there's a current trick, validate the move beats the CURRENT HIGHEST play
   // (not the lead card - you must beat the last card played / current leader)
-  if (game.currentTrick.length > 0) {
+  // EXCEPTION: If Dog is the only card in the trick and player has Dog priority,
+  // they can play any combination (Dog passes a "winning hand" - no need to beat it)
+  const dogInTrick = game.currentTrick.length === 1 && 
+    game.currentTrick[0].cards.some(c => c.name === 'dog');
+  const hasDogPriority = game.dogPriorityPlayer === playerId;
+  
+  if (game.currentTrick.length > 0 && !(dogInTrick && hasDogPriority)) {
     const winningPlay = getCurrentWinningPlay(game.currentTrick);
     const currentWinningCombo = winningPlay ? winningPlay.combination : null;
     
@@ -362,32 +399,17 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     combination: validation
   });
   
-  // Handle wish fulfillment - wish is cleared when:
-  // 1. The exact wished card is played as a single, OR
-  // 2. Any card is played after Mah Jong (as a single)
-  // Note: When Mah Jong is played as a single, it has NO value - its only role is to make a wish.
-  // The wish is for "the next card to be played" - once someone plays any card after Mah Jong,
-  // the wish is fulfilled/cleared, regardless of what card they played.
+  // Handle wish fulfillment - wish is cleared ONLY when the exact wished card is played as a single
+  // According to Tichu rules, the wish persists across tricks until the exact wished card is played
+  // Mah Jong as a single has NO value - its only role is to make a wish that persists
   if (game.mahJongWish && game.mahJongWish.mustPlay) {
-    // Check if the exact wished card is played
+    // Check if the exact wished card is played as a single
     if (validation.type === 'single' && cards[0].type === 'standard' && 
         cards[0].rank === game.mahJongWish.wishedRank) {
       // Exact wished card played, clear wish
       game.mahJongWish = null;
-    } else {
-      // Check if Mah Jong was played as a single in this trick (meaning someone is playing after it)
-      // Note: currentTrick already includes the new card at this point
-      if (game.currentTrick.length >= 2) {
-        const mahJongPlay = game.currentTrick.find(play => 
-          play.combination.type === 'single' && play.cards[0].name === 'mahjong'
-        );
-        if (mahJongPlay) {
-          // Someone played a card after Mah Jong (as a single) - wish is fulfilled/cleared
-          // Mah Jong as a single has no value, so any card played after it fulfills the wish
-          game.mahJongWish = null;
-        }
-      }
     }
+    // Otherwise, wish persists - it will be enforced on the next player's turn
   }
   
   // Check if player went out (empty hand) - handle this first
@@ -406,6 +428,25 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       return { ...winResult, success: true, game, playerWon: true };
     }
     return winResult;
+  }
+  
+  // BUGS.md line 1: When a card is played and all others pass, lead player wins trick and plays again
+  // Check if all other players have passed (this happens when a new play resets passes)
+  // After adding the card to trick, check if all other players have passed
+  const playersWhoShouldHaveTurn = game.players
+    .filter(p => p.id !== playerId && 
+      !game.playersOut?.includes(p.id) && 
+      game.hands[p.id] && 
+      game.hands[p.id].length > 0)
+    .map(p => p.id);
+  
+  // If all other players have passed, the lead player wins the trick immediately
+  // This handles the case where player 1 plays, then players 2, 3, 4 all pass
+  if (playersWhoShouldHaveTurn.length > 0 && 
+      playersWhoShouldHaveTurn.every(id => game.passedPlayers.includes(id))) {
+    // All other players have passed - lead player wins trick and plays again
+    const trickResult = winTrick(game, playerId);
+    return { ...trickResult, success: true, game, trickWon: true, winner: playerId, leadPlaysAgain: true };
   }
   
   // Clear passed players (new play resets passes)

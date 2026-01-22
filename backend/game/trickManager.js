@@ -39,15 +39,6 @@ function startNewTrick(game) {
   game.passedPlayers = [];
   game.dogPriorityPlayer = null; // Clear Dog priority when starting a new trick
   
-  // If lead player has gone out, pass lead to next player with cards (rulebook)
-  const leadHasNoCards = !game.hands[game.leadPlayer] || game.hands[game.leadPlayer].length === 0;
-  if (leadHasNoCards) {
-    const nextPlayer = getNextPlayerWithCards(game, game.leadPlayer);
-    if (nextPlayer) {
-      game.leadPlayer = nextPlayer.id;
-    }
-  }
-  
   // Set current player index to lead player (winner gets priority)
   // The winner of the previous trick becomes the lead player and must play first
   const leadPlayerIndex = game.turnOrder.findIndex(p => p.id === game.leadPlayer);
@@ -60,8 +51,8 @@ function startNewTrick(game) {
       // Winner has cards - they get priority to play next
       game.currentPlayerIndex = leadPlayerIndex;
     } else {
-      // Winner has no cards or has gone out, find next player with cards
-      // (This can happen if winner finished their hand on the winning play)
+      // Winner has no cards or has gone out, find NEXT player in turn order with cards
+      // This ensures priority goes to player 2, not player 4 (BUGS.md line 24)
       const nextPlayer = getNextPlayerWithCards(game, leadPlayerId);
       if (nextPlayer) {
         game.leadPlayer = nextPlayer.id;
@@ -146,22 +137,12 @@ function winTrick(game, winnerId) {
   
   // Set winner as new lead player (they get priority to play next)
   // This ensures the winner gets priority - they must play a card and cannot pass
+  // BUGS.md line 30: if a player wins their hand make sure they get priority
   game.leadPlayer = winnerId;
   
-  // Clear Mah Jong wish if Mah Jong didn't win the trick
-  // (If Mah Jong won, the wish would have been cleared when the wished card was played)
-  // Need to check before clearing currentTrick
-  if (game.mahJongWish && game.mahJongWish.mustPlay) {
-    const mahJongInTrick = game.currentTrick.some(play => 
-      play.cards.some(c => c.name === 'mahjong')
-    );
-    if (mahJongInTrick && winnerId !== game.currentTrick.find(play => 
-      play.cards.some(c => c.name === 'mahjong')
-    )?.playerId) {
-      // Mah Jong was in the trick but didn't win, so wish is cleared
-      game.mahJongWish = null;
-    }
-  }
+  // Mah Jong wish persists across tricks until the exact wished card is played
+  // The wish is only cleared in moveHandler.js when the exact wished card is played
+  // No need to clear it here - it will persist until fulfilled
   
   // If Dragon selection is pending, don't clear dragon flag yet
   // Still need to clear current trick, but wait for opponent selection before assigning stack
