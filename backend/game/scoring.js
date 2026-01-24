@@ -17,7 +17,9 @@ function handlePlayerWin(game, playerId) {
   }
   
   // Check for double victory: both teammates go out 1st and 2nd
-  if (game.playersOut.length === 2) {
+  // CRITICAL: Only end the round if the current trick is empty (no active trick)
+  // If there's an active trick, we need to let it complete first
+  if (game.playersOut.length === 2 && (!game.currentTrick || game.currentTrick.length === 0)) {
     const firstPlayer = game.players.find(p => p.id === game.playersOut[0]);
     const secondPlayer = game.players.find(p => p.id === game.playersOut[1]);
     
@@ -82,9 +84,11 @@ function handlePlayerWin(game, playerId) {
   }
   
   // Check if round should end (only one player has cards left = tailender)
+  // CRITICAL: Only end the round if the current trick is empty (no active trick)
+  // If there's an active trick, we need to let it complete first
   const playersWithCards = game.players.filter(p => !game.playersOut.includes(p.id));
   
-  if (playersWithCards.length === 1) {
+  if (playersWithCards.length === 1 && (!game.currentTrick || game.currentTrick.length === 0)) {
     // Round ends - add last player to playersOut
     const lastPlayer = playersWithCards[0];
     if (!game.playersOut.includes(lastPlayer.id)) {
