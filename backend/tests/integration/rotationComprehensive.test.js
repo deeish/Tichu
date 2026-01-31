@@ -73,8 +73,10 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
         console.log('P4 move failed:', p4Result.error);
       }
       expect(p4Result.success).toBe(true);
-      // P4 played a pair, which should be in the trick
-      expect(game.currentTrick.some(p => p.playerId === 'p4')).toBe(true);
+      // P4 played last card (went out) so trick ends: winner is P4, new trick started
+      expect(p4Result.newTrick).toBe(true);
+      expect(p4Result.winner).toBe('p4');
+      expect(game.currentTrick.length).toBe(0);
     });
 
     test('Scenario 2: P1 plays, P2 passes, P3 passes, P4 should get turn', () => {
@@ -189,24 +191,25 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
 
   describe('Straight Variations', () => {
     test('Scenario 7: P1 plays straight, P2 beats, P3 passes, P4 should get turn', () => {
+      // Use mixed-suit straights so they are regular straights (not straight-flush bombs)
       game.hands = {
-        p1: [createCard('5', 'hearts'), createCard('6', 'hearts'), createCard('7', 'hearts'), createCard('8', 'hearts'), createCard('9', 'hearts'), createCard('2', 'hearts')], // Give P1 6 cards
-        p2: [createCard('6', 'spades'), createCard('7', 'spades'), createCard('8', 'spades'), createCard('9', 'spades'), createCard('10', 'spades')],
+        p1: [createCard('5', 'hearts'), createCard('6', 'spades'), createCard('7', 'hearts'), createCard('8', 'diamonds'), createCard('9', 'clubs'), createCard('2', 'hearts')], // Give P1 6 cards
+        p2: [createCard('6', 'hearts'), createCard('7', 'spades'), createCard('8', 'hearts'), createCard('9', 'diamonds'), createCard('10', 'clubs')],
         p3: [createCard('K', 'hearts')],
-        p4: [createCard('7', 'diamonds'), createCard('8', 'diamonds'), createCard('9', 'diamonds'), createCard('10', 'diamonds'), createCard('J', 'diamonds')]
+        p4: [createCard('7', 'hearts'), createCard('8', 'spades'), createCard('9', 'diamonds'), createCard('10', 'clubs'), createCard('J', 'diamonds')]
       };
       game.leadPlayer = 'p1';
       game.currentPlayerIndex = 0;
 
       debugGameState(game, 'Initial State');
       makeMove(game, 'p1', [
-        createCard('5', 'hearts'), createCard('6', 'hearts'), createCard('7', 'hearts'), 
-        createCard('8', 'hearts'), createCard('9', 'hearts')
+        createCard('5', 'hearts'), createCard('6', 'spades'), createCard('7', 'hearts'),
+        createCard('8', 'diamonds'), createCard('9', 'clubs')
       ], 'play');
       debugGameState(game, 'After P1 plays straight');
       makeMove(game, 'p2', [
-        createCard('6', 'spades'), createCard('7', 'spades'), createCard('8', 'spades'), 
-        createCard('9', 'spades'), createCard('10', 'spades')
+        createCard('6', 'hearts'), createCard('7', 'spades'), createCard('8', 'hearts'),
+        createCard('9', 'diamonds'), createCard('10', 'clubs')
       ], 'play');
       debugGameState(game, 'After P2 plays straight');
       makeMove(game, 'p3', [], 'pass');
@@ -216,8 +219,8 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
       const currentPlayer = game.turnOrder[game.currentPlayerIndex];
       expect(currentPlayer?.id).toBe('p4');
       const p4Result = makeMove(game, 'p4', [
-        createCard('7', 'diamonds'), createCard('8', 'diamonds'), createCard('9', 'diamonds'), 
-        createCard('10', 'diamonds'), createCard('J', 'diamonds')
+        createCard('7', 'hearts'), createCard('8', 'spades'), createCard('9', 'diamonds'),
+        createCard('10', 'clubs'), createCard('J', 'diamonds')
       ], 'play');
       debugGameState(game, 'After P4 plays');
       expect(p4Result.success).toBe(true);
@@ -226,6 +229,7 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
 
   describe('Bomb Interrupt Variations', () => {
     test('Scenario 8: P1 plays, P2 passes, P3 plays bomb, P4 should get turn', () => {
+      game.mahJongPlayed = true; // Bombs allowed only after Mah Jong has been played
       game.hands = {
         p1: [createCard('K', 'hearts')],
         p2: [createCard('Q', 'hearts')],
@@ -258,6 +262,7 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
     });
 
     test('Scenario 9: P1 plays, P2 plays bomb, P3 should get turn', () => {
+      game.mahJongPlayed = true; // Bombs allowed only after Mah Jong has been played
       game.hands = {
         p1: [createCard('K', 'hearts'), createCard('2', 'hearts')], // Give P1 2 cards
         p2: [
@@ -384,6 +389,26 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
       }
       expect(p3Result.success).toBe(true);
     });
+
+    test('Scenario 12b: Dog, partner plays pair, next player can beat with higher pair (not single)', () => {
+      game.hands = {
+        p1: [createSpecialCard('dog')],
+        p2: [createCard('J', 'hearts'), createCard('J', 'spades')],
+        p3: [createCard('Q', 'hearts'), createCard('Q', 'spades')],
+        p4: [createCard('K', 'hearts')]
+      };
+      game.leadPlayer = 'p1';
+      game.currentPlayerIndex = 0;
+
+      makeMove(game, 'p1', [createSpecialCard('dog')], 'play');
+      makeMove(game, 'p2', [createCard('J', 'hearts'), createCard('J', 'spades')], 'play');
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p3');
+      const p3Result = makeMove(game, 'p3', [createCard('Q', 'hearts'), createCard('Q', 'spades')], 'play');
+      expect(p3Result.success).toBe(true);
+      expect(game.currentTrick.some(p => p.playerId === 'p3')).toBe(true);
+      const winningEntry = game.currentTrick.find(p => p.playerId === 'p3');
+      expect(winningEntry.combination.type).toBe('pair');
+    });
   });
 
   describe('All Players Pass Variations', () => {
@@ -448,7 +473,13 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
       
       // All players should have gotten a turn
       expect(turns).toEqual(['p1', 'p2', 'p3', 'p4']);
-      expect(game.currentTrick.length).toBe(4);
+      // When last player (P4) plays, trick must end: no double turn for lead
+      expect(p4Result.newTrick).toBe(true);
+      expect(p4Result.trickWon).toBe(true);
+      expect(p4Result.winner).toBe('p4');
+      expect(game.currentTrick.length).toBe(0);
+      expect(game.leadPlayer).toBe('p4');
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p4');
     });
 
     test('Scenario 15: P1 plays, P2 passes, P3 beats, P4 passes, P1 should win', () => {
@@ -523,6 +554,57 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
       expect(currentPlayer?.id).toBe('p4');
       const p4Result = makeMove(game, 'p4', [createCard('J', 'hearts')], 'play');
       expect(p4Result.success).toBe(true);
+    });
+  });
+
+  describe('Last player plays - trick ends (no double turn for lead)', () => {
+    test('when all four play in a trick, last player play ends trick and winner leads next', () => {
+      game.hands = {
+        p1: [createCard('2', 'hearts')],
+        p2: [createCard('3', 'hearts')],
+        p3: [createCard('4', 'hearts')],
+        p4: [createCard('5', 'hearts')]
+      };
+      game.leadPlayer = 'p1';
+      game.currentPlayerIndex = 0;
+
+      makeMove(game, 'p1', [createCard('2', 'hearts')], 'play');
+      makeMove(game, 'p2', [createCard('3', 'hearts')], 'play');
+      makeMove(game, 'p3', [createCard('4', 'hearts')], 'play');
+      const lastResult = makeMove(game, 'p4', [createCard('5', 'hearts')], 'play');
+
+      expect(lastResult.success).toBe(true);
+      expect(lastResult.newTrick).toBe(true);
+      expect(lastResult.trickWon).toBe(true);
+      expect(lastResult.winner).toBe('p4');
+      expect(game.currentTrick.length).toBe(0);
+      expect(game.leadPlayer).toBe('p4');
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p4');
+    });
+
+    test('when last player plays (without going out), trick ends and winner leads next', () => {
+      // P4 has two cards so we hit the normal advance path (not player-went-out path)
+      game.hands = {
+        p1: [createCard('10', 'hearts'), createCard('A', 'hearts')],
+        p2: [createCard('J', 'hearts')],
+        p3: [createCard('Q', 'hearts')],
+        p4: [createCard('K', 'hearts'), createCard('2', 'clubs')]
+      };
+      game.leadPlayer = 'p1';
+      game.currentPlayerIndex = 0;
+
+      makeMove(game, 'p1', [createCard('10', 'hearts')], 'play');
+      makeMove(game, 'p2', [createCard('J', 'hearts')], 'play');
+      makeMove(game, 'p3', [createCard('Q', 'hearts')], 'play');
+      const p4Result = makeMove(game, 'p4', [createCard('K', 'hearts')], 'play');
+
+      // Trick must end; current player must be P4 (winner), not P1 (lead)
+      expect(p4Result.newTrick).toBe(true);
+      expect(p4Result.trickWon).toBe(true);
+      expect(p4Result.winner).toBe('p4');
+      expect(game.leadPlayer).toBe('p4');
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p4');
+      expect(game.currentTrick.length).toBe(0);
     });
   });
 

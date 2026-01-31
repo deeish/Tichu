@@ -17,6 +17,12 @@ describe('validateCombination', () => {
       expect(result.valid).toBe(true);
       expect(result.type).toBe('single');
     });
+
+    test('should validate Phoenix as a single card', () => {
+      const result = validateCombination([{ type: 'special', name: 'phoenix' }]);
+      expect(result.valid).toBe(true);
+      expect(result.type).toBe('single');
+    });
   });
 
   describe('Pairs', () => {
@@ -179,5 +185,27 @@ describe('getPhoenixValue', () => {
     }];
     const value = getPhoenixValue(phoenix, currentTrick);
     expect(value).toBe(13.5); // K is 13, so Phoenix is 13.5
+  });
+
+  test('Phoenix on 10 counts as 10.5 (last card + 0.5)', () => {
+    const phoenix = { type: 'special', name: 'phoenix' };
+    const currentTrick = [{
+      playerId: 'p1',
+      cards: [{ type: 'standard', rank: '10', suit: 'hearts' }],
+      combination: { type: 'single' }
+    }];
+    const value = getPhoenixValue(phoenix, currentTrick);
+    expect(value).toBe(10.5); // 10 + 0.5
+  });
+
+  test('Phoenix cannot beat Dragon: value capped at 15.5 when Dragon in trick', () => {
+    const phoenix = { type: 'special', name: 'phoenix' };
+    const currentTrick = [{
+      playerId: 'p1',
+      cards: [{ type: 'special', name: 'dragon' }],
+      combination: { type: 'single' }
+    }];
+    const value = getPhoenixValue(phoenix, currentTrick);
+    expect(value).toBe(15.5); // Phoenix can beat Ace (14) but not Dragon (16)
   });
 });

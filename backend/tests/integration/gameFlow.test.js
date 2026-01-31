@@ -105,18 +105,105 @@ describe('Game Flow Integration Tests', () => {
       expect(game.mahJongWish).toEqual({ wishedRank: 'K', mustPlay: true });
     });
 
-    test('should enforce wish when starting new trick', () => {
+    test('should enforce wish when starting new trick only if player HAS the wished card', () => {
       game.mahJongWish = { wishedRank: 'K', mustPlay: true };
       game.hands.p1 = [{ type: 'standard', rank: 'K', suit: 'hearts' }];
-      
-      // Try to play wrong card
+
+      // Try to play wrong card when they have the wish - must be rejected
       const wrongResult = makeMove(game, 'p1', [{ type: 'standard', rank: 'Q', suit: 'hearts' }], 'play');
       expect(wrongResult.success).toBe(false);
-      
+
       // Play correct card
       const correctResult = makeMove(game, 'p1', [{ type: 'standard', rank: 'K', suit: 'hearts' }], 'play');
       expect(correctResult.success).toBe(true);
       expect(game.mahJongWish).toBe(null); // Wish cleared
+    });
+
+    test('player WITHOUT wished card is not restricted: can start trick with any valid combination', () => {
+      game.mahJongWish = { wishedRank: 'K', mustPlay: true };
+      game.currentTrick = [];
+      game.leadPlayer = 'p1';
+      game.currentPlayerIndex = 0;
+      // p1 does NOT have K - has only a pair of 7s
+      game.hands.p1 = [
+        { type: 'standard', rank: '7', suit: 'hearts' },
+        { type: 'standard', rank: '7', suit: 'spades' }
+      ];
+
+      // Should be allowed to start the trick with a pair (not forced to play a single or the wish)
+      const result = makeMove(game, 'p1', [
+        { type: 'standard', rank: '7', suit: 'hearts' },
+        { type: 'standard', rank: '7', suit: 'spades' }
+      ], 'play');
+      expect(result.success).toBe(true);
+      expect(game.currentTrick.length).toBe(1);
+      expect(game.mahJongWish).toEqual({ wishedRank: 'K', mustPlay: true }); // Wish still active
+    });
+
+    test('player WITHOUT wished card can pass when wish is active (no restriction)', () => {
+      game.mahJongWish = { wishedRank: '5', mustPlay: true };
+      game.currentTrick = [
+        { playerId: 'p1', cards: [{ type: 'standard', rank: '10', suit: 'hearts' }], combination: { type: 'single', cards: [{ type: 'standard', rank: '10', suit: 'hearts' }] } }
+      ];
+      game.leadPlayer = 'p1';
+      game.currentPlayerIndex = 1;
+      game.hands.p2 = [{ type: 'standard', rank: 'J', suit: 'hearts' }]; // p2 has J, not 5
+
+      const result = makeMove(game, 'p2', [], 'pass');
+      expect(result.success).toBe(true);
+      expect(game.passedPlayers).toContain('p2');
+    });
+
+    test('after Mah Jong wish + bomb: when bomb winner has no cards, next player with cards leads', () => {
+      game.hands = {
+        p1: [{ type: 'special', name: 'mahjong' }],
+        p2: [
+          { type: 'standard', rank: '8', suit: 'hearts' },
+          { type: 'standard', rank: 'A', suit: 'hearts' },
+          { type: 'standard', rank: 'A', suit: 'diamonds' },
+          { type: 'standard', rank: 'A', suit: 'clubs' },
+          { type: 'standard', rank: 'A', suit: 'spades' }
+        ],
+        p3: [{ type: 'standard', rank: '9', suit: 'hearts' }],
+        p4: [{ type: 'standard', rank: 'K', suit: 'hearts' }]
+      };
+      game.leadPlayer = 'p1';
+      game.currentPlayerIndex = 0;
+      game.currentTrick = [];
+      game.passedPlayers = [];
+      game.mahJongPlayed = false;
+      game.mahJongWish = null;
+      makeMove(game, 'p1', [{ type: 'special', name: 'mahjong' }], 'play', '5');
+      makeMove(game, 'p2', [{ type: 'standard', rank: '8', suit: 'hearts' }], 'play');
+      makeMove(game, 'p3', [{ type: 'standard', rank: '9', suit: 'hearts' }], 'play');
+      makeMove(game, 'p2', [
+        { type: 'standard', rank: 'A', suit: 'hearts' },
+        { type: 'standard', rank: 'A', suit: 'diamonds' },
+        { type: 'standard', rank: 'A', suit: 'clubs' },
+        { type: 'standard', rank: 'A', suit: 'spades' }
+      ], 'play');
+      expect(game.leadPlayer).toBe('p2');
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p4');
+      makeMove(game, 'p4', [], 'pass');
+      makeMove(game, 'p1', [], 'pass');
+      // P2 (bomb winner) and P3 went out; next player with cards is P4
+      expect(game.leadPlayer).toBe('p4');
+      expect(game.currentTrick.length).toBe(0);
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p4');
+    });
+
+    test('should allow pass when player has wished card but it cannot beat current play (no soft lock)', () => {
+      game.mahJongWish = { wishedRank: '5', mustPlay: true };
+      game.currentTrick = [
+        { playerId: 'p1', cards: [{ type: 'special', name: 'mahjong' }], combination: { type: 'single', cards: [{ type: 'special', name: 'mahjong' }] } },
+        { playerId: 'p2', cards: [{ type: 'standard', rank: '8', suit: 'hearts' }], combination: { type: 'single', cards: [{ type: 'standard', rank: '8', suit: 'hearts' }] } }
+      ];
+      game.hands.p3 = [{ type: 'standard', rank: '5', suit: 'hearts' }];
+      game.leadPlayer = 'p1';
+      game.currentPlayerIndex = 2;
+      const result = makeMove(game, 'p3', [], 'pass');
+      expect(result.success).toBe(true);
+      expect(game.passedPlayers).toContain('p3');
     });
 
     test('should persist wish across tricks', () => {
@@ -160,8 +247,10 @@ describe('Game Flow Integration Tests', () => {
       // Player 4 should be able to play (A beats K)
       const p4Result = makeMove(game, 'p4', [{ type: 'standard', rank: 'A', suit: 'hearts' }], 'play');
       expect(p4Result.success).toBe(true);
-      // Verify p4's play is in the trick
-      expect(game.currentTrick.some(play => play.playerId === 'p4')).toBe(true);
+      // P4 played last card (went out) so trick ends: winner is p4, new trick started
+      expect(p4Result.newTrick).toBe(true);
+      expect(p4Result.winner).toBe('p4');
+      expect(game.currentTrick.length).toBe(0);
     });
   });
 
@@ -175,6 +264,54 @@ describe('Game Flow Integration Tests', () => {
       
       expect(game.leadPlayer).toBe('p2'); // Next player in turn order
       expect(game.currentPlayerIndex).toBe(1); // p2's index
+    });
+  });
+
+  describe('Phoenix as single', () => {
+    test('Phoenix on 10 counts as 10.5; Jack (11) can beat it', () => {
+      game.mahJongPlayed = true;
+      game.hands = {
+        p1: [{ type: 'standard', rank: '10', suit: 'hearts' }],
+        p2: [{ type: 'special', name: 'phoenix' }],
+        p3: [{ type: 'standard', rank: 'J', suit: 'hearts' }],
+        p4: [{ type: 'standard', rank: 'Q', suit: 'hearts' }]
+      };
+      game.leadPlayer = 'p1';
+      game.currentPlayerIndex = 0;
+      game.currentTrick = [];
+      game.passedPlayers = [];
+
+      const p1Result = makeMove(game, 'p1', [{ type: 'standard', rank: '10', suit: 'hearts' }], 'play');
+      expect(p1Result.success).toBe(true);
+      const p2Result = makeMove(game, 'p2', [{ type: 'special', name: 'phoenix' }], 'play');
+      expect(p2Result.success).toBe(true);
+      expect(game.currentTrick.length).toBe(2);
+      const winningPlay = getCurrentWinningPlay(game.currentTrick);
+      expect(winningPlay.playerId).toBe('p2');
+      expect(game.currentTrick[1].cards[0].phoenixValue).toBe(10.5);
+
+      const p3Result = makeMove(game, 'p3', [{ type: 'standard', rank: 'J', suit: 'hearts' }], 'play');
+      expect(p3Result.success).toBe(true);
+      expect(getCurrentWinningPlay(game.currentTrick).playerId).toBe('p3');
+    });
+
+    test('Phoenix cannot beat Dragon as single (Dragon is strongest single, not including bombs)', () => {
+      game.mahJongPlayed = true;
+      game.hands = {
+        p1: [{ type: 'special', name: 'dragon' }],
+        p2: [{ type: 'special', name: 'phoenix' }],
+        p3: [{ type: 'standard', rank: 'A', suit: 'hearts' }],
+        p4: [{ type: 'standard', rank: 'K', suit: 'hearts' }]
+      };
+      game.leadPlayer = 'p1';
+      game.currentPlayerIndex = 0;
+      game.currentTrick = [];
+      game.passedPlayers = [];
+
+      makeMove(game, 'p1', [{ type: 'special', name: 'dragon' }], 'play');
+      const p2Result = makeMove(game, 'p2', [{ type: 'special', name: 'phoenix' }], 'play');
+      expect(p2Result.success).toBe(false);
+      expect(p2Result.error).toMatch(/beat|higher|pass/i);
     });
   });
 });

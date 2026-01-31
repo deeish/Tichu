@@ -8,25 +8,35 @@ const { getCardPoints } = require('./deck');
 const { getNextPlayerWithCards, advanceTurn } = require('./turnManagement');
 
 /**
+ * Returns true if this play is Dog only (Dog passes priority; it does not set a combination to beat).
+ */
+function isDogOnlyPlay(play) {
+  return play && play.cards && play.cards.length === 1 &&
+    play.cards.some(c => c.name === 'dog');
+}
+
+/**
  * Finds the current winning (highest) play in the trick.
  * You must beat the last card played (current highest), not the lead card.
+ * Dog is skipped when determining the winning play: Dog only passes priority;
+ * the partner's play (e.g. a pair) sets the combination type others must beat.
  * @param {Array} currentTrick - Array of { playerId, cards, combination }
  * @returns {Object|null} The play entry with the highest combination, or null if trick is empty
  */
 function getCurrentWinningPlay(currentTrick) {
   if (!currentTrick || currentTrick.length === 0) return null;
-  
-  let winningPlay = currentTrick[0];
-  
-  for (let i = 1; i < currentTrick.length; i++) {
+
+  let winningPlay = null;
+  for (let i = 0; i < currentTrick.length; i++) {
     const play = currentTrick[i];
-    const comparison = compareCombinations(play.combination, winningPlay.combination);
-    // If this play beats the current winning play, it becomes the new leader
-    if (comparison === 1) {
+    if (isDogOnlyPlay(play)) continue;
+    if (winningPlay === null) {
       winningPlay = play;
+    } else {
+      const comparison = compareCombinations(play.combination, winningPlay.combination);
+      if (comparison === 1) winningPlay = play;
     }
   }
-  
   return winningPlay;
 }
 

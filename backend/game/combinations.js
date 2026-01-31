@@ -451,7 +451,10 @@ function getSpecialValue(card) {
 }
 
 /**
- * Calculates Phoenix value when played as a single card
+ * Calculates Phoenix value when played as a single card.
+ * Rule: Phoenix as single = (last card played + 0.5), or 1.5 if led.
+ * Example: 10 is played, Phoenix on top = 10.5; Jack (11) beats it.
+ * Phoenix cannot beat Dragon as a single; Dragon is the strongest single (not including bombs).
  * @param {Object} phoenixCard - The Phoenix card
  * @param {Array} currentTrick - Current trick cards
  * @returns {number} Phoenix value
@@ -467,12 +470,11 @@ function getPhoenixValue(phoenixCard, currentTrick) {
   for (const play of currentTrick) {
     for (const card of play.cards) {
       if (card.name === 'phoenix') {
-        // If there's already a Phoenix, use its value
         if (card.phoenixValue !== undefined) {
           highestValue = Math.max(highestValue, card.phoenixValue);
         }
       } else if (card.name === 'dragon') {
-        // Dragon is 16, Phoenix cannot beat it
+        // Dragon is 16; Phoenix cannot beat Dragon as a single
         highestValue = Math.max(highestValue, 16);
       } else {
         const cardValue = card.type === 'special' ? getSpecialValue(card) : getCardValue(card.rank);
@@ -481,8 +483,7 @@ function getPhoenixValue(phoenixCard, currentTrick) {
     }
   }
   
-  // Phoenix is half a rank higher than the highest card
-  // But cannot beat Dragon (16)
+  // Phoenix = highest + 0.5, but cannot beat Dragon (16)
   if (highestValue >= 16) {
     return 15.5; // Phoenix can beat Ace (14) but not Dragon
   }

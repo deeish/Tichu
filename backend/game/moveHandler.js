@@ -21,46 +21,73 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   if (game.state !== 'playing') {
     return { success: false, error: 'Game is not in playing state' };
   }
-  
+
+  // After Dragon wins a trick, points/cards must be passed out (opponent selected) before any next play
+  if (game.dragonOpponentSelection) {
+    const isDragonPlayer = game.dragonOpponentSelection.playerId === playerId;
+    return {
+      success: false,
+      error: isDragonPlayer
+        ? 'Select which opponent receives the Dragon trick (pass out points) before playing the next card'
+        : 'Dragon opponent must be selected (pass out points) before the next card can be played'
+    };
+  }
+
   // Handle pass action (cannot be a bomb)
+  // RULE (BUGS.md): Only players who did NOT start the round (not the lead) may pass.
+  // Exceptions: player with Dog priority cannot pass; player who has the Mah Jong wished card cannot pass.
   if (action === 'pass') {
-    // Check turn order for pass
     const currentPlayer = game.turnOrder[game.currentPlayerIndex];
     if (currentPlayer.id !== playerId) {
       return { success: false, error: 'Not your turn' };
     }
-    
-    // Lead player cannot pass - they must play a card (they have priority from winning the previous trick)
-    // This applies both when starting a new trick (currentTrick.length === 0) and during a trick
-    // BUGS.md line 27: when a player gets priority they are never allowed to pass
+
+    // 1) Lead cannot pass (whoever has priority: winner of last trick or bomb player)
     if (game.leadPlayer === playerId) {
       return { success: false, error: 'You are the lead player and must play a card (cannot pass)' };
     }
-    
-    // Player with Dog priority cannot pass - they must play a card
-    // BUGS.md line 27: when a player gets priority they are never allowed to pass
+
+    // 2) Player with Dog priority cannot pass
     if (game.dogPriorityPlayer === playerId) {
       return { success: false, error: 'You have priority from Dog and must play a card (cannot pass)' };
     }
-    
-    // Additional check: If current trick is empty and player is the lead, they cannot pass
-    // This handles edge case where lead player might try to pass at start of new trick
-    if (game.currentTrick.length === 0 && game.leadPlayer === playerId) {
+
+    // 3) If current trick is empty, only the lead would have the turn; already blocked above
+    if (game.currentTrick.length === 0) {
       return { success: false, error: 'You are the lead player and must play a card to start the trick (cannot pass)' };
     }
-    
-    // Check if there's an active wish that must be fulfilled
+
+    // 4) Active Mah Jong wish: only if player HAS the wished card can they be blocked from passing (and only when playing it would be legal).
+    // Players who do not have the wished card are not restricted at all - they can pass or play any legal card.
     if (game.mahJongWish && game.mahJongWish.mustPlay) {
       const hand = game.hands[playerId];
-      const hasWishedCard = hand.some(card => 
+      const hasWishedCard = hand && hand.some(card =>
         card.type === 'standard' && card.rank === game.mahJongWish.wishedRank
       );
-      
       if (hasWishedCard) {
-        return { success: false, error: `You must play ${game.mahJongWish.wishedRank} as a single card (cannot pass)` };
+        const trickEmpty = !game.currentTrick || game.currentTrick.length === 0;
+        if (!trickEmpty) {
+          const winningPlay = getCurrentWinningPlay(game.currentTrick);
+          const currentCombo = winningPlay ? winningPlay.combination : null;
+          if (currentCombo && currentCombo.type === 'single') {
+            const wishedAsSingle = {
+              type: 'single',
+              cards: [{ type: 'standard', rank: game.mahJongWish.wishedRank, suit: 'hearts' }]
+            };
+            const comparison = compareCombinations(wishedAsSingle, currentCombo);
+            if (comparison !== 1) {
+              // Wished card doesn't beat current play - allow pass (avoids soft lock)
+            } else {
+              return { success: false, error: `You must play ${game.mahJongWish.wishedRank} as a single card (cannot pass)` };
+            }
+          }
+          // Current play is not a single (e.g. pair) - wished card as single can't beat; allow pass
+        } else {
+          return { success: false, error: `You must play ${game.mahJongWish.wishedRank} as a single card (cannot pass)` };
+        }
       }
     }
-    
+
     // If there's a wish but player doesn't have the card, they can pass
     // The wish stays active for the next player
     game.passedPlayers.push(playerId);
@@ -206,18 +233,28 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
   }
   
-  // BOMB INTERRUPT LOGIC: Bombs can be played at any time, except when Dog is in the current trick
+  // BOMB INTERRUPT LOGIC: Bombs can be played at any time, except when Dog is the ONLY play.
+  // Rule: You cannot bomb when Dog is played; after the dogged player plays their card(s), bombs are allowed.
   const isBomb = validation.type === 'bomb';
   if (isBomb) {
-    // Check if Dog is in the current trick
-    const dogInTrick = game.currentTrick.some(trickEntry => 
-      trickEntry.cards.some(c => c.name === 'dog')
-    );
-    
-    if (dogInTrick) {
-      return { success: false, error: 'Bombs cannot be played when Dog is in the current trick' };
+    // No one can bomb until Mah Jong has been played this round
+    if (!game.mahJongPlayed) {
+      return { success: false, error: 'Mah Jong must be played before any bomb can be played' };
     }
-    
+    // Lead with Mah Jong in hand cannot start the trick with a bomb - must play Mah Jong first
+    if (game.leadPlayer === playerId && game.currentTrick.length === 0) {
+      const hasMahJong = hand.some(card => card.name === 'mahjong');
+      if (hasMahJong) {
+        return { success: false, error: 'You must play Mah Jong first (cannot start with a bomb)' };
+      }
+    }
+
+    const dogOnlyInTrick = game.currentTrick.length === 1 &&
+      game.currentTrick[0].cards.some(c => c.name === 'dog');
+    if (dogOnlyInTrick) {
+      return { success: false, error: 'Bombs cannot be played when Dog is the only card in the trick (dogged player must play first)' };
+    }
+
     // If there's already a bomb in the trick, the new bomb must beat it
     // Only bombs can beat bombs - compare against current HIGHEST play, not the lead
     if (game.currentTrick.length > 0) {
@@ -317,8 +354,11 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
           break;
         }
         
+        // All players have acted - bomb wins, end trick and give bomb player the turn
         if (leadPlayerIndex !== -1 && nextPlayerIndex === leadPlayerIndex) {
-          break;
+          const bombWinnerId = game.leadPlayer;
+          const trickResult = winTrick(game, bombWinnerId);
+          return { ...trickResult, ...winResult, bombPlayed: true, playerWon: true, newTrick: true };
         }
         
         nextPlayerIndex = (nextPlayerIndex + 1) % game.turnOrder.length;
@@ -361,8 +401,11 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
         break;
       }
       
+      // All players have acted - bomb wins, end trick and give bomb player the turn
       if (leadPlayerIndex !== -1 && nextPlayerIndex === leadPlayerIndex) {
-        break;
+        const bombWinnerId = game.leadPlayer; // Bomb player was set above
+        const result = winTrick(game, bombWinnerId);
+        return { ...result, bombPlayed: true, newTrick: true };
       }
       
       nextPlayerIndex = (nextPlayerIndex + 1) % game.turnOrder.length;
@@ -390,7 +433,14 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       }
     }
   }
-  
+
+  // Phoenix as single: value = last card played + 0.5 (or 1.5 if led). Must be set before "must beat" comparison.
+  if (validation.type === 'single' && cards[0].name === 'phoenix') {
+    const phoenixValue = getPhoenixValue(cards[0], game.currentTrick);
+    cards[0].phoenixValue = phoenixValue;
+    validation.phoenixValue = phoenixValue;
+  }
+
   // If there's a current trick, validate the move beats the CURRENT HIGHEST play
   // (not the lead card - you must beat the last card played / current leader)
   // EXCEPTION: If Dog is the only card in the trick and player has Dog priority,
@@ -418,25 +468,20 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       return { success: false, error: 'Must play a higher combination or pass' };
     }
   } else if (game.currentTrick.length === 0) {
-    // Starting a new trick - check if wish must be fulfilled
+    // Starting a new trick - only restrict the lead if they HAVE the wished card
     if (game.mahJongWish && game.mahJongWish.mustPlay) {
       const hand = game.hands[playerId];
-      const hasWishedCard = hand.some(card => 
+      const hasWishedCard = hand && hand.some(card =>
         card.type === 'standard' && card.rank === game.mahJongWish.wishedRank
       );
-      
+      // Only players who actually have the wished card are restricted; others can play any valid combination
       if (hasWishedCard) {
-        // Must play the wished card as a single to start the trick
-        if (validation.type !== 'single' || cards[0].type !== 'standard' || 
+        if (validation.type !== 'single' || cards[0].type !== 'standard' ||
             cards[0].rank !== game.mahJongWish.wishedRank) {
           return { success: false, error: `You must play ${game.mahJongWish.wishedRank} as a single card to start this trick` };
         }
-      } else {
-        // Don't have the wished card, can play any single to start the trick
-        if (validation.type !== 'single') {
-          return { success: false, error: 'Must play a single card to start this trick (wish is active)' };
-        }
       }
+      // Player does not have the wished card: no restriction from the wish (can play any valid combination)
     } else if (!game.mahJongWish) {
       // No active wish - can play any valid combination to start trick
       // (This is the normal case)
@@ -470,15 +515,12 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     game.mahJongWish = null;
   }
   
-  // Handle Phoenix single card value (must be done before adding to trick)
-  if (validation.type === 'single' && cards[0].name === 'phoenix') {
-    const phoenixValue = getPhoenixValue(cards[0], game.currentTrick);
-    // Store Phoenix value in the card for comparison
-    cards[0].phoenixValue = phoenixValue;
-    // Also update in validation for comparison
-    validation.phoenixValue = phoenixValue;
+  // Phoenix value already set above (before "must beat" check). Ensure card in hand ref has it for trick.
+  if (validation.type === 'single' && cards[0].name === 'phoenix' && cards[0].phoenixValue === undefined) {
+    cards[0].phoenixValue = getPhoenixValue(cards[0], game.currentTrick);
+    validation.phoenixValue = cards[0].phoenixValue;
   }
-  
+
   // Handle special cards
   const specialCardResult = handleSpecialCards(game, playerId, cards, validation);
   if (specialCardResult.error) {
@@ -536,8 +578,12 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   // CRITICAL: If Dog was played, don't handle going out here - Dog already set the turn
   // The partner should get priority, not the next player in normal turn order
   if (hand.length === 0 && !dogWasPlayed) {
-    // Check if all others passed before going out
-    if (game.passedPlayers.length === game.players.length - 1) {
+    // When Dragon is played (single), everyone must get a chance to play or pass before the trick can end
+    const playJustAdded = game.currentTrick[game.currentTrick.length - 1];
+    const isDragonSingle = playJustAdded?.cards?.some(c => c.name === 'dragon') && playJustAdded?.combination?.type === 'single';
+
+    // Check if all others passed before going out - but never end trick on the same move when Dragon was just played
+    if (game.passedPlayers.length === game.players.length - 1 && !isDragonSingle) {
       // Win the trick first, then handle going out
       const trickResult = winTrick(game, playerId);
       const winResult = handlePlayerWin(game, playerId);
@@ -581,8 +627,12 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
           break;
         }
         
+        // All players have acted - end trick (winner is current player who went out)
         if (leadPlayerIndex !== -1 && nextPlayerIndex === leadPlayerIndex) {
-          break;
+          const winningPlay = getCurrentWinningPlay(game.currentTrick);
+          const winnerId = winningPlay ? winningPlay.playerId : leadPlayerId;
+          const trickResult = winTrick(game, winnerId);
+          return { ...trickResult, ...winResult, playerWon: true, newTrick: true };
         }
         
         nextPlayerIndex = (nextPlayerIndex + 1) % game.turnOrder.length;
@@ -662,11 +712,12 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
         break;
       }
       
-      // If we've wrapped back to lead player, stop (all players have acted)
-      // This means we've gone through all players after the lead
+      // If we've wrapped back to lead player, all players have acted - end the trick
       if (nextPlayerIndex === leadPlayerIndex) {
-        // All players have acted - this will be handled by pass detection
-        break;
+        const winningPlay = getCurrentWinningPlay(game.currentTrick);
+        const winnerId = winningPlay ? winningPlay.playerId : leadPlayerId;
+        const result = winTrick(game, winnerId);
+        return { ...result, newTrick: true };
       }
       
       // Move to next player

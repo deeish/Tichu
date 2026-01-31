@@ -83,6 +83,36 @@ describe('Dragon Special Card', () => {
     expect(game.dragonOpponentSelection.playerId).toBe('p1');
   });
 
+  test('cannot play or pass until Dragon opponent is selected (pass out points first)', () => {
+    // Set up: Dragon just won, opponent selection pending
+    game.currentTrick = [
+      { playerId: 'p1', cards: [{ type: 'special', name: 'dragon' }], combination: { type: 'single' } }
+    ];
+    game.dragonPlayed = { playerId: 'p1', trickIndex: 0 };
+    winTrick(game, 'p1');
+    expect(game.dragonOpponentSelection).not.toBe(null);
+
+    // Dragon player (p1) cannot play next card until they select opponent
+    const p1Play = makeMove(game, 'p1', [{ type: 'standard', rank: 'K', suit: 'hearts' }], 'play');
+    expect(p1Play.success).toBe(false);
+    expect(p1Play.error).toMatch(/select|pass out|Dragon/i);
+
+    // Other players also cannot play
+    const p2Pass = makeMove(game, 'p2', [], 'pass');
+    expect(p2Pass.success).toBe(false);
+    expect(p2Pass.error).toMatch(/Dragon|pass out|select/i);
+
+    // After p1 selects opponent, play can continue
+    const selectResult = selectDragonOpponent(game, 'p1', 'p3');
+    expect(selectResult.success).toBe(true);
+    expect(game.dragonOpponentSelection).toBe(null);
+    expect(game.playerStacks.p3.points).toBe(25);
+
+    // Now p1 (lead) can play
+    const p1PlayAfter = makeMove(game, 'p1', [{ type: 'standard', rank: 'K', suit: 'hearts' }], 'play');
+    expect(p1PlayAfter.success).toBe(true);
+  });
+
   test('should allow Dragon player to select opponent', () => {
     // Set up Dragon win scenario
     game.currentTrick = [
@@ -114,7 +144,36 @@ describe('Dragon Special Card', () => {
     expect(result.error).toContain('opponent');
   });
 
+  test('when Dragon is played, everyone gets a turn (play or pass) before trick can end', () => {
+    // P1 leads with Dragon (only card - would go out)
+    game.hands.p1 = [{ type: 'special', name: 'dragon' }];
+    game.leadPlayer = 'p1';
+    game.currentPlayerIndex = 0;
+    game.currentTrick = [];
+    game.passedPlayers = [];
+
+    const result = makeMove(game, 'p1', [{ type: 'special', name: 'dragon' }], 'play');
+    expect(result.success).toBe(true);
+    expect(result.trickWon).not.toBe(true); // Trick must NOT end on the same move
+    expect(game.currentTrick.length).toBe(1);
+    expect(game.currentTrick[0].playerId).toBe('p1');
+    // Next player (p2) must get a turn
+    expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p2');
+
+    // P2 can pass (cannot beat Dragon with a single)
+    const p2Pass = makeMove(game, 'p2', [], 'pass');
+    expect(p2Pass.success).toBe(true);
+    expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p3');
+
+    // P3 passes, P4 passes - then trick ends and Dragon player wins
+    makeMove(game, 'p3', [], 'pass');
+    makeMove(game, 'p4', [], 'pass');
+    expect(game.dragonOpponentSelection).not.toBe(null);
+    expect(game.dragonOpponentSelection.playerId).toBe('p1');
+  });
+
   test('should allow bomb to beat Dragon', () => {
+    game.mahJongPlayed = true; // Bombs allowed only after Mah Jong has been played
     // p1 plays Dragon
     makeMove(game, 'p1', [{ type: 'special', name: 'dragon' }], 'play');
     

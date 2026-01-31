@@ -73,6 +73,13 @@ describe('Declarations', () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain('right phase');
     });
+
+    test('should reject Grand Tichu if player already declared Tichu (one or the other)', () => {
+      game.tichuDeclarations.p1 = true;
+      const result = declareGrandTichu(game, 'p1');
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/one or the other|both.*Tichu/i);
+    });
   });
 
   describe('revealRemainingCards', () => {
@@ -154,6 +161,22 @@ describe('Declarations', () => {
       
       expect(result.success).toBe(false);
       expect(result.error).toContain('your turn');
+    });
+
+    test('should reject Tichu if player already declared Grand Tichu (one or the other)', () => {
+      game.state = 'playing';
+      game.turnOrder = [
+        { id: 'p1', team: 1, name: 'Player 1' },
+        { id: 'p2', team: 1, name: 'Player 2' },
+        { id: 'p3', team: 2, name: 'Player 3' },
+        { id: 'p4', team: 2, name: 'Player 4' }
+      ];
+      game.currentPlayerIndex = 0;
+      game.firstCardPlayed = {};
+      game.grandTichuDeclarations.p1 = true;
+      const result = declareTichu(game, 'p1');
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/one or the other|both.*Tichu/i);
     });
   });
 });

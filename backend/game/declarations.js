@@ -5,17 +5,22 @@
 
 /**
  * Handles Grand Tichu declaration
+ * Rule: Players cannot call both Tichu and Grand Tichu (one or the other).
  */
 function declareGrandTichu(game, playerId) {
   if (game.state !== 'grand-tichu') {
     return { success: false, error: 'Not the right phase for Grand Tichu' };
   }
-  
+
+  if (game.tichuDeclarations && game.tichuDeclarations[playerId]) {
+    return { success: false, error: 'You cannot call both Tichu and Grand Tichu (one or the other)' };
+  }
+
   // Can only declare if cards haven't been revealed yet
   if (game.cardsRevealed[playerId]) {
     return { success: false, error: 'Cannot declare Grand Tichu after revealing cards' };
   }
-  
+
   game.grandTichuDeclarations[playerId] = true;
   // Reveal remaining cards when declaring Grand Tichu
   game.cardsRevealed[playerId] = true;
@@ -45,24 +50,29 @@ function revealRemainingCards(game, playerId) {
 
 /**
  * Handles Tichu declaration
- * Can only be called during playing phase, when playing first card
+ * Can only be called during playing phase, when playing first card.
+ * Rule: Players cannot call both Tichu and Grand Tichu (one or the other).
  */
 function declareTichu(game, playerId) {
   if (game.state !== 'playing') {
     return { success: false, error: 'Tichu can only be declared during play' };
   }
-  
+
+  if (game.grandTichuDeclarations && game.grandTichuDeclarations[playerId]) {
+    return { success: false, error: 'You cannot call both Tichu and Grand Tichu (one or the other)' };
+  }
+
   // Check if player has already played their first card
   if (game.firstCardPlayed[playerId]) {
     return { success: false, error: 'Tichu can only be declared when playing your first card' };
   }
-  
+
   // Check if it's player's turn
   const currentPlayer = game.turnOrder[game.currentPlayerIndex];
   if (currentPlayer.id !== playerId) {
     return { success: false, error: 'Can only declare Tichu on your turn' };
   }
-  
+
   game.tichuDeclarations[playerId] = true;
   return { success: true, game };
 }

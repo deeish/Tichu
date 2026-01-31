@@ -50,7 +50,7 @@ describe('Bomb Interrupts', () => {
       playersOut: [],
       dogPriorityPlayer: null,
       mahJongWish: null,
-      mahJongPlayed: false,
+      mahJongPlayed: true, // Bombs allowed only after Mah Jong has been played
       firstCardPlayed: {},
       playerStacks: {
         p1: { cards: [], points: 0 },
@@ -62,6 +62,46 @@ describe('Bomb Interrupts', () => {
       dragonPlayed: null,
       dragonOpponentSelection: null
     };
+  });
+
+  test('should reject any bomb when Mah Jong has not been played', () => {
+    game.mahJongPlayed = false;
+    game.currentTrick = [];
+    game.leadPlayer = 'p1';
+    game.currentPlayerIndex = 0;
+    // p1 (lead) tries to start with a bomb before Mah Jong was ever played
+    const result = makeMove(game, 'p1', [
+      { type: 'standard', rank: 'K', suit: 'hearts' },
+      { type: 'standard', rank: 'K', suit: 'diamonds' },
+      { type: 'standard', rank: 'K', suit: 'clubs' },
+      { type: 'standard', rank: 'K', suit: 'spades' }
+    ], 'play');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Mah Jong must be played before any bomb/i);
+  });
+
+  test('should reject bomb as first card when lead has Mah Jong (must play Mah Jong first)', () => {
+    game.hands.p1 = [
+      { type: 'special', name: 'mahjong' },
+      { type: 'standard', rank: 'K', suit: 'hearts' },
+      { type: 'standard', rank: 'K', suit: 'diamonds' },
+      { type: 'standard', rank: 'K', suit: 'clubs' },
+      { type: 'standard', rank: 'K', suit: 'spades' }
+    ];
+    game.mahJongPlayed = true; // Mah Jong was played by someone else; this lead still has it and must play it first
+    game.currentTrick = [];
+    game.leadPlayer = 'p1';
+    game.currentPlayerIndex = 0;
+
+    const result = makeMove(game, 'p1', [
+      { type: 'standard', rank: 'K', suit: 'hearts' },
+      { type: 'standard', rank: 'K', suit: 'diamonds' },
+      { type: 'standard', rank: 'K', suit: 'clubs' },
+      { type: 'standard', rank: 'K', suit: 'spades' }
+    ], 'play');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Mah Jong first|cannot start with a bomb/i);
   });
 
   test('should allow bomb to interrupt normal play', () => {
@@ -123,6 +163,42 @@ describe('Bomb Interrupts', () => {
     expect(winningPlay.playerId).toBe('p3'); // Higher bomb wins
   });
 
+  test('when bomb wins (no one can respond), bomb player gets turn not original lead', () => {
+    // P1 plays, P2 and P3 are out (no cards), P4 plays bomb - no one else can respond
+    game.hands = {
+      p1: [{ type: 'standard', rank: 'K', suit: 'hearts' }],
+      p2: [],
+      p3: [],
+      p4: [
+        { type: 'standard', rank: 'A', suit: 'hearts' },
+        { type: 'standard', rank: 'A', suit: 'diamonds' },
+        { type: 'standard', rank: 'A', suit: 'clubs' },
+        { type: 'standard', rank: 'A', suit: 'spades' }
+      ]
+    };
+    game.playersOut = ['p2', 'p3'];
+    game.leadPlayer = 'p1';
+    game.currentPlayerIndex = 0;
+    game.currentTrick = [];
+    game.passedPlayers = [];
+
+    makeMove(game, 'p1', [{ type: 'standard', rank: 'K', suit: 'hearts' }], 'play');
+    const bombResult = makeMove(game, 'p4', [
+      { type: 'standard', rank: 'A', suit: 'hearts' },
+      { type: 'standard', rank: 'A', suit: 'diamonds' },
+      { type: 'standard', rank: 'A', suit: 'clubs' },
+      { type: 'standard', rank: 'A', suit: 'spades' }
+    ], 'play');
+
+    expect(bombResult.success).toBe(true);
+    expect(bombResult.bombPlayed).toBe(true);
+    expect(bombResult.newTrick).toBe(true);
+    expect(bombResult.winner).toBe('p4');
+    expect(game.leadPlayer).toBe('p4');
+    expect(game.currentTrick.length).toBe(0);
+    expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p4');
+  });
+
   test('should prevent bomb when Dog is in trick', () => {
     // Set up: p1 plays Dog as lead card
     game.currentTrick = [];
@@ -152,9 +228,43 @@ describe('Bomb Interrupts', () => {
       { type: 'standard', rank: 'A', suit: 'spades' }
     ], 'play');
     
-    // The bomb should be rejected because Dog is in the trick
+    // The bomb should be rejected because Dog is the only card (dogged player must play first)
     expect(bombResult.success).toBe(false);
     expect(bombResult.error).toContain('Dog');
+  });
+
+  test('should allow bomb after dogged player plays (Dog + partner play in trick)', () => {
+    game.currentTrick = [];
+    game.currentPlayerIndex = 0;
+    game.leadPlayer = 'p1';
+    game.hands = {
+      p1: [{ type: 'special', name: 'dog' }],
+      p2: [
+        { type: 'standard', rank: 'J', suit: 'hearts' },
+        { type: 'standard', rank: 'J', suit: 'spades' }
+      ],
+      p3: [
+        { type: 'standard', rank: 'A', suit: 'hearts' },
+        { type: 'standard', rank: 'A', suit: 'diamonds' },
+        { type: 'standard', rank: 'A', suit: 'clubs' },
+        { type: 'standard', rank: 'A', suit: 'spades' }
+      ],
+      p4: [{ type: 'standard', rank: 'Q', suit: 'hearts' }]
+    };
+    makeMove(game, 'p1', [{ type: 'special', name: 'dog' }], 'play');
+    makeMove(game, 'p2', [
+      { type: 'standard', rank: 'J', suit: 'hearts' },
+      { type: 'standard', rank: 'J', suit: 'spades' }
+    ], 'play');
+    expect(game.currentTrick.length).toBe(2);
+    const bombResult = makeMove(game, 'p3', [
+      { type: 'standard', rank: 'A', suit: 'hearts' },
+      { type: 'standard', rank: 'A', suit: 'diamonds' },
+      { type: 'standard', rank: 'A', suit: 'clubs' },
+      { type: 'standard', rank: 'A', suit: 'spades' }
+    ], 'play');
+    expect(bombResult.success).toBe(true);
+    expect(bombResult.bombPlayed).toBe(true);
   });
 
   test('should allow player to go out with bomb and continue trick', () => {

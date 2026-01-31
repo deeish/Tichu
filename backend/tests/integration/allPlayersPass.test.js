@@ -5,7 +5,7 @@
 
 const { makeMove } = require('../../game/moveHandler');
 const { winTrick, startNewTrick } = require('../../game/trickManager');
-const { createTestGame, createCard } = require('../utils/testHelpers');
+const { createTestGame, createCard, createSpecialCard } = require('../utils/testHelpers');
 
 describe('All Players Pass Scenario', () => {
   let game;
@@ -134,6 +134,7 @@ describe('All Players Pass Scenario', () => {
   });
 
   test('should handle all pass with bomb interrupt', () => {
+    game.mahJongPlayed = true; // Bombs allowed only after Mah Jong has been played
     // Give p3 a bomb
     game.hands.p3 = [
       createCard('A', 'hearts'),
@@ -173,5 +174,74 @@ describe('All Players Pass Scenario', () => {
     // All have passed - p3 wins
     winTrick(game, 'p3');
     expect(game.playerStacks.p3.cards.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Pass rule: only non-lead may pass (unless dog or Mah Jong wish)', () => {
+  let game;
+
+  beforeEach(() => {
+    game = createTestGame({
+      state: 'playing',
+      hands: {
+        p1: [createCard('K', 'hearts'), createCard('A', 'hearts')],
+        p2: [createCard('Q', 'hearts')],
+        p3: [createCard('J', 'hearts')],
+        p4: [createCard('10', 'hearts')]
+      },
+      currentTrick: [],
+      passedPlayers: [],
+      leadPlayer: 'p1',
+      currentPlayerIndex: 0,
+      playersOut: []
+    });
+  });
+
+  test('lead cannot pass (must play)', () => {
+    // At start of trick it is lead (p1) turn; they cannot pass
+    const result = makeMove(game, 'p1', [], 'pass');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/lead.*cannot pass|must play/i);
+  });
+
+  test('non-lead can pass when no dog or wish', () => {
+    makeMove(game, 'p1', [createCard('K', 'hearts')], 'play');
+    // p2 is not lead, no dog priority, no wish → can pass
+    const result = makeMove(game, 'p2', [], 'pass');
+    expect(result.success).toBe(true);
+    expect(game.passedPlayers).toContain('p2');
+  });
+
+  test('player with Dog priority cannot pass', () => {
+    // P1 plays Dog; P2 (partner) gets priority
+    game.hands.p1 = [createSpecialCard('dog')];
+    game.currentTrick = [];
+    game.leadPlayer = 'p1';
+    game.currentPlayerIndex = 0;
+    makeMove(game, 'p1', [createSpecialCard('dog')], 'play');
+    expect(game.dogPriorityPlayer).toBe('p2');
+    expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p2');
+    const result = makeMove(game, 'p2', [], 'pass');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Dog|priority|cannot pass/i);
+  });
+
+  test('player with Mah Jong wished card cannot pass when wish would beat current play', () => {
+    game.hands.p1 = [createCard('J', 'hearts'), createCard('A', 'hearts')]; // p1 has J to lead
+    makeMove(game, 'p1', [createCard('J', 'hearts')], 'play'); // J is led
+    game.mahJongWish = { wishedRank: 'Q', mustPlay: true };
+    game.hands.p2 = [createCard('Q', 'hearts')]; // p2 has Q (wish) - Q beats J, so cannot pass
+    const result = makeMove(game, 'p2', [], 'pass');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Q|wish|cannot pass/i);
+  });
+
+  test('player without wished card can pass (wish stays for next)', () => {
+    makeMove(game, 'p1', [createCard('K', 'hearts')], 'play');
+    game.mahJongWish = { wishedRank: 'Q', mustPlay: true };
+    game.hands.p2 = [createCard('J', 'hearts')]; // p2 does NOT have Q
+    const result = makeMove(game, 'p2', [], 'pass');
+    expect(result.success).toBe(true);
+    expect(game.passedPlayers).toContain('p2');
   });
 });
