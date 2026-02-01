@@ -57,14 +57,18 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       return { success: false, error: 'You are the lead player and must play a card to start the trick (cannot pass)' };
     }
 
-    // 4) Active Mah Jong wish: only if player HAS the wished card can they be blocked from passing (and only when playing it would be legal).
-    // Players who do not have the wished card are not restricted at all - they can pass or play any legal card.
+    // 4) Active Mah Jong wish: if player HAS the wished card they cannot pass (must play single or bomb containing that rank).
+    // If they only have it in a bomb (4+ of that rank), they must play - cannot pass.
     if (game.mahJongWish && game.mahJongWish.mustPlay) {
       const hand = game.hands[playerId];
-      const hasWishedCard = hand && hand.some(card =>
-        card.type === 'standard' && card.rank === game.mahJongWish.wishedRank
-      );
+      const wishedRank = game.mahJongWish.wishedRank;
+      const countWished = hand ? hand.filter(c => c.type === 'standard' && c.rank === wishedRank).length : 0;
+      const hasWishedCard = countWished >= 1;
       if (hasWishedCard) {
+        // If they have 4+ of that rank (only have it in a bomb), they cannot pass - must play bomb or one as single
+        if (countWished >= 4) {
+          return { success: false, error: `You must play ${wishedRank} as a single or in a bomb (cannot pass)` };
+        }
         const trickEmpty = !game.currentTrick || game.currentTrick.length === 0;
         if (!trickEmpty) {
           const winningPlay = getCurrentWinningPlay(game.currentTrick);
@@ -72,18 +76,16 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
           if (currentCombo && currentCombo.type === 'single') {
             const wishedAsSingle = {
               type: 'single',
-              cards: [{ type: 'standard', rank: game.mahJongWish.wishedRank, suit: 'hearts' }]
+              cards: [{ type: 'standard', rank: wishedRank, suit: 'hearts' }]
             };
             const comparison = compareCombinations(wishedAsSingle, currentCombo);
-            if (comparison !== 1) {
-              // Wished card doesn't beat current play - allow pass (avoids soft lock)
-            } else {
-              return { success: false, error: `You must play ${game.mahJongWish.wishedRank} as a single card (cannot pass)` };
+            if (comparison === 1) {
+              return { success: false, error: `You must play ${wishedRank} as a single card (cannot pass)` };
             }
           }
           // Current play is not a single (e.g. pair) - wished card as single can't beat; allow pass
         } else {
-          return { success: false, error: `You must play ${game.mahJongWish.wishedRank} as a single card (cannot pass)` };
+          return { success: false, error: `You must play ${wishedRank} as a single card or in a bomb (cannot pass)` };
         }
       }
     }
@@ -296,6 +298,13 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       combination: validation
     });
     
+    // Wish fulfillment: bomb containing the wished rank clears the wish (four-of-a-kind or straight-flush)
+    if (game.mahJongWish && game.mahJongWish.mustPlay && cards.some(c =>
+      c.type === 'standard' && c.rank === game.mahJongWish.wishedRank
+    )) {
+      game.mahJongWish = null;
+    }
+    
     // Clear passed players (bomb interrupts)
     game.passedPlayers = [];
     
@@ -468,17 +477,21 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       return { success: false, error: 'Must play a higher combination or pass' };
     }
   } else if (game.currentTrick.length === 0) {
-    // Starting a new trick - only restrict the lead if they HAVE the wished card
+    // Starting a new trick - if they HAVE the wished card they must lead with it (single or bomb containing that rank).
+    // They can play one as single (e.g. one 2 from four 2's) or the full bomb; both clear the wish.
     if (game.mahJongWish && game.mahJongWish.mustPlay) {
       const hand = game.hands[playerId];
       const hasWishedCard = hand && hand.some(card =>
         card.type === 'standard' && card.rank === game.mahJongWish.wishedRank
       );
-      // Only players who actually have the wished card are restricted; others can play any valid combination
       if (hasWishedCard) {
-        if (validation.type !== 'single' || cards[0].type !== 'standard' ||
-            cards[0].rank !== game.mahJongWish.wishedRank) {
-          return { success: false, error: `You must play ${game.mahJongWish.wishedRank} as a single card to start this trick` };
+        const playingWishedAsSingle = validation.type === 'single' && cards[0].type === 'standard' &&
+            cards[0].rank === game.mahJongWish.wishedRank;
+        const playingBombWithWish = validation.type === 'bomb' && cards.some(c =>
+          c.type === 'standard' && c.rank === game.mahJongWish.wishedRank
+        );
+        if (!playingWishedAsSingle && !playingBombWithWish) {
+          return { success: false, error: `You must play ${game.mahJongWish.wishedRank} as a single card or in a bomb to start this trick` };
         }
       }
       // Player does not have the wished card: no restriction from the wish (can play any valid combination)
@@ -561,17 +574,16 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   //   passedPlayers: game.passedPlayers
   // });
   
-  // Handle wish fulfillment - wish is cleared ONLY when the exact wished card is played as a single
-  // According to Tichu rules, the wish persists across tricks until the exact wished card is played
-  // Mah Jong as a single has NO value - its only role is to make a wish that persists
+  // Handle wish fulfillment - wish is cleared when the wished rank is played as a single OR in a bomb (four-of-a-kind or straight-flush containing that rank)
   if (game.mahJongWish && game.mahJongWish.mustPlay) {
-    // Check if the exact wished card is played as a single
-    if (validation.type === 'single' && cards[0].type === 'standard' && 
-        cards[0].rank === game.mahJongWish.wishedRank) {
-      // Exact wished card played, clear wish
+    const playedWishedAsSingle = validation.type === 'single' && cards[0].type === 'standard' &&
+        cards[0].rank === game.mahJongWish.wishedRank;
+    const playedBombWithWish = validation.type === 'bomb' && cards.some(c =>
+      c.type === 'standard' && c.rank === game.mahJongWish.wishedRank
+    );
+    if (playedWishedAsSingle || playedBombWithWish) {
       game.mahJongWish = null;
     }
-    // Otherwise, wish persists - it will be enforced on the next player's turn
   }
   
   // Check if player went out (empty hand) - handle this first

@@ -349,4 +349,85 @@ describe('Mah Jong Wish - Edge cases', () => {
     expect(right.success).toBe(true);
     expect(game.mahJongWish).toBe(null);
   });
+
+  test('player with only bomb of wished rank (four 2s) cannot pass - must play bomb or single', () => {
+    // P1 plays Mah Jong and wishes 2. P2 plays 3, P3 plays 8. P4 has only four 2s (bomb).
+    // P4 cannot pass; must play (bomb beats 8; single 2 would not beat 8 so only bomb is valid here).
+    const game = baseGame();
+    game.mahJongWish = { wishedRank: '2', mustPlay: true };
+    game.mahJongPlayed = true;
+    const c8 = createCard('8', 'hearts');
+    game.currentTrick = [
+      { playerId: 'p1', cards: [createSpecialCard('mahjong')], combination: { type: 'single', cards: [createSpecialCard('mahjong')] } },
+      { playerId: 'p2', cards: [createCard('3', 'hearts')], combination: { type: 'single', cards: [createCard('3', 'hearts')] } },
+      { playerId: 'p3', cards: [c8], combination: { type: 'single', cards: [c8] } }
+    ];
+    game.leadPlayer = 'p1';
+    game.currentPlayerIndex = 3;
+    game.hands.p4 = [
+      createCard('2', 'hearts'), createCard('2', 'spades'),
+      createCard('2', 'diamonds'), createCard('2', 'clubs')
+    ];
+    const passResult = makeMove(game, 'p4', [], 'pass');
+    expect(passResult.success).toBe(false);
+    expect(passResult.error).toMatch(/must play|cannot pass/i);
+    // Playing the bomb clears the wish (single 2 would not beat 8)
+    const playBomb = makeMove(game, 'p4', [
+      createCard('2', 'hearts'), createCard('2', 'spades'),
+      createCard('2', 'diamonds'), createCard('2', 'clubs')
+    ], 'play');
+    expect(playBomb.success).toBe(true);
+    expect(game.mahJongWish).toBe(null);
+  });
+
+  test('playing wished rank as a bomb (four-of-a-kind) clears the wish', () => {
+    const game = baseGame();
+    game.mahJongWish = { wishedRank: '2', mustPlay: true };
+    game.mahJongPlayed = true;
+    game.currentTrick = [
+      { playerId: 'p1', cards: [createCard('3', 'hearts')], combination: { type: 'single', cards: [createCard('3', 'hearts')] } }
+    ];
+    game.leadPlayer = 'p1';
+    game.currentPlayerIndex = 1;
+    game.hands.p2 = [
+      createCard('2', 'hearts'), createCard('2', 'spades'),
+      createCard('2', 'diamonds'), createCard('2', 'clubs')
+    ];
+    const playResult = makeMove(game, 'p2', [
+      createCard('2', 'hearts'), createCard('2', 'spades'),
+      createCard('2', 'diamonds'), createCard('2', 'clubs')
+    ], 'play');
+    expect(playResult.success).toBe(true);
+    expect(game.mahJongWish).toBe(null);
+  });
+
+  test('lead with only bomb of wished rank can lead with single (one card) or bomb; both clear wish', () => {
+    const game = baseGame();
+    game.mahJongWish = { wishedRank: '2', mustPlay: true };
+    game.mahJongPlayed = true;
+    game.hands.p1 = [
+      createCard('2', 'hearts'), createCard('2', 'spades'),
+      createCard('2', 'diamonds'), createCard('2', 'clubs')
+    ];
+    // Option 1: lead with one 2 as single
+    const playSingle = makeMove(game, 'p1', [createCard('2', 'hearts')], 'play');
+    expect(playSingle.success).toBe(true);
+    expect(game.mahJongWish).toBe(null);
+  });
+
+  test('lead with bomb of wished rank: playing full bomb clears the wish', () => {
+    const game = baseGame();
+    game.mahJongWish = { wishedRank: '2', mustPlay: true };
+    game.mahJongPlayed = true;
+    game.hands.p1 = [
+      createCard('2', 'hearts'), createCard('2', 'spades'),
+      createCard('2', 'diamonds'), createCard('2', 'clubs')
+    ];
+    const playBomb = makeMove(game, 'p1', [
+      createCard('2', 'hearts'), createCard('2', 'spades'),
+      createCard('2', 'diamonds'), createCard('2', 'clubs')
+    ], 'play');
+    expect(playBomb.success).toBe(true);
+    expect(game.mahJongWish).toBe(null);
+  });
 });
