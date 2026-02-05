@@ -100,10 +100,11 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
     });
 
     test('Scenario 3: P1 plays, P2 beats, P3 beats, P4 should get turn', () => {
+      // Give P1–P3 two cards each so no one goes out until after P4 acts (avoids "3 out = end round")
       game.hands = {
-        p1: [createCard('10', 'hearts')],
-        p2: [createCard('J', 'hearts')],
-        p3: [createCard('Q', 'hearts')],
+        p1: [createCard('10', 'hearts'), createCard('2', 'hearts')],
+        p2: [createCard('J', 'hearts'), createCard('2', 'spades')],
+        p3: [createCard('Q', 'hearts'), createCard('2', 'diamonds')],
         p4: [createCard('K', 'hearts')]
       };
       game.leadPlayer = 'p1';
@@ -302,6 +303,14 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
 
   describe('Player Going Out Mid-Trick', () => {
     test('Scenario 10: P1 plays last card, P2 beats, P3 should get turn', () => {
+      // P1 and P2 on different teams so 1st+2nd out does not trigger double victory
+      game.players = [
+        { id: 'p1', team: 1, name: 'Player 1' },
+        { id: 'p2', team: 2, name: 'Player 2' },
+        { id: 'p3', team: 2, name: 'Player 3' },
+        { id: 'p4', team: 1, name: 'Player 4' }
+      ];
+      game.turnOrder = [...game.players];
       game.hands = {
         p1: [createCard('10', 'hearts')], // Only card, lower so P2 can beat
         p2: [createCard('J', 'hearts')], // P2 beats with J
@@ -312,17 +321,14 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
       game.currentPlayerIndex = 0;
 
       const p1Result = makeMove(game, 'p1', [createCard('10', 'hearts')], 'play');
-      // P1 goes out automatically
       if (p1Result.playerWon) {
         expect(game.playersOut).toContain('p1');
       }
       
-      // P2 should still get turn
       let currentPlayer = game.turnOrder[game.currentPlayerIndex];
       expect(currentPlayer?.id).toBe('p2');
       makeMove(game, 'p2', [createCard('J', 'hearts')], 'play');
       
-      // P3 should get turn and can beat with Q
       currentPlayer = game.turnOrder[game.currentPlayerIndex];
       expect(currentPlayer?.id).toBe('p3');
       const p3Result = makeMove(game, 'p3', [createCard('Q', 'hearts')], 'play');
@@ -330,10 +336,18 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
     });
 
     test('Scenario 11: P1 plays, P2 plays last card and goes out, P3 should get turn', () => {
+      // P1 and P2 on different teams so double victory does not trigger
+      game.players = [
+        { id: 'p1', team: 1, name: 'Player 1' },
+        { id: 'p2', team: 2, name: 'Player 2' },
+        { id: 'p3', team: 2, name: 'Player 3' },
+        { id: 'p4', team: 1, name: 'Player 4' }
+      ];
+      game.turnOrder = [...game.players];
       game.hands = {
-        p1: [createCard('10', 'hearts')], // Lower so P2 can beat
-        p2: [createCard('J', 'hearts')], // Only card, P2 beats
-        p3: [createCard('Q', 'hearts')], // P3 can beat with Q
+        p1: [createCard('10', 'hearts')],
+        p2: [createCard('J', 'hearts')],
+        p3: [createCard('Q', 'hearts')],
         p4: [createCard('K', 'hearts')]
       };
       game.leadPlayer = 'p1';
@@ -342,12 +356,10 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
       makeMove(game, 'p1', [createCard('10', 'hearts')], 'play');
       const p2Result = makeMove(game, 'p2', [createCard('J', 'hearts')], 'play');
       
-      // P2 goes out
       if (p2Result.playerWon) {
         expect(game.playersOut).toContain('p2');
       }
       
-      // P3 should get turn and can beat with Q
       const currentPlayer = game.turnOrder[game.currentPlayerIndex];
       expect(currentPlayer?.id).toBe('p3');
       const p3Result = makeMove(game, 'p3', [createCard('Q', 'hearts')], 'play');
@@ -439,10 +451,11 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
 
   describe('Complex Multi-Play Scenarios', () => {
     test('Scenario 14: P1 plays, P2 beats, P3 beats, P4 beats, all should get turns', () => {
+      // Give P1–P3 two cards each so no one goes out mid-trick (avoids "3 out = end round")
       game.hands = {
-        p1: [createCard('10', 'hearts')],
-        p2: [createCard('J', 'hearts')],
-        p3: [createCard('Q', 'hearts')],
+        p1: [createCard('10', 'hearts'), createCard('2', 'hearts')],
+        p2: [createCard('J', 'hearts'), createCard('2', 'spades')],
+        p3: [createCard('Q', 'hearts'), createCard('2', 'diamonds')],
         p4: [createCard('K', 'hearts')]
       };
       game.leadPlayer = 'p1';
@@ -511,10 +524,18 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
 
   describe('Edge Cases with Players Out', () => {
     test('Scenario 16: P1 plays, P2 out, P3 should get turn (skip P2)', () => {
+      // P1 and P2 different teams so P1 going out does not trigger double victory with P2
+      game.players = [
+        { id: 'p1', team: 1, name: 'Player 1' },
+        { id: 'p2', team: 2, name: 'Player 2' },
+        { id: 'p3', team: 2, name: 'Player 3' },
+        { id: 'p4', team: 1, name: 'Player 4' }
+      ];
+      game.turnOrder = [...game.players];
       game.hands = {
-        p1: [createCard('10', 'hearts')], // Lower so P3 can beat
-        p2: [], // Out
-        p3: [createCard('J', 'hearts')], // P3 can beat with J
+        p1: [createCard('10', 'hearts')],
+        p2: [],
+        p3: [createCard('J', 'hearts')],
         p4: [createCard('Q', 'hearts')]
       };
       game.playersOut = ['p2'];
@@ -525,7 +546,6 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
       makeMove(game, 'p1', [createCard('10', 'hearts')], 'play');
       debugGameState(game, 'After P1 plays (should skip P2, go to P3)');
       
-      // Should skip P2 and go to P3 (check by player ID)
       const currentPlayer = game.turnOrder[game.currentPlayerIndex];
       expect(currentPlayer?.id).toBe('p3');
       const p3Result = makeMove(game, 'p3', [createCard('J', 'hearts')], 'play');
@@ -537,11 +557,19 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
     });
 
     test('Scenario 17: P1 plays, P2 out, P3 out, P4 should get turn', () => {
+      // P1 and P2 different teams so P1 going out does not trigger double victory
+      game.players = [
+        { id: 'p1', team: 1, name: 'Player 1' },
+        { id: 'p2', team: 2, name: 'Player 2' },
+        { id: 'p3', team: 2, name: 'Player 3' },
+        { id: 'p4', team: 1, name: 'Player 4' }
+      ];
+      game.turnOrder = [...game.players];
       game.hands = {
-        p1: [createCard('10', 'hearts')], // Lower so P4 can beat
-        p2: [], // Out
-        p3: [], // Out
-        p4: [createCard('J', 'hearts')] // P4 can beat with J
+        p1: [createCard('10', 'hearts')],
+        p2: [],
+        p3: [],
+        p4: [createCard('J', 'hearts')]
       };
       game.playersOut = ['p2', 'p3'];
       game.leadPlayer = 'p1';
@@ -549,7 +577,6 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
 
       makeMove(game, 'p1', [createCard('10', 'hearts')], 'play');
       
-      // Should skip P2 and P3, go to P4 (check by player ID)
       const currentPlayer = game.turnOrder[game.currentPlayerIndex];
       expect(currentPlayer?.id).toBe('p4');
       const p4Result = makeMove(game, 'p4', [createCard('J', 'hearts')], 'play');
@@ -559,10 +586,11 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
 
   describe('Last player plays - trick ends (no double turn for lead)', () => {
     test('when all four play in a trick, last player play ends trick and winner leads next', () => {
+      // Give P1–P3 two cards so they do not go out when playing (avoids "3 out = end round" before P4 plays)
       game.hands = {
-        p1: [createCard('2', 'hearts')],
-        p2: [createCard('3', 'hearts')],
-        p3: [createCard('4', 'hearts')],
+        p1: [createCard('2', 'hearts'), createCard('A', 'hearts')],
+        p2: [createCard('3', 'hearts'), createCard('A', 'spades')],
+        p3: [createCard('4', 'hearts'), createCard('A', 'diamonds')],
         p4: [createCard('5', 'hearts')]
       };
       game.leadPlayer = 'p1';

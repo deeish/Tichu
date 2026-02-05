@@ -54,6 +54,7 @@ describe('Turn Management', () => {
     test('should skip players who have gone out', () => {
       game.currentPlayerIndex = 0;
       game.playersOut = ['p2'];
+      game.hands.p2 = []; // gone out = no cards
       
       advanceTurn(game);
       
@@ -73,6 +74,7 @@ describe('Turn Management', () => {
       game.currentPlayerIndex = 0;
       game.passedPlayers = ['p2'];
       game.playersOut = ['p3'];
+      game.hands.p3 = []; // p3 gone out
       
       advanceTurn(game);
       
@@ -97,6 +99,8 @@ describe('Turn Management', () => {
 
     test('should wrap around to find player', () => {
       game.playersOut = ['p2', 'p3'];
+      game.hands.p2 = [];
+      game.hands.p3 = [];
       const nextPlayer = getNextPlayerWithCards(game, 'p4');
       
       expect(nextPlayer.id).toBe('p1'); // Wraps around
@@ -104,6 +108,7 @@ describe('Turn Management', () => {
 
     test('should skip players who have gone out', () => {
       game.playersOut = ['p2'];
+      game.hands.p2 = [];
       const nextPlayer = getNextPlayerWithCards(game, 'p1');
       
       expect(nextPlayer.id).toBe('p3'); // Skips p2
@@ -118,6 +123,10 @@ describe('Turn Management', () => {
 
     test('should return null if all players have gone out', () => {
       game.playersOut = ['p1', 'p2', 'p3', 'p4'];
+      game.hands.p1 = [];
+      game.hands.p2 = [];
+      game.hands.p3 = [];
+      game.hands.p4 = [];
       const nextPlayer = getNextPlayerWithCards(game, 'p1');
       
       expect(nextPlayer).toBe(null);

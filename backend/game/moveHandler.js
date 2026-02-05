@@ -150,9 +150,13 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
         break;
       }
       
-      // If we've wrapped back to lead player, stop
+      // If we've wrapped back to lead player, everyone else has had a turn -> end the trick
+      // Do NOT give the lead another turn; end the trick and winner leads next.
       if (nextPlayerIndex === leadPlayerIndex) {
-        break;
+        const winningPlay = getCurrentWinningPlay(game.currentTrick);
+        const winnerId = winningPlay ? winningPlay.playerId : leadPlayerId;
+        const result = winTrick(game, winnerId);
+        return { ...result, newTrick: true };
       }
       
       nextPlayerIndex = (nextPlayerIndex + 1) % game.turnOrder.length;
@@ -160,60 +164,8 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
     
     game.currentPlayerIndex = nextPlayerIndex;
-    const currentIndexAfterAdvance = game.currentPlayerIndex;
-    const nextPlayer = game.turnOrder[game.currentPlayerIndex];
-    const nextPlayerId = nextPlayer?.id;
     
-    // CRITICAL FIX: Ensure we've actually given ALL players after the lead a turn
-    // The issue is that we might wrap around before all players have gotten a turn
-    // We need to check if we've cycled through ALL players in turn order after the lead
-    
-    let cycledBackToLead = false;
-    if (leadPlayerIndex !== -1 && playersWhoShouldHaveTurn.length > 0) {
-      // Get all players after the lead in turn order (in the correct order)
-      const playersAfterLead = [];
-      for (let i = 1; i < game.turnOrder.length; i++) {
-        const idx = (leadPlayerIndex + i) % game.turnOrder.length;
-        const player = game.turnOrder[idx];
-        if (player && playersWhoShouldHaveTurn.includes(player.id)) {
-          playersAfterLead.push(player.id);
-        }
-      }
-      
-      // Check if all players after lead have acted
-      const allAfterLeadActed = playersAfterLead.length > 0 && 
-        playersAfterLead.every(id => 
-          game.passedPlayers.includes(id) || 
-          game.currentTrick.some(play => play.playerId === id)
-        );
-      
-      // CRITICAL: Only end trick if we've wrapped around AND all players have acted
-      // We must ensure we've actually given every player a turn, not just that they've acted
-      // Check if we've wrapped around to or past the lead player
-      const wasAfterLead = currentIndexBeforeAdvance > leadPlayerIndex || 
-                          (currentIndexBeforeAdvance < leadPlayerIndex && currentIndexBeforeAdvance === 0);
-      const isAtOrBeforeLead = currentIndexAfterAdvance <= leadPlayerIndex;
-      const wrappedAround = wasAfterLead && isAtOrBeforeLead;
-      
-      // Only consider it cycled if ALL players after lead have acted AND we've wrapped around
-      // OR if the next player is the lead (meaning we've gone through everyone)
-      cycledBackToLead = allAfterLeadActed && (wrappedAround || nextPlayerId === leadPlayerId);
-    }
-    
-    // End trick ONLY if: all remaining players have acted AND we've cycled back to lead
-    // This ensures every player gets a turn before the trick ends
-    if (game.currentTrick.length > 0 && allPlayersHaveActed && cycledBackToLead) {
-      const winningPlay = getCurrentWinningPlay(game.currentTrick);
-      if (winningPlay) {
-        const result = winTrick(game, winningPlay.playerId);
-        return { ...result, newTrick: true };
-      }
-      // Fallback: if no winning play found, use the lead player
-      const result = winTrick(game, leadPlayerId);
-      return { ...result, newTrick: true };
-    }
-    
-    // Not all players have acted yet, continue with next player's turn
+    // Not all players have acted yet; it's the next player's turn
     return { success: true, game };
   }
   
