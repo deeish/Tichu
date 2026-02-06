@@ -244,13 +244,17 @@ describe('Game Flow Integration Tests', () => {
       expect(game.currentPlayerIndex).toBe(3); // p4's index
       expect(game.currentTrick.length).toBeGreaterThan(0); // Trick still active
       
-      // Player 4 should be able to play (A beats K)
+      // Player 4 plays A (beats K) and goes out. Current holder is P4 so P1, P2, P3 each get a chance to respond before trick ends.
       const p4Result = makeMove(game, 'p4', [{ type: 'standard', rank: 'A', suit: 'hearts' }], 'play');
       expect(p4Result.success).toBe(true);
-      // P4 played last card (went out) so trick ends: winner is p4, new trick started
-      expect(p4Result.newTrick).toBe(true);
-      expect(p4Result.winner).toBe('p4');
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p1');
+      makeMove(game, 'p1', [], 'pass');
+      makeMove(game, 'p2', [], 'pass');
+      const p3Pass = makeMove(game, 'p3', [], 'pass');
+      expect(p3Pass.newTrick).toBe(true);
       expect(game.currentTrick.length).toBe(0);
+      // P4 went out so next trick is led by first player with cards (P1)
+      expect(game.leadPlayer).toBe('p1');
     });
   });
 
@@ -269,6 +273,15 @@ describe('Game Flow Integration Tests', () => {
 
   describe('Phoenix as single', () => {
     test('Phoenix on 10 counts as 10.5; Jack (11) can beat it', () => {
+      // P1 and P2 must be on different teams so when P2 goes out we don't trigger double victory
+      // (which clears currentTrick and would make the trick empty)
+      game.players = [
+        { id: 'p1', team: 1, name: 'Player 1' },
+        { id: 'p2', team: 2, name: 'Player 2' },
+        { id: 'p3', team: 2, name: 'Player 3' },
+        { id: 'p4', team: 1, name: 'Player 4' }
+      ];
+      game.turnOrder = [...game.players];
       game.mahJongPlayed = true;
       game.hands = {
         p1: [{ type: 'standard', rank: '10', suit: 'hearts' }],

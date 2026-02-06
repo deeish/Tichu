@@ -78,12 +78,26 @@ function handlePlayerWin(game, playerId) {
     }
   }
   
-  // Round ends when 3 of 4 have finished (one player left with cards = tailender)
-  // Resolve current trick first if present, then end round
+  // Round ends when 3 of 4 have finished (tailender) OR when all 4 are out
   const playersWithCards = game.players.filter(p => !game.playersOut.includes(p.id));
   
-  if (playersWithCards.length === 1) {
-    // If there's an active trick, assign it to the current winner before ending the round
+  // Tailender: only when trick is empty, so the 4th player gets their turn if 3rd went out mid-trick
+  if (playersWithCards.length === 1 && (!game.currentTrick || game.currentTrick.length === 0)) {
+    const lastPlayer = playersWithCards[0];
+    if (!game.playersOut.includes(lastPlayer.id)) {
+      game.playersOut.push(lastPlayer.id);
+    }
+    const remainingCards = game.hands[lastPlayer.id] || [];
+    if (!game.playerStacks[lastPlayer.id]) {
+      game.playerStacks[lastPlayer.id] = { cards: [], points: 0 };
+    }
+    game.playerStacks[lastPlayer.id].cards.push(...remainingCards);
+    game.roundEnded = true;
+    game.state = 'round-ended';
+  }
+  
+  // All 4 out (e.g. 4th player just went out): resolve current trick if any, then end round
+  if (game.playersOut.length === 4 && !game.roundEnded) {
     if (game.currentTrick && game.currentTrick.length > 0) {
       const winningPlay = getCurrentWinningPlay(game.currentTrick);
       const winnerId = winningPlay ? winningPlay.playerId : game.currentTrick[0]?.playerId;
@@ -105,22 +119,10 @@ function handlePlayerWin(game, playerId) {
       game.currentTrick = [];
       game.passedPlayers = [];
     }
-    
-    const lastPlayer = playersWithCards[0];
-    if (!game.playersOut.includes(lastPlayer.id)) {
-      game.playersOut.push(lastPlayer.id);
-    }
-    const remainingCards = game.hands[lastPlayer.id] || [];
-    if (!game.playerStacks[lastPlayer.id]) {
-      game.playerStacks[lastPlayer.id] = { cards: [], points: 0 };
-    }
-    game.playerStacks[lastPlayer.id].cards.push(...remainingCards);
-    
     game.roundEnded = true;
     game.state = 'round-ended';
   }
   
-  // If round hasn't ended yet, continue playing
   if (!game.roundEnded) {
     return { success: true, game, playerWon: true };
   }

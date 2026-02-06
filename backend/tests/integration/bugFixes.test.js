@@ -139,7 +139,7 @@ describe('Bug fixes (BUGS.md)', () => {
           p1: [createCard('10', 'hearts')],
           p2: [createCard('J', 'hearts')],
           p3: [createCard('Q', 'hearts')],
-          p4: [createCard('K', 'hearts'), createCard('A', 'hearts')]
+          p4: [createCard('K', 'hearts')] // one card so P4 goes out when playing
         },
         scores: { team1: 0, team2: 0 },
         tichuDeclarations: {},
@@ -152,14 +152,15 @@ describe('Bug fixes (BUGS.md)', () => {
       expect(game.playersOut).toContain('p1');
       expect(game.playersOut).toContain('p2');
 
-      // P3 plays last card → 3rd out; only P4 has cards → round should end
+      // P3 plays last card → 3rd out; trick not empty so round does NOT end yet - P4 gets a turn
       const r3 = makeMove(game, 'p3', [createCard('Q', 'hearts')], 'play');
       expect(r3.success).toBe(true);
+      expect(game.roundEnded).toBe(false);
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p4');
 
-      expect(game.playersOut).toContain('p1');
-      expect(game.playersOut).toContain('p2');
-      expect(game.playersOut).toContain('p3');
-      expect(game.playersOut).toContain('p4');
+      // P4 plays last card (only card) → 4th out; round ends
+      const r4 = makeMove(game, 'p4', [createCard('K', 'hearts')], 'play');
+      expect(r4.success).toBe(true);
       expect(game.playersOut).toHaveLength(4);
       expect(game.state).toBe('round-ended');
       expect(game.roundEnded).toBe(true);

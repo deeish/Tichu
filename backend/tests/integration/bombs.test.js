@@ -164,7 +164,8 @@ describe('Bomb Interrupts', () => {
   });
 
   test('when bomb wins (no one can respond), bomb player gets turn not original lead', () => {
-    // P1 plays, P2 and P3 are out (no cards), P4 plays bomb - no one else can respond
+    // P1 plays (and goes out), P2 and P3 are out. P4 plays bomb but must have a card left
+    // so we don't trigger "all 4 out" round end (which re-initializes and would break these assertions).
     game.hands = {
       p1: [{ type: 'standard', rank: 'K', suit: 'hearts' }],
       p2: [],
@@ -173,7 +174,8 @@ describe('Bomb Interrupts', () => {
         { type: 'standard', rank: 'A', suit: 'hearts' },
         { type: 'standard', rank: 'A', suit: 'diamonds' },
         { type: 'standard', rank: 'A', suit: 'clubs' },
-        { type: 'standard', rank: 'A', suit: 'spades' }
+        { type: 'standard', rank: 'A', suit: 'spades' },
+        { type: 'standard', rank: '2', suit: 'hearts' }
       ]
     };
     game.playersOut = ['p2', 'p3'];
@@ -197,6 +199,49 @@ describe('Bomb Interrupts', () => {
     expect(game.leadPlayer).toBe('p4');
     expect(game.currentTrick.length).toBe(0);
     expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p4');
+  });
+
+  test('after bomb, every player including original trick starter gets one chance (BUGS.md lead rule)', () => {
+    // P1 leads (e.g. Mah Jong or single), P2 bombs, P3 pass, P4 pass → P1 must get a turn (not skipped).
+    game.hands = {
+      p1: [{ type: 'standard', rank: '10', suit: 'hearts' }, { type: 'standard', rank: 'J', suit: 'hearts' }],
+      p2: [
+        { type: 'standard', rank: 'A', suit: 'hearts' },
+        { type: 'standard', rank: 'A', suit: 'diamonds' },
+        { type: 'standard', rank: 'A', suit: 'clubs' },
+        { type: 'standard', rank: 'A', suit: 'spades' }
+      ],
+      p3: [{ type: 'standard', rank: 'K', suit: 'hearts' }],
+      p4: [{ type: 'standard', rank: 'Q', suit: 'hearts' }]
+    };
+    game.currentTrick = [];
+    game.leadPlayer = 'p1';
+    game.currentPlayerIndex = 0;
+    game.passedPlayers = [];
+
+    makeMove(game, 'p1', [{ type: 'standard', rank: '10', suit: 'hearts' }], 'play');
+    const bombResult = makeMove(game, 'p2', [
+      { type: 'standard', rank: 'A', suit: 'hearts' },
+      { type: 'standard', rank: 'A', suit: 'diamonds' },
+      { type: 'standard', rank: 'A', suit: 'clubs' },
+      { type: 'standard', rank: 'A', suit: 'spades' }
+    ], 'play');
+    expect(bombResult.success).toBe(true);
+    expect(game.leadPlayer).toBe('p2');
+    // Turn order rotated to [p2, p3, p4, p1]; next from bomb (index 0) is index 1 = p3
+    expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p3');
+
+    makeMove(game, 'p3', [], 'pass');
+    expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p4');
+    makeMove(game, 'p4', [], 'pass');
+    // After P4 passes, next must be P1 (original starter), not P2 (lead) — we only end when we'd return to lead
+    expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p1');
+    expect(game.currentTrick.length).toBeGreaterThan(0); // Trick not ended yet
+
+    const p1PassResult = makeMove(game, 'p1', [], 'pass');
+    expect(p1PassResult.success).toBe(true);
+    expect(p1PassResult.newTrick).toBe(true);
+    expect(game.currentTrick.length).toBe(0);
   });
 
   test('should prevent bomb when Dog is in trick', () => {
