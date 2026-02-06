@@ -10,6 +10,37 @@ const { advanceTurn } = require('./turnManagement');
 const { handlePlayerWin } = require('./scoring');
 
 /**
+ * Current holder of the trick = the player who last played (last entry in currentTrick).
+ * Used as fallback for "lead" so we never use trick starter (currentTrick[0]) for end-of-trick logic,
+ * which would incorrectly end the trick when the 4th player plays (BUGS.md).
+ */
+function getCurrentHolder(game) {
+  if (!game.currentTrick || game.currentTrick.length === 0) return null;
+  return game.currentTrick[game.currentTrick.length - 1].playerId;
+}
+
+/**
+ * Whether this player has already acted "since the current leader" this trick.
+ * "Lead" = whoever played last (current holder). We use the lead's LAST play index so that if
+ * the same player plays again (e.g. P2 at index 1 and 4), only plays at or after index 4 count as acted (BUGS.md).
+ */
+function hasActedSinceLead(game, playerId, leadPlayerId) {
+  if (game.passedPlayers.includes(playerId)) return true;
+  const playIndex = game.currentTrick.findIndex(p => p.playerId === playerId);
+  if (playIndex < 0) return false;
+  // Use last occurrence of lead (most recent play by them) so "acted" = at or after that play
+  let leadPlayIndex = -1;
+  for (let i = game.currentTrick.length - 1; i >= 0; i--) {
+    if (game.currentTrick[i].playerId === leadPlayerId) {
+      leadPlayIndex = i;
+      break;
+    }
+  }
+  const cutoff = leadPlayIndex >= 0 ? leadPlayIndex : 0;
+  return playIndex >= cutoff;
+}
+
+/**
  * Handles a player's move
  * @param {Object} game - Game state
  * @param {string} playerId - Player making the move
@@ -20,6 +51,11 @@ const { handlePlayerWin } = require('./scoring');
 function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   if (game.state !== 'playing') {
     return { success: false, error: 'Game is not in playing state' };
+  }
+
+  // BUGS.md: Players who have finished their hand are out of the pool until next round - they cannot act.
+  if (game.playersOut?.includes(playerId)) {
+    return { success: false, error: 'You have already finished this round and cannot play or pass' };
   }
 
   // After Dragon wins a trick, points/cards must be passed out (opponent selected) before any next play
@@ -94,8 +130,12 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     // The wish stays active for the next player
     game.passedPlayers.push(playerId);
     
-    // Get the lead player (first player to play in this trick)
-    const leadPlayerId = game.currentTrick[0]?.playerId;
+    // Lead for "when to end trick" = current holder (who last played). When all 4 have played once, MUST use
+    // last in trick so we don't end the trick until everyone has had a chance to pass (BUGS.md).
+    const currentHolder = getCurrentHolder(game);
+    const allFourPlayedOnce = game.currentTrick.length === game.players.length &&
+      new Set(game.currentTrick.map(p => p.playerId)).size === game.players.length;
+    const leadPlayerId = (allFourPlayedOnce ? currentHolder : null) || game.leadPlayer || currentHolder;
     if (!leadPlayerId) {
       return { success: false, error: 'No lead player found' };
     }
@@ -141,22 +181,23 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       const hasGoneOut = game.playersOut?.includes(nextPlayerId);
       const hasNoCards = !game.hands[nextPlayerId] || game.hands[nextPlayerId].length === 0;
       
-      // Check if this player has already acted (passed or played)
-      const hasActed = game.passedPlayers.includes(nextPlayerId) || 
-                      game.currentTrick.some(play => play.playerId === nextPlayerId);
-      
-      // If player hasn't acted and can act, this is our next player
-      if (!hasGoneOut && !hasNoCards && !hasActed) {
-        break;
-      }
-      
-      // If we've wrapped back to lead player, everyone else has had a turn -> end the trick
-      // Do NOT give the lead another turn; end the trick and winner leads next.
-      if (nextPlayerIndex === leadPlayerIndex) {
+      // If the next player we would give the turn to is the lead, end the trick (don't give lead a second turn).
+      // Check this BEFORE "hasn't acted" so we don't give the turn to the lead when they've played earlier in the trick (BUGS.md).
+      const distinctPlayersInTrick = new Set(game.currentTrick.map(p => p.playerId)).size;
+      const allFourPlayedOnce = game.currentTrick.length === game.players.length && distinctPlayersInTrick === game.players.length;
+      const fourPlaysFewPasses = allFourPlayedOnce && game.passedPlayers.length < game.players.length - 1;
+      if (nextPlayerIndex === leadPlayerIndex && !fourPlaysFewPasses) {
         const winningPlay = getCurrentWinningPlay(game.currentTrick);
         const winnerId = winningPlay ? winningPlay.playerId : leadPlayerId;
         const result = winTrick(game, winnerId);
         return { ...result, newTrick: true };
+      }
+      
+      // Acted since current leader (after a bomb, only pass or play at/after bomb counts)
+      const hasActed = hasActedSinceLead(game, nextPlayerId, leadPlayerId);
+      
+      if (!hasGoneOut && !hasNoCards && !hasActed) {
+        break;
       }
       
       nextPlayerIndex = (nextPlayerIndex + 1) % game.turnOrder.length;
@@ -286,9 +327,9 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     // Player went out but trick continues (others can still play higher bomb)
     const winResult = handlePlayerWin(game, playerId);
     if (!game.roundEnded) {
-      // Use the same logic as normal play to find next player who hasn't acted
-      const leadPlayerId = game.currentTrick[0]?.playerId;
-      const leadPlayerIndex = leadPlayerId ? game.turnOrder.findIndex(p => p.id === leadPlayerId) : -1;
+      // Lead is bomb player (game.leadPlayer) for wrap check
+      const leadPlayerId = game.leadPlayer;
+      const leadPlayerIndex = leadPlayerId ? game.turnOrder.findIndex(p => p.id === leadPlayerId) : 0;
       
       // Clear passed players
       game.passedPlayers = [];
@@ -309,13 +350,12 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
         
         const hasGoneOut = game.playersOut?.includes(nextPlayerId);
         const hasNoCards = !game.hands[nextPlayerId] || game.hands[nextPlayerId].length === 0;
-        const hasPlayed = game.currentTrick.some(play => play.playerId === nextPlayerId);
+        const hasActed = hasActedSinceLead(game, nextPlayerId, game.leadPlayer);
         
-        if (!hasGoneOut && !hasNoCards && !hasPlayed) {
+        if (!hasGoneOut && !hasNoCards && !hasActed) {
           break;
         }
         
-        // All players have acted - bomb wins, end trick and give bomb player the turn
         if (leadPlayerIndex !== -1 && nextPlayerIndex === leadPlayerIndex) {
           const bombWinnerId = game.leadPlayer;
           const trickResult = winTrick(game, bombWinnerId);
@@ -333,9 +373,9 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
     
     // Advance to next player to give others a chance to play a higher bomb
-    // Use the same logic as normal play to find next player who hasn't acted
-    const leadPlayerId = game.currentTrick[0]?.playerId;
-    const leadPlayerIndex = leadPlayerId ? game.turnOrder.findIndex(p => p.id === leadPlayerId) : -1;
+    // Lead is bomb player (game.leadPlayer); they are at index 0 after rotation. End when we'd return to index 0.
+    const leadPlayerId = game.leadPlayer;
+    const leadPlayerIndex = leadPlayerId ? game.turnOrder.findIndex(p => p.id === leadPlayerId) : 0;
     
     // Clear passed players (bomb interrupts)
     game.passedPlayers = [];
@@ -356,15 +396,14 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       
       const hasGoneOut = game.playersOut?.includes(nextPlayerId);
       const hasNoCards = !game.hands[nextPlayerId] || game.hands[nextPlayerId].length === 0;
-      const hasPlayed = game.currentTrick.some(play => play.playerId === nextPlayerId);
+      const hasActed = hasActedSinceLead(game, nextPlayerId, game.leadPlayer);
       
-      if (!hasGoneOut && !hasNoCards && !hasPlayed) {
+      if (!hasGoneOut && !hasNoCards && !hasActed) {
         break;
       }
       
-      // All players have acted - bomb wins, end trick and give bomb player the turn
       if (leadPlayerIndex !== -1 && nextPlayerIndex === leadPlayerIndex) {
-        const bombWinnerId = game.leadPlayer; // Bomb player was set above
+        const bombWinnerId = game.leadPlayer;
         const result = winTrick(game, bombWinnerId);
         return { ...result, bombPlayed: true, newTrick: true };
       }
@@ -518,13 +557,27 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     combination: validation
   });
   
-  // DEBUG: Log the current state
-  // console.log('After adding to trick:', {
-  //   playerId,
-  //   currentPlayerIndex: game.currentPlayerIndex,
-  //   currentTrick: game.currentTrick.map(p => p.playerId),
-  //   passedPlayers: game.passedPlayers
-  // });
+  // Current holder of the trick is the "lead": everyone after them must get one chance to respond before we can end.
+  // (Bomb path and Dog set leadPlayer themselves; do not overwrite when Dog was played.)
+  if (!dogWasPlayed) {
+    game.leadPlayer = playerId;
+  }
+  
+  // BUGS.md: Bulletproof guard - when all 4 have played and no one has passed, NEVER end the trick.
+  const allPlayedNoPasses = game.currentTrick.length === game.players.length && (!game.passedPlayers || game.passedPlayers.length === 0);
+  if (allPlayedNoPasses && !dogWasPlayed) {
+    let winResult = null;
+    const playerHandEmpty = !game.hands[playerId] || game.hands[playerId].length === 0;
+    if (playerHandEmpty) {
+      winResult = handlePlayerWin(game, playerId);
+      if (game.roundEnded) return { ...winResult, success: true, game };
+    }
+    const nextIdx = (game.currentPlayerIndex + 1) % game.turnOrder.length;
+    game.passedPlayers = [];
+    game.currentPlayerIndex = nextIdx;
+    if (game.dogPriorityPlayer === playerId) game.dogPriorityPlayer = null;
+    return { success: true, game, ...(winResult || {}), ...(playerHandEmpty ? { playerWon: true } : {}) };
+  }
   
   // Handle wish fulfillment - wish is cleared when the wished rank is played as a single OR in a bomb (four-of-a-kind or straight-flush containing that rank)
   if (game.mahJongWish && game.mahJongWish.mustPlay) {
@@ -536,6 +589,27 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     if (playedWishedAsSingle || playedBombWithWish) {
       game.mahJongWish = null;
     }
+  }
+  
+  // BUGS.md: First play of trick (e.g. Mah Jong on first turn) - advance to next in turn order who can act (not out, has cards).
+  if (game.currentTrick.length === 1 && !dogWasPlayed) {
+    game.passedPlayers = [];
+    if (game.dogPriorityPlayer === playerId) game.dogPriorityPlayer = null;
+    let nextIdx = (game.currentPlayerIndex + 1) % game.turnOrder.length;
+    const maxAttempts = game.turnOrder.length;
+    for (let i = 0; i < maxAttempts; i++) {
+      const nextId = game.turnOrder[nextIdx]?.id;
+      const out = nextId && (game.playersOut?.includes(nextId) || !(game.hands[nextId]?.length));
+      if (!nextId || !out) break;
+      nextIdx = (nextIdx + 1) % game.turnOrder.length;
+    }
+    game.currentPlayerIndex = nextIdx;
+    const firstPlayHandEmpty = !game.hands[playerId] || game.hands[playerId].length === 0;
+    if (firstPlayHandEmpty) {
+      const winResult = handlePlayerWin(game, playerId);
+      if (game.roundEnded) return { ...winResult, success: true, game };
+    }
+    return { success: true, game, ...(firstPlayHandEmpty ? { playerWon: true } : {}) };
   }
   
   // Check if player went out (empty hand) - handle this first
@@ -556,18 +630,13 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     // Player went out but trick continues - need to advance to next player who hasn't acted
     const winResult = handlePlayerWin(game, playerId);
     if (!game.roundEnded) {
-      // Use the same logic as the main play handler to find next player
-      // This ensures consistency
-      const leadPlayerId = game.currentTrick[0]?.playerId;
+      // Lead = current holder (who just played). Fallback to last in trick, never trick starter.
+      const leadPlayerId = game.leadPlayer || getCurrentHolder(game);
       const leadPlayerIndex = leadPlayerId ? game.turnOrder.findIndex(p => p.id === leadPlayerId) : -1;
       
       // Clear passed players (new play resets passes)
       game.passedPlayers = [];
       
-      // Get list of players who have already played in this trick
-      const playersWhoHavePlayed = new Set(game.currentTrick.map(play => play.playerId));
-      
-      // Find next player who hasn't acted yet
       let nextPlayerIndex = (game.currentPlayerIndex + 1) % game.turnOrder.length;
       let attempts = 0;
       const maxAttempts = game.turnOrder.length;
@@ -582,19 +651,19 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
         
         const hasGoneOut = game.playersOut?.includes(nextPlayerId);
         const hasNoCards = !game.hands[nextPlayerId] || game.hands[nextPlayerId].length === 0;
-        const hasPlayed = playersWhoHavePlayed.has(nextPlayerId);
+        const hasActed = hasActedSinceLead(game, nextPlayerId, leadPlayerId);
         
-        // Skip the current player (who just played and went out) - they're already in playersOut
-        const isCurrentPlayer = nextPlayerId === playerId;
-        
-        if (!hasGoneOut && !hasNoCards && !hasPlayed && !isCurrentPlayer) {
+        if (!hasGoneOut && !hasNoCards && !hasActed) {
           break;
         }
         
-        // All players have acted - end trick (winner is current player who went out)
-        if (leadPlayerIndex !== -1 && nextPlayerIndex === leadPlayerIndex) {
+        // All players have acted - end trick; winner is highest play, or player who just went out if unclear
+        // Defensive: never end when the lead just played and no one has passed (same as normal play path).
+        const leadJustPlayed = game.currentTrick.length > 0 &&
+          game.currentTrick[game.currentTrick.length - 1].playerId === leadPlayerId;
+        if (leadPlayerIndex !== -1 && nextPlayerIndex === leadPlayerIndex && !(leadJustPlayed && game.passedPlayers.length === 0)) {
           const winningPlay = getCurrentWinningPlay(game.currentTrick);
-          const winnerId = winningPlay ? winningPlay.playerId : leadPlayerId;
+          const winnerId = winningPlay ? winningPlay.playerId : playerId;
           const trickResult = winTrick(game, winnerId);
           return { ...trickResult, ...winResult, playerWon: true, newTrick: true };
         }
@@ -621,12 +690,9 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   // Move to next player who hasn't acted yet
   // Note: If Dog was played, don't advance turn - handleSpecialCards already set currentPlayerIndex to the partner
   if (!dogWasPlayed) {
-    // Find the lead player (first player in this trick)
-    // After adding the current play, the lead is the first entry in currentTrick
-    const leadPlayerId = game.currentTrick[0]?.playerId;
+    // Lead = current holder (who just played). Fallback to last in trick, never trick starter (would end trick after 4th play).
+    const leadPlayerId = game.leadPlayer || getCurrentHolder(game);
     if (!leadPlayerId) {
-      // This shouldn't happen - currentTrick should have at least one entry (the current play)
-      // But handle it gracefully
       return { success: false, error: 'Invalid trick state - no lead player found' };
     }
     
@@ -639,11 +705,8 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     // When a new play is made, all previous passes are reset - players can act again
     game.passedPlayers = [];
     
-    // Get list of players who have already played in this trick
-    const playersWhoHavePlayed = new Set(game.currentTrick.map(play => play.playerId));
-    
-    // Verify that the current player is in the list of players who have played
-    if (!playersWhoHavePlayed.has(playerId)) {
+    // Verify that the current player is in the trick (they just played)
+    if (game.currentTrick.every(p => p.playerId !== playerId)) {
       return { success: false, error: 'Current player not found in trick' };
     }
     
@@ -667,20 +730,26 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       const hasGoneOut = game.playersOut?.includes(nextPlayerId);
       const hasNoCards = !game.hands[nextPlayerId] || game.hands[nextPlayerId].length === 0;
       
-      // Check if this player has already played in this trick
-      const hasPlayed = playersWhoHavePlayed.has(nextPlayerId);
+      // Acted since current leader (after bomb, only play at/after bomb counts)
+      const hasActed = hasActedSinceLead(game, nextPlayerId, leadPlayerId);
       
-      // If player hasn't played and can act, this is our next player
-      if (!hasGoneOut && !hasNoCards && !hasPlayed) {
-        // Found valid next player
+      if (!hasGoneOut && !hasNoCards && !hasActed) {
         break;
       }
       
       // If we've wrapped back to lead player, all players have acted - end the trick
-      if (nextPlayerIndex === leadPlayerIndex) {
+      // Defensive: never end when the lead just played and no one has passed (everyone must get one chance to respond)
+      const leadJustPlayed = game.currentTrick.length > 0 &&
+        game.currentTrick[game.currentTrick.length - 1].playerId === leadPlayerId;
+      if (nextPlayerIndex === leadPlayerIndex && !(leadJustPlayed && game.passedPlayers.length === 0)) {
         const winningPlay = getCurrentWinningPlay(game.currentTrick);
-        const winnerId = winningPlay ? winningPlay.playerId : leadPlayerId;
+        const winnerId = winningPlay ? winningPlay.playerId : playerId;
         const result = winTrick(game, winnerId);
+        if (!game.hands[playerId] || game.hands[playerId].length === 0) {
+          const winResult = handlePlayerWin(game, playerId);
+          if (game.roundEnded) return { ...result, ...winResult, newTrick: true };
+          return { ...result, ...winResult, newTrick: true, playerWon: true };
+        }
         return { ...result, newTrick: true };
       }
       
@@ -690,6 +759,11 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
     // Set the next player as current
     game.currentPlayerIndex = nextPlayerIndex;
+    if (!game.hands[playerId] || game.hands[playerId].length === 0) {
+      const winResult = handlePlayerWin(game, playerId);
+      if (game.roundEnded) return { ...winResult, success: true, game, playerWon: true };
+      return { ...winResult, success: true, game, playerWon: true };
+    }
   } else {
     // Dog was played - passed players are already cleared by handleSpecialCards
     // Don't clear again, and don't advance (handleSpecialCards already set currentPlayerIndex)
