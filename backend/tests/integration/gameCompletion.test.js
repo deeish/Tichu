@@ -156,4 +156,29 @@ describe('Game Completion - Multiple Rounds', () => {
     game.scores.team2 += game.roundScores.team2;
     expect(game.scores.team2).toBe(-70); // 30 - 100 penalty
   });
+
+  test('BUGS.md #3: when all 4 players are out, round ends and next round starts (initializeGame)', () => {
+    game.state = 'playing';
+    game.playersOut = ['p1', 'p2', 'p3'];
+    game.hands = { p1: [], p2: [], p3: [], p4: [] };
+    game.currentTrick = [];
+    game.passedPlayers = [];
+    game.playerStacks = {
+      p1: { cards: [], points: 10 },
+      p2: { cards: [], points: 20 },
+      p3: { cards: [], points: 0 },
+      p4: { cards: [], points: 5 }
+    };
+    game.scores = { team1: 0, team2: 0 };
+    game.roundEnded = false;
+
+    handlePlayerWin(game, 'p4');
+
+    expect(game.state).toBe('grand-tichu');
+    expect(game.playersOut).toEqual([]);
+    expect(game.roundEnded).toBe(false);
+    expect(game.hands.p1.length).toBe(8);
+    expect(game.mahJongWish).toBe(null);
+    expect(game.currentTrick).toEqual([]);
+  });
 });

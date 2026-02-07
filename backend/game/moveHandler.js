@@ -189,8 +189,13 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       if (nextPlayerIndex === leadPlayerIndex && !fourPlaysFewPasses) {
         const winningPlay = getCurrentWinningPlay(game.currentTrick);
         const winnerId = winningPlay ? winningPlay.playerId : leadPlayerId;
+        // BUGS.md #3: When winner has empty hand (went out), add to playersOut before winTrick so startNewTrick skips them and round can end when all 4 out
+        if (!game.hands[winnerId] || game.hands[winnerId].length === 0) {
+          handlePlayerWin(game, winnerId);
+          if (game.roundEnded) return { success: true, game, newTrick: true, playerWon: true, roundEnded: true };
+        }
         const result = winTrick(game, winnerId);
-        return { ...result, newTrick: true };
+        return { ...result, newTrick: true, ...(game.hands[winnerId]?.length === 0 ? { playerWon: true } : {}) };
       }
       
       // Acted since current leader (after a bomb, only pass or play at/after bomb counts)
@@ -450,6 +455,19 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   const hasDogPriority = game.dogPriorityPlayer === playerId;
   
   if (game.currentTrick.length > 0 && !(dogInTrick && hasDogPriority)) {
+    // BUGS.md: When following, if you have the wished card you must play it (cannot play a different card e.g. 2 when wish is 7).
+    if (game.mahJongWish && game.mahJongWish.mustPlay) {
+      const hand = game.hands[playerId];
+      const hasWishedCard = hand && hand.some(card =>
+        card.type === 'standard' && card.rank === game.mahJongWish.wishedRank
+      );
+      const playingWishedRank = cards.some(c =>
+        c.type === 'standard' && c.rank === game.mahJongWish.wishedRank
+      );
+      if (hasWishedCard && !playingWishedRank) {
+        return { success: false, error: `You must play the wished card (${game.mahJongWish.wishedRank}) when you have it` };
+      }
+    }
     const winningPlay = getCurrentWinningPlay(game.currentTrick);
     const currentWinningCombo = winningPlay ? winningPlay.combination : null;
     

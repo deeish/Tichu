@@ -236,6 +236,18 @@ describe('Mah Jong Wish - Fulfillment and persistence', () => {
     expect(game.mahJongWish).toBe(null);
   });
 
+  test('BUGS.md #2: wished card played once (as single when following) clears the wish', () => {
+    const game = baseGame();
+    game.mahJongWish = { wishedRank: '7', mustPlay: true };
+    game.currentTrick = [
+      { playerId: 'p1', cards: [createCard('5', 'hearts')], combination: { type: 'single', cards: [createCard('5', 'hearts')] } }
+    ];
+    game.currentPlayerIndex = 1;
+    game.hands.p2 = [createCard('7', 'hearts')];
+    makeMove(game, 'p2', [createCard('7', 'hearts')], 'play');
+    expect(game.mahJongWish).toBe(null);
+  });
+
   test('playing the wished rank in a pair does NOT clear the wish', () => {
     const game = baseGame();
     game.mahJongWish = { wishedRank: 'K', mustPlay: true };
@@ -291,6 +303,22 @@ describe('Mah Jong Wish - Playing in the middle of a trick', () => {
     game.hands.p2 = [createCard('Q', 'hearts')];
     const result = makeMove(game, 'p2', [createCard('Q', 'hearts')], 'play');
     expect(result.success).toBe(true);
+    expect(game.mahJongWish).toBe(null);
+  });
+
+  test('BUGS.md: player WITH wished card (7) must play it when following; playing 2 instead is rejected', () => {
+    const game = baseGame();
+    game.mahJongWish = { wishedRank: '7', mustPlay: true };
+    game.currentTrick = [
+      { playerId: 'p1', cards: [createCard('2', 'hearts')], combination: { type: 'single', cards: [createCard('2', 'hearts')] } }
+    ];
+    game.currentPlayerIndex = 1;
+    game.hands.p2 = [createCard('7', 'hearts'), createCard('2', 'spades')];
+    const wrong = makeMove(game, 'p2', [createCard('2', 'spades')], 'play');
+    expect(wrong.success).toBe(false);
+    expect(wrong.error).toMatch(/wished card|7/);
+    const right = makeMove(game, 'p2', [createCard('7', 'hearts')], 'play');
+    expect(right.success).toBe(true);
     expect(game.mahJongWish).toBe(null);
   });
 
