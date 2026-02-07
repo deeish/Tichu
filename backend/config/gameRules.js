@@ -7,7 +7,7 @@ module.exports = {
   // Scoring constants
   TICHU_POINTS: 100,
   GRAND_TICHU_POINTS: 200,
-  WINNING_SCORE: 1000,
+  WINNING_SCORE: 1000, // First team to reach 1000 wins. If both hit 1000 in same round, higher score wins.
   DOUBLE_VICTORY_POINTS: 200,
   
   // Card point values

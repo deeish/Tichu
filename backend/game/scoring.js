@@ -6,6 +6,7 @@
 const { initializeGame } = require('./initialization');
 const { getCurrentWinningPlay } = require('./trickManager');
 const { getCardPoints } = require('./deck');
+const { WINNING_SCORE } = require('../config/gameRules');
 
 /**
  * Handles when a player empties their hand
@@ -68,9 +69,10 @@ function handlePlayerWin(game, playerId) {
         game.scores.team1 = (game.scores.team1 || 0) + game.roundScores.team1;
         game.scores.team2 = (game.scores.team2 || 0) + game.roundScores.team2;
       }
-      if (game.scores && (game.scores.team1 >= 1000 || game.scores.team2 >= 1000)) {
+      if (game.scores && (game.scores.team1 >= WINNING_SCORE || game.scores.team2 >= WINNING_SCORE)) {
         game.state = 'finished';
-        game.winner = game.scores.team1 >= 1000 ? 1 : 2;
+        // If both hit 1000 in same round, team with more points wins; else first to 1000 wins
+        game.winner = game.scores.team1 >= game.scores.team2 ? 1 : 2;
       } else {
         initializeGame(game);
       }
@@ -180,9 +182,10 @@ function handlePlayerWin(game, playerId) {
     game.scores.team2 = (game.scores.team2 || 0) + game.roundScores.team2;
   }
   
-  if (game.scores && (game.scores.team1 >= 1000 || game.scores.team2 >= 1000)) {
+  if (game.scores && (game.scores.team1 >= WINNING_SCORE || game.scores.team2 >= WINNING_SCORE)) {
     game.state = 'finished';
-    game.winner = game.scores.team1 >= 1000 ? 1 : 2;
+    // If both hit 1000 in same round, team with more points wins; else first to 1000 wins
+    game.winner = game.scores.team1 >= game.scores.team2 ? 1 : 2;
   } else {
     initializeGame(game);
   }
