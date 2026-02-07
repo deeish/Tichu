@@ -81,19 +81,38 @@ function handlePlayerWin(game, playerId) {
   }
   
   // Round ends when 3 of 4 have finished (tailender) OR when all 4 are out
+  // BUGS.md: When P1,P2,P3 are out, round ends immediately; P4 cannot play more or claim points for cards in hand (discarded)
   const playersWithCards = game.players.filter(p => !game.playersOut.includes(p.id));
   
-  // Tailender: only when trick is empty, so the 4th player gets their turn if 3rd went out mid-trick
-  if (playersWithCards.length === 1 && (!game.currentTrick || game.currentTrick.length === 0)) {
+  // Tailender: as soon as only one player has cards left, round ends. Resolve current trick (if any) to whoever is winning; P4's hand is discarded (not counted).
+  if (playersWithCards.length === 1) {
     const lastPlayer = playersWithCards[0];
+    // Resolve in-progress trick so points go to current winner (one of P1/P2/P3), not lost
+    if (game.currentTrick && game.currentTrick.length > 0) {
+      const winningPlay = getCurrentWinningPlay(game.currentTrick);
+      const winnerId = winningPlay ? winningPlay.playerId : game.currentTrick[0]?.playerId;
+      if (winnerId) {
+        let trickPoints = 0;
+        for (const play of game.currentTrick) {
+          for (const card of play.cards) {
+            trickPoints += getCardPoints(card);
+          }
+        }
+        if (!game.playerStacks[winnerId]) {
+          game.playerStacks[winnerId] = { cards: [], points: 0 };
+        }
+        for (const play of game.currentTrick) {
+          game.playerStacks[winnerId].cards.push(...play.cards);
+        }
+        game.playerStacks[winnerId].points += trickPoints;
+      }
+      game.currentTrick = [];
+      game.passedPlayers = [];
+    }
     if (!game.playersOut.includes(lastPlayer.id)) {
       game.playersOut.push(lastPlayer.id);
     }
-    const remainingCards = game.hands[lastPlayer.id] || [];
-    if (!game.playerStacks[lastPlayer.id]) {
-      game.playerStacks[lastPlayer.id] = { cards: [], points: 0 };
-    }
-    game.playerStacks[lastPlayer.id].cards.push(...remainingCards);
+    // P4's remaining hand is discarded (not added to stack, not counted for points)
     game.roundEnded = true;
     game.state = 'round-ended';
   }

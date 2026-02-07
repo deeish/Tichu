@@ -439,6 +439,11 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
   }
 
+  // Dog can only be played as lead - reject before "must beat" so we return the right error
+  if (cards.some(c => c.name === 'dog') && game.currentTrick.length > 0) {
+    return { success: false, error: 'Dog can only be played as the lead card' };
+  }
+
   // Phoenix as single: value = last card played + 0.5 (or 1.5 if led). Must be set before "must beat" comparison.
   if (validation.type === 'single' && cards[0].name === 'phoenix') {
     const phoenixValue = getPhoenixValue(cards[0], game.currentTrick);
@@ -448,13 +453,15 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
 
   // If there's a current trick, validate the move beats the CURRENT HIGHEST play
   // (not the lead card - you must beat the last card played / current leader)
-  // EXCEPTION: If Dog is the only card in the trick and player has Dog priority,
-  // they can play any combination (Dog passes a "winning hand" - no need to beat it)
+  // EXCEPTION: If Dog is the only card in the trick, the current player (whoever has the turn) can play any combination.
+  // getCurrentWinningPlay skips Dog so would return null; without this we'd hit "Invalid trick state".
+  // Use turn order as source of truth so this works even if dogPriorityPlayer was cleared or not synced (e.g. client round-trip).
   const dogInTrick = game.currentTrick.length === 1 && 
     game.currentTrick[0].cards.some(c => c.name === 'dog');
-  const hasDogPriority = game.dogPriorityPlayer === playerId;
+  const currentPlayerId = game.turnOrder[game.currentPlayerIndex]?.id;
+  const canPlayAnyAfterDog = dogInTrick && (currentPlayerId === playerId);
   
-  if (game.currentTrick.length > 0 && !(dogInTrick && hasDogPriority)) {
+  if (game.currentTrick.length > 0 && !canPlayAnyAfterDog) {
     // BUGS.md: When following, if you have the wished card you must play it (cannot play a different card e.g. 2 when wish is 7).
     if (game.mahJongWish && game.mahJongWish.mustPlay) {
       const hand = game.hands[playerId];
@@ -610,9 +617,11 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   }
   
   // BUGS.md: First play of trick (e.g. Mah Jong on first turn) - advance to next in turn order who can act (not out, has cards).
+  // When Dog was played, dogWasPlayed is true so we skip this block; preserve dogPriorityPlayer (set by handleSpecialCards).
   if (game.currentTrick.length === 1 && !dogWasPlayed) {
     game.passedPlayers = [];
-    if (game.dogPriorityPlayer === playerId) game.dogPriorityPlayer = null;
+    const onlyPlayIsDog = game.currentTrick[0].cards.some(c => c.name === 'dog');
+    if (!onlyPlayIsDog && game.dogPriorityPlayer === playerId) game.dogPriorityPlayer = null;
     let nextIdx = (game.currentPlayerIndex + 1) % game.turnOrder.length;
     const maxAttempts = game.turnOrder.length;
     for (let i = 0; i < maxAttempts; i++) {
@@ -700,8 +709,8 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   // who hasn't acted yet in this trick. We should NOT skip players who have passed (they already acted),
   // but we should find the next player who hasn't acted (not in passedPlayers and not in currentTrick).
   
-  // Clear Dog priority when the player with priority plays a card
-  if (game.dogPriorityPlayer === playerId) {
+  // Clear Dog priority when the player with priority plays a card (except when they just played Dog - then priority stays so "must play single" applies)
+  if (game.dogPriorityPlayer === playerId && !dogWasPlayed) {
     game.dogPriorityPlayer = null;
   }
   

@@ -273,8 +273,8 @@ describe('Game Flow Integration Tests', () => {
 
   describe('Phoenix as single', () => {
     test('Phoenix on 10 counts as 10.5; Jack (11) can beat it', () => {
-      // P1 and P2 must be on different teams so when P2 goes out we don't trigger double victory
-      // (which clears currentTrick and would make the trick empty)
+      // P1 and P2 must have 2 cards each so they don't go out when they play; otherwise when P3
+      // goes out we'd have 3 out (tailender) and the round would end, clearing currentTrick.
       game.players = [
         { id: 'p1', team: 1, name: 'Player 1' },
         { id: 'p2', team: 2, name: 'Player 2' },
@@ -284,8 +284,8 @@ describe('Game Flow Integration Tests', () => {
       game.turnOrder = [...game.players];
       game.mahJongPlayed = true;
       game.hands = {
-        p1: [{ type: 'standard', rank: '10', suit: 'hearts' }],
-        p2: [{ type: 'special', name: 'phoenix' }],
+        p1: [{ type: 'standard', rank: '10', suit: 'hearts' }, { type: 'standard', rank: '2', suit: 'spades' }],
+        p2: [{ type: 'special', name: 'phoenix' }, { type: 'standard', rank: '3', suit: 'clubs' }],
         p3: [{ type: 'standard', rank: 'J', suit: 'hearts' }],
         p4: [{ type: 'standard', rank: 'Q', suit: 'hearts' }]
       };

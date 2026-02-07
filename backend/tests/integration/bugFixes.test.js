@@ -8,7 +8,7 @@
  */
 
 const { makeMove } = require('../../game/moveHandler');
-const { createTestGame, createCard } = require('../utils/testHelpers');
+const { createTestGame, createCard, createSpecialCard } = require('../utils/testHelpers');
 
 // Prevent actual round restart so we can assert round-ended state and scores
 jest.mock('../../game/initialization', () => ({
@@ -152,18 +152,231 @@ describe('Bug fixes (BUGS.md)', () => {
       expect(game.playersOut).toContain('p1');
       expect(game.playersOut).toContain('p2');
 
-      // P3 plays last card → 3rd out; trick not empty so round does NOT end yet - P4 gets a turn
+      // P3 plays last card → 3rd out; round ends immediately (tailender). P4 does not get a turn; P4's hand is discarded.
       const r3 = makeMove(game, 'p3', [createCard('Q', 'hearts')], 'play');
       expect(r3.success).toBe(true);
-      expect(game.roundEnded).toBe(false);
-      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p4');
-
-      // P4 plays last card (only card) → 4th out; round ends
-      const r4 = makeMove(game, 'p4', [createCard('K', 'hearts')], 'play');
-      expect(r4.success).toBe(true);
-      expect(game.playersOut).toHaveLength(4);
-      expect(game.state).toBe('round-ended');
       expect(game.roundEnded).toBe(true);
+      expect(game.playersOut).toHaveLength(4); // P4 added as tailender, cannot play
+      expect(game.state).toBe('round-ended');
+    });
+  });
+
+  describe('4. Dog: when turn returns to Dog player, can play any hand (no soft lock)', () => {
+    test('when only Dog player has cards, they get priority back and can play any combination (single, pair, etc.)', () => {
+      // P1 (lead) plays Dog. Partner P2 has no cards, so getNextPlayerWithCards(p2) wraps to P1. P1 gets turn back.
+      const game = createTestGame({
+        state: 'playing',
+        currentTrick: [],
+        passedPlayers: [],
+        leadPlayer: 'p1',
+        currentPlayerIndex: 0,
+        hands: {
+          p1: [createSpecialCard('dog'), createCard('5', 'hearts'), createCard('5', 'spades')],
+          p2: [],
+          p3: [],
+          p4: []
+        }
+      });
+
+      const dogResult = makeMove(game, 'p1', [createSpecialCard('dog')], 'play');
+      expect(dogResult.success).toBe(true);
+      expect(game.dogPriorityPlayer).toBe('p1'); // Turn came back to P1 (only player with cards)
+      expect(game.currentTrick.length).toBe(1);
+      expect(game.currentTrick[0].cards[0].name).toBe('dog');
+
+      // With Dog priority (whether partner or self), player can play any valid combination - e.g. a pair
+      const pairResult = makeMove(game, 'p1', [createCard('5', 'hearts'), createCard('5', 'spades')], 'play');
+      expect(pairResult.success).toBe(true);
+      expect(game.currentTrick.length).toBe(2); // Dog + pair
+      expect(game.state).toBe('playing');
+    });
+  });
+
+  describe('5. Dog: all scenarios', () => {
+    test('Dog can only be played as lead (not when trick has cards)', () => {
+      const game = createTestGame({
+        state: 'playing',
+        currentTrick: [{ playerId: 'p1', cards: [createCard('5', 'hearts')], combination: { type: 'single', cards: [] } }],
+        passedPlayers: [],
+        leadPlayer: 'p1',
+        currentPlayerIndex: 1,
+        hands: {
+          p1: [createCard('2', 'hearts')],
+          p2: [createSpecialCard('dog'), createCard('6', 'hearts')],
+          p3: [createCard('K', 'hearts')],
+          p4: [createCard('A', 'hearts')]
+        }
+      });
+      const result = makeMove(game, 'p2', [createSpecialCard('dog')], 'play');
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/lead|only.*lead/i);
+    });
+
+    test('Partner gets priority and can play any combination (e.g. pair)', () => {
+      const game = createTestGame({
+        state: 'playing',
+        currentTrick: [],
+        passedPlayers: [],
+        leadPlayer: 'p1',
+        currentPlayerIndex: 0,
+        hands: {
+          p1: [createSpecialCard('dog')],
+          p2: [createCard('5', 'hearts'), createCard('5', 'spades')],
+          p3: [createCard('K', 'hearts')],
+          p4: [createCard('A', 'hearts')]
+        }
+      });
+      const dogResult = makeMove(game, 'p1', [createSpecialCard('dog')], 'play');
+      expect(dogResult.success).toBe(true);
+      expect(game.dogPriorityPlayer).toBe('p2'); // P1's partner
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p2');
+
+      const pairResult = makeMove(game, 'p2', [createCard('5', 'hearts'), createCard('5', 'spades')], 'play');
+      expect(pairResult.success).toBe(true);
+      expect(game.currentTrick.length).toBe(2); // Dog + pair
+    });
+
+    test('Dog priority player cannot pass', () => {
+      const game = createTestGame({
+        state: 'playing',
+        currentTrick: [],
+        passedPlayers: [],
+        leadPlayer: 'p1',
+        currentPlayerIndex: 0,
+        hands: {
+          p1: [createSpecialCard('dog'), createCard('2', 'hearts')],
+          p2: [createCard('5', 'hearts'), createCard('5', 'spades')],
+          p3: [createCard('K', 'hearts')],
+          p4: [createCard('A', 'hearts')]
+        }
+      });
+      makeMove(game, 'p1', [createSpecialCard('dog')], 'play');
+      expect(game.dogPriorityPlayer).toBe('p2');
+      const passResult = makeMove(game, 'p2', [], 'pass');
+      expect(passResult.success).toBe(false);
+      expect(passResult.error).toMatch(/priority|cannot pass|must play/i);
+    });
+
+    test('Bomb not allowed when Dog is the only card in the trick', () => {
+      const game = createTestGame({
+        state: 'playing',
+        currentTrick: [{ playerId: 'p1', cards: [createSpecialCard('dog')], combination: { type: 'single', cards: [] } }],
+        passedPlayers: [],
+        leadPlayer: 'p1',
+        currentPlayerIndex: 1,
+        hands: {
+          p1: [createCard('2', 'hearts')],
+          p2: [
+            createCard('A', 'hearts'), createCard('A', 'diamonds'),
+            createCard('A', 'clubs'), createCard('A', 'spades')
+          ],
+          p3: [createCard('K', 'hearts')],
+          p4: [createCard('Q', 'hearts')]
+        }
+      });
+      game.dogPriorityPlayer = 'p2';
+      const bombResult = makeMove(game, 'p2', [
+        createCard('A', 'hearts'), createCard('A', 'diamonds'),
+        createCard('A', 'clubs'), createCard('A', 'spades')
+      ], 'play');
+      expect(bombResult.success).toBe(false);
+      expect(bombResult.error).toMatch(/bomb|dog|only card/i);
+    });
+
+    test('Partner has no cards: next player with cards gets priority and can play any combination', () => {
+      const game = createTestGame({
+        state: 'playing',
+        currentTrick: [],
+        passedPlayers: [],
+        leadPlayer: 'p1',
+        currentPlayerIndex: 0,
+        hands: {
+          p1: [createSpecialCard('dog')],
+          p2: [], // partner, no cards
+          p3: [createCard('7', 'hearts'), createCard('7', 'spades')],
+          p4: [createCard('K', 'hearts')]
+        }
+      });
+      const dogResult = makeMove(game, 'p1', [createSpecialCard('dog')], 'play');
+      expect(dogResult.success).toBe(true);
+      expect(game.dogPriorityPlayer).toBe('p3'); // Next with cards after P2
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p3');
+
+      const pairResult = makeMove(game, 'p3', [createCard('7', 'hearts'), createCard('7', 'spades')], 'play');
+      expect(pairResult.success).toBe(true);
+      expect(game.currentTrick.length).toBe(2);
+    });
+
+    test('After Dog-priority player plays, next player must beat or pass', () => {
+      const game = createTestGame({
+        state: 'playing',
+        currentTrick: [
+          { playerId: 'p1', cards: [createSpecialCard('dog')], combination: { type: 'single', cards: [] } },
+          { playerId: 'p2', cards: [createCard('5', 'hearts'), createCard('5', 'spades')], combination: { type: 'pair', cards: [], rank: '5' } }
+        ],
+        passedPlayers: [],
+        leadPlayer: 'p1',
+        currentPlayerIndex: 2,
+        hands: {
+          p1: [createCard('2', 'hearts')],
+          p2: [createCard('K', 'hearts')],
+          p3: [createCard('3', 'hearts'), createCard('3', 'spades')], // pair of 3s does not beat pair of 5s
+          p4: [createCard('7', 'hearts'), createCard('7', 'spades')]  // pair of 7s beats 5s
+        }
+      });
+      const lowPairResult = makeMove(game, 'p3', [createCard('3', 'hearts'), createCard('3', 'spades')], 'play');
+      expect(lowPairResult.success).toBe(false);
+      expect(lowPairResult.error).toMatch(/higher|beat/i);
+
+      const passResult = makeMove(game, 'p3', [], 'pass');
+      expect(passResult.success).toBe(true);
+
+      const highPairResult = makeMove(game, 'p4', [createCard('7', 'hearts'), createCard('7', 'spades')], 'play');
+      expect(highPairResult.success).toBe(true);
+    });
+
+    test('Dog player gets turn back can play single', () => {
+      const game = createTestGame({
+        state: 'playing',
+        currentTrick: [],
+        passedPlayers: [],
+        leadPlayer: 'p1',
+        currentPlayerIndex: 0,
+        hands: {
+          p1: [createSpecialCard('dog'), createCard('10', 'hearts')],
+          p2: [],
+          p3: [],
+          p4: []
+        }
+      });
+      makeMove(game, 'p1', [createSpecialCard('dog')], 'play');
+      expect(game.dogPriorityPlayer).toBe('p1');
+      const singleResult = makeMove(game, 'p1', [createCard('10', 'hearts')], 'play');
+      expect(singleResult.success).toBe(true);
+      expect(game.currentTrick.length).toBe(2);
+    });
+
+    test('P1 plays Dog, teammate P2 out, P3 out, P4 out → priority back to P1, P1 can play any combination (not just singles)', () => {
+      const game = createTestGame({
+        state: 'playing',
+        currentTrick: [],
+        passedPlayers: [],
+        leadPlayer: 'p1',
+        currentPlayerIndex: 0,
+        hands: {
+          p1: [createSpecialCard('dog'), createCard('7', 'hearts'), createCard('7', 'spades')],
+          p2: [],
+          p3: [],
+          p4: []
+        }
+      });
+      makeMove(game, 'p1', [createSpecialCard('dog')], 'play');
+      expect(game.dogPriorityPlayer).toBe('p1');
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p1');
+      // P1 must be allowed to play a pair (or any combo), not restricted to singles
+      const pairResult = makeMove(game, 'p1', [createCard('7', 'hearts'), createCard('7', 'spades')], 'play');
+      expect(pairResult.success).toBe(true);
+      expect(game.currentTrick.length).toBe(2);
     });
   });
 });
