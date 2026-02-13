@@ -1,0 +1,138 @@
+.drawer-column {
+  background: rgba(0, 0, 0, 0.35);
+  border-left: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  min-width: var(--drawer-collapsed);
+  transition: min-width 0.2s ease;
+}
+
+.drawer-column.drawer-open {
+  min-width: var(--drawer-open);
+}
+
+.drawer {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Divider / handle: subtle by default, accent on hover; grip icon; larger hit area */
+.drawer-toggle {
+  width: 32px;
+  min-width: 32px;
+  padding: 12px 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.drawer-toggle:hover,
+.drawer-toggle:focus {
+  background: rgba(255, 255, 255, 0.04);
+  border-left-color: rgba(99, 102, 241, 0.4);
+  color: rgba(255, 255, 255, 0.7);
+  outline: none;
+}
+
+.drawer-toggle:active {
+  border-left-color: rgba(99, 102, 241, 0.6);
+}
+
+.drawer-toggle .drawer-grip {
+  width: 4px;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 6px 0 currentColor, 0 12px 0 currentColor;
+}
+
+.drawer-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--s16);
+}
+
+.drawer-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: var(--s12);
+}
+
+.drawer-tab {
+  padding: 6px 12px;
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-panel);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.drawer-tab:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.drawer-tab.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.drawer-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.drawer-panel-inner {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.drawer-placeholder {
+  margin: 0;
+  font-style: italic;
+}
+
+.drawer-players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.drawer-players li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s8) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.drawer-players li.you .drawer-player-name {
+  font-weight: 600;
+  color: #fff;
+}
+
+.drawer-player-name {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+}
+
+.drawer-player-team {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}

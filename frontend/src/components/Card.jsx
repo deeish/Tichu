@@ -1,7 +1,11 @@
 import './Card.css';
 
-function Card({ card, onClick, selected = false, playable = false }) {
+function Card({ card, onClick, selected = false, playable = false, width, height }) {
   if (!card) return null;
+
+  const sizeStyle = (width != null || height != null)
+    ? { width: width != null ? `${width}px` : undefined, height: height != null ? `${height}px` : undefined }
+    : undefined;
 
   const handleClick = () => {
     if (onClick && playable) {
@@ -38,6 +42,7 @@ function Card({ card, onClick, selected = false, playable = false }) {
   return (
     <div
       className={`card ${selected ? 'selected' : ''} ${playable ? 'playable' : ''} ${isSpecial ? 'special' : ''}`}
+      style={sizeStyle}
       onClick={handleClick}
     >
       {isSpecial ? (

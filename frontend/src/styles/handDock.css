@@ -1,0 +1,264 @@
+/* Hand dock: header + body (rail + hint | button box); room for full cards + future won area */
+.hand-dock {
+  width: clamp(980px, 76vw, 1160px);
+  max-width: 100%;
+  min-width: 860px;
+  margin: 0 auto;
+  height: 100%;
+  min-height: 180px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: var(--radius-dock);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: grid;
+  grid-template-rows: 44px 1fr;
+  padding: 0 var(--s20);
+  gap: 0;
+  align-content: stretch;
+  z-index: var(--z-dock);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.dock-body {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--s16);
+  min-height: 0;
+  align-items: stretch;
+}
+
+.dock-main {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Placeholder for won cards (left of hand); reserve space for future use */
+.dock-won {
+  min-width: 0;
+  width: 0;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.dock-actions-box {
+  width: 140px;
+  flex-shrink: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding-left: var(--s16);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+}
+
+.dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--s8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dock-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.dock-sort {
+  display: flex;
+  gap: 4px;
+}
+
+.dock-sort button {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.dock-sort button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.dock-sort button.active {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* Hand rail: flex to fill space so full card height is visible (no cut-off) */
+.dock-rail {
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  min-height: 100px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--s8) 0 var(--s12);
+}
+
+.dock-rail-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.dock-card-wrap {
+  position: absolute;
+  bottom: 0;
+  transition: transform 0.15s ease, z-index 0.15s;
+}
+
+.dock-card-wrap.selected {
+  transform: translateY(-12px);
+  z-index: 10;
+}
+
+.dock-card-wrap.disabled {
+  opacity: 1;
+  pointer-events: none;
+}
+
+.dock-card-wrap .card {
+  margin: 0;
+  cursor: pointer;
+}
+
+.dock-overflow {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  margin-right: var(--s8);
+}
+
+.dock-overflow .card-back {
+  margin-left: -24px;
+}
+
+.dock-overflow .card-back:first-child {
+  margin-left: 0;
+}
+
+.dock-overflow-badge {
+  align-self: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+/* Actions: vertical stack inside right-side box */
+.dock-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s8);
+  padding: 0;
+  min-height: 0;
+}
+
+.dock-btn {
+  padding: 0 16px;
+  min-width: 100px;
+  height: 38px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-panel);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+.dock-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.dock-btn-primary {
+  background: rgba(99, 102, 241, 0.9);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dock-btn-primary:hover:not(:disabled) {
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.35);
+}
+
+.dock-btn-primary:disabled {
+  background: rgba(99, 102, 241, 0.35);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.dock-btn-secondary {
+  min-width: 88px;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dock-btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.dock-btn-secondary:disabled {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.dock-btn-rail {
+  /* Secondary action near rail / sort (e.g. Reveal cards) */
+  min-width: 0;
+  font-size: 12px;
+}
+
+.dock-btn-bomb {
+  background: rgba(220, 38, 38, 0.9);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dock-btn-bomb:hover:not(:disabled) {
+  box-shadow: 0 2px 12px rgba(220, 38, 38, 0.35);
+}
+
+.dock-btn-bomb:disabled {
+  background: rgba(220, 38, 38, 0.4);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Hint line: below rail, inside main area */
+.dock-hint {
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.5);
+  padding: var(--s4) 0 var(--s8);
+  min-height: 18px;
+  flex-shrink: 0;
+}
+
+.dock-hint.error {
+  color: #fca5a5;
+}
+
+.dock-hint.success {
+  color: #86efac;
+}

@@ -1,0 +1,87 @@
+/**
+ * Layout tokens as CSS custom properties and z-index hierarchy.
+ * --dock-h and --drawer-w are set from JS on .game-layout.
+ */
+:root {
+  /* Spacing */
+  --s4: 4px;
+  --s8: 8px;
+  --s12: 12px;
+  --s16: 16px;
+  --s20: 20px;
+  --s24: 24px;
+  --s32: 32px;
+
+  /* Radii */
+  --radius-panel: 12px;
+  --radius-dock: 16px;
+  --radius-pill: 999px;
+
+  /* Fixed structure (HUD row: top safe margin + content for score chips) */
+  --hud-height: 88px;
+  --seat-w: 320px;
+  --seat-h: 88px;
+  --drawer-open: 320px;
+  --drawer-collapsed: 56px;
+
+  /* Computed (set by JS on .game-layout) */
+  --dock-h: 200px;
+  --drawer-w: 56px;
+
+  /* Z-index */
+  --z-table: 0;
+  --z-mat: 1;
+  --z-seats: 2;
+  --z-dock: 3;
+  --z-preview: 4;
+  --z-tooltips: 5;
+  --z-modals: 6;
+}
+
+/* 3-row grid shell: HUD | main (table + drawer) | dock */
+.game-layout {
+  display: grid;
+  grid-template-rows: var(--hud-height) 1fr minmax(180px, var(--dock-h));
+  grid-template-columns: 1fr;
+  min-height: 100vh;
+  background: #1a1a2e;
+  color: #fff;
+}
+
+.game-layout .game-hud {
+  grid-column: 1 / -1;
+  height: var(--hud-height);
+}
+
+.game-layout .game-main {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr var(--drawer-w);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.game-layout.drawer-open .game-main {
+  grid-template-columns: 1fr var(--drawer-open);
+}
+
+.game-layout .table-column {
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.game-layout .drawer-column {
+  min-width: 0;
+  min-height: 0;
+}
+
+.game-layout .hand-dock-wrapper {
+  grid-column: 1 / -1;
+  height: var(--dock-h);
+  min-height: 180px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0 var(--s16);
+}

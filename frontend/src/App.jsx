@@ -93,6 +93,19 @@ function App() {
     socket.emit('create-test-game', name)
   }
 
+  const inActiveGame = gameState && gameState.state !== 'waiting';
+
+  if (inActiveGame) {
+    return (
+      <GameBoard
+        game={gameState}
+        socket={socket}
+        playerId={playerId || socket.id}
+        isConnected={isConnected}
+      />
+    );
+  }
+
   return (
     <div className="app">
       <header>
@@ -150,13 +163,7 @@ function App() {
 
             <p>Waiting for players... ({gameState.players.length}/4)</p>
           </div>
-        ) : (
-          <GameBoard 
-            game={gameState} 
-            socket={socket} 
-            playerId={playerId || socket.id}
-          />
-        )}
+        ) : null}
       </main>
     </div>
   )

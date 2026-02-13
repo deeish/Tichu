@@ -5,11 +5,11 @@ function formatRoundScore(r) {
   return n > 0 ? `+${n}` : n;
 }
 
-function GameInfo({ game, currentPlayer, playerId }) {
+function GameInfo({ game, currentPlayer, playerId, variant }) {
   if (!game) return null;
 
-  const getPlayerName = (playerId) => {
-    const player = game.players.find(p => p.id === playerId);
+  const getPlayerName = (pid) => {
+    const player = game.players.find(p => p.id === pid);
     return player ? player.name : 'Unknown';
   };
 
@@ -18,19 +18,37 @@ function GameInfo({ game, currentPlayer, playerId }) {
       case 'waiting':
         return 'Waiting for players...';
       case 'grand-tichu':
-        return 'Declare Grand Tichu (optional)';
+        return 'Grand Tichu';
       case 'exchanging':
-        return 'Exchange cards with other players';
+        return 'Exchanging';
       case 'playing':
-        return currentPlayer?.id === playerId 
-          ? 'Your turn!' 
-          : `${getPlayerName(currentPlayer?.id)}'s turn`;
+        return currentPlayer?.id === playerId ? 'Your turn' : `${getPlayerName(currentPlayer?.id)}'s turn`;
       case 'finished':
-        return `Game Over! Team ${game.winner} wins!`;
+        return `Team ${game.winner} wins`;
       default:
         return game.state;
     }
   };
+
+  if (variant === 'hud') {
+    return (
+      <div className="game-info game-info--hud">
+        <div className="hud-center-line">
+          {game.id} · {getStateMessage()}
+        </div>
+        <div className="hud-score-chips">
+          <div className="hud-score-chip">
+            <span className="hud-score-value">{game.scores?.team1 ?? 0}</span>
+            <span className="hud-score-label">Team 1 {formatRoundScore(game.roundScores?.team1)}</span>
+          </div>
+          <div className="hud-score-chip">
+            <span className="hud-score-value">{game.scores?.team2 ?? 0}</span>
+            <span className="hud-score-label">Team 2 {formatRoundScore(game.roundScores?.team2)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="game-info">
