@@ -1,5 +1,10 @@
 import './GameInfo.css';
 
+function formatRoundScore(r) {
+  const n = r ?? 0;
+  return n > 0 ? `+${n}` : n;
+}
+
 function GameInfo({ game, currentPlayer, playerId }) {
   if (!game) return null;
 
@@ -37,13 +42,13 @@ function GameInfo({ game, currentPlayer, playerId }) {
       <div className="scores-section">
         <div className="score team1">
           <span className="team-label">Team 1</span>
-          <span className="score-value">{game.scores?.team1 || 0}</span>
-          <span className="round-score">+{game.roundScores?.team1 || 0}</span>
+          <span className="score-value">{game.scores?.team1 ?? 0}</span>
+          <span className="round-score">{formatRoundScore(game.roundScores?.team1)}</span>
         </div>
         <div className="score team2">
           <span className="team-label">Team 2</span>
-          <span className="score-value">{game.scores?.team2 || 0}</span>
-          <span className="round-score">+{game.roundScores?.team2 || 0}</span>
+          <span className="score-value">{game.scores?.team2 ?? 0}</span>
+          <span className="round-score">{formatRoundScore(game.roundScores?.team2)}</span>
         </div>
       </div>
 

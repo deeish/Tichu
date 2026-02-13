@@ -1,7 +1,9 @@
 Current Bug List
 ****
+Check the logic for these:
 -Most gameplay bugs have been cleared but check for edgecases, especially with bombs
 -did some testing with points but double check that its fully functional
+
 
 
 rule book:

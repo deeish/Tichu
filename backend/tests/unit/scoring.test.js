@@ -116,15 +116,8 @@ describe('Scoring Logic', () => {
     expect(mockGame.roundScores.team1).toBe(190); // (60+30) + 100 Tichu bonus
   });
 
-  test('should apply Tichu penalty for failed declaration', () => {
-    // Test case: p4 declares Tichu but doesn't finish (goes out last or not at all)
-    // When p4 is the last player remaining, they're automatically added to playersOut
-    // So their Tichu is considered successful (they "finished" even if last)
-    // To test a failed Tichu, we need p4 to NOT be in playersOut when scoring happens
-    // But that's not possible with the current logic - last player is always added
-    
-    // Actually, let's test the scenario where p4 declares but the round ends with them as last
-    // In this case, p4 is added to playersOut, so Tichu is successful
+  test('should apply Tichu penalty when declarer does not get first', () => {
+    // p4 declares Tichu but gets last (not first) → -100 to their team (BUGS.md: can get negative points)
     mockGame.playerStacks.p1.points = 50;
     mockGame.playerStacks.p2.points = 30;
     mockGame.playerStacks.p3.points = 20;
@@ -132,21 +125,15 @@ describe('Scoring Logic', () => {
     mockGame.playersOut = ['p1', 'p2', 'p3'];
     mockGame.hands.p1 = [];
     mockGame.hands.p2 = [];
-    mockGame.hands.p3 = []; // p3 has no cards (going out)
-    mockGame.hands.p4 = [{ type: 'standard', rank: '2', suit: 'hearts' }]; // p4 still has cards
-    mockGame.tichuDeclarations = { p4: true }; // p4 declared but will be last
-    
-    // p3 goes out - this leaves only p4 with cards, so round should end
-    // p4 is automatically added to playersOut, so their Tichu is considered successful
+    mockGame.hands.p3 = [];
+    mockGame.hands.p4 = [{ type: 'standard', rank: '2', suit: 'hearts' }];
+    mockGame.tichuDeclarations = { p4: true };
+
     handlePlayerWin(mockGame, 'p3');
 
-    // Last place (p4) points transfer to first place (p1) before team scores
-    // p1: 50 + 10 (from p4) = 60
-    // p4: 0 (last place)
-    // Team2: 20 + 0 = 20
-    // p4 declared Tichu and is in playersOut (added as last player), so +100 bonus
-    // Team2: 20 + 100 = 120
-    expect(mockGame.roundScores.team2).toBe(120); // 20 + 0 + 100 Tichu bonus (p4 finished, even if last)
+    // First place is p1; p4 declared Tichu but got last → -100 penalty
+    // Team2 stack: 20 + 0 (p4's points transferred to p1) = 20; then -100 = -80
+    expect(mockGame.roundScores.team2).toBe(-80);
   });
 
 

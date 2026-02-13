@@ -280,31 +280,59 @@ function validateStraight(cards) {
     .filter(v => v !== null)
     .sort((a, b) => a - b);
   
-  // Check for duplicate ranks (straights require unique consecutive ranks)
+  // Check for duplicate ranks (straights require unique ranks)
   const uniqueValues = new Set(values);
   if (uniqueValues.size !== values.length) {
     return { valid: false, error: 'Straights cannot have duplicate ranks' };
   }
   
-  // Check for consecutive sequence
-  for (let i = 1; i < values.length; i++) {
-    if (values[i] !== values[i - 1] + 1) {
-      return { valid: false };
+  const ACE_VALUE = 14;
+  const hasPhoenix = cards.some(c => c.name === 'phoenix');
+  const n = cards.length;
+  const minVal = values[0];
+  const maxVal = values[values.length - 1];
+  let highestValue = maxVal;
+  let phoenixValue = null;
+
+  if (hasPhoenix && values.length === n - 1) {
+    // Phoenix fills one slot. Either: (1) non-Phoenix values are consecutive → Phoenix at bottom or top, or (2) one gap → Phoenix fills the gap.
+    let gapIndex = -1;
+    for (let i = 1; i < values.length; i++) {
+      const diff = values[i] - values[i - 1];
+      if (diff > 1) {
+        if (diff !== 2 || gapIndex !== -1) return { valid: false }; // multiple gaps or gap > 1
+        gapIndex = i;
+      }
+    }
+    if (gapIndex >= 0) {
+      // One gap: Phoenix fills it (e.g. 8,10,J,Q,K → Phoenix = 9)
+      if (maxVal - minVal !== n - 1) return { valid: false }; // span must be n-1 so one hole
+      phoenixValue = values[gapIndex - 1] + 1;
+      highestValue = maxVal;
+    } else {
+      // Consecutive: Phoenix at top (maxVal + 1) or bottom (minVal - 1)
+      if (maxVal < ACE_VALUE) {
+        phoenixValue = maxVal + 1;
+        highestValue = maxVal + 1;
+      } else if (minVal >= 2) {
+        phoenixValue = minVal - 1;
+        highestValue = maxVal;
+      } else {
+        return { valid: false }; // no valid place for Phoenix
+      }
+    }
+  } else {
+    // No Phoenix: must be consecutive
+    for (let i = 1; i < values.length; i++) {
+      if (values[i] !== values[i - 1] + 1) {
+        return { valid: false };
+      }
     }
   }
   
-  // Highest card in straight (for comparison): rulebook says compare by highest card
-  // When Phoenix is present, it can fill the top slot ONLY if max+1 <= 14 (Ace is highest)
-  // e.g. Phoenix,A,K,Q,J can only form 10-J-Q-K-A (Phoenix=10); cannot beat A,K,Q,J,10
-  const ACE_VALUE = 14;
-  const hasPhoenix = cards.some(c => c.name === 'phoenix');
-  const maxVal = Math.max(...values);
-  let highestValue = maxVal;
-  if (hasPhoenix && values.length === cards.length - 1 && maxVal < ACE_VALUE) {
-    highestValue = maxVal + 1;  // Phoenix can be the top only when it's not above Ace
-  }
-  
-  return { valid: true, type: 'straight', cards, length: cards.length, hasMahJong, highestValue };
+  const result = { valid: true, type: 'straight', cards, length: cards.length, hasMahJong, highestValue };
+  if (phoenixValue != null) result.phoenixValue = phoenixValue;
+  return result;
 }
 
 function validateBomb(cards) {

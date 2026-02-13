@@ -120,6 +120,79 @@ describe('validateCombination', () => {
       expect(result.valid).toBe(true);
       expect(result.type).toBe('straight');
     });
+
+    test('should validate straight with Phoenix filling a gap (e.g. 8, P, 10, J, Q, K)', () => {
+      const cards = [
+        { type: 'standard', rank: '8', suit: 'hearts' },
+        { type: 'special', name: 'phoenix' },
+        { type: 'standard', rank: '10', suit: 'diamonds' },
+        { type: 'standard', rank: 'J', suit: 'clubs' },
+        { type: 'standard', rank: 'Q', suit: 'spades' },
+        { type: 'standard', rank: 'K', suit: 'hearts' }
+      ];
+      const result = validateCombination(cards);
+      expect(result.valid).toBe(true);
+      expect(result.type).toBe('straight');
+      expect(result.phoenixValue).toBe(9);
+      expect(result.highestValue).toBe(13);
+    });
+
+    test('should validate straight with Phoenix at top (10, J, Q, K, P as 10-J-Q-K-A)', () => {
+      const cards = [
+        { type: 'standard', rank: '10', suit: 'hearts' },
+        { type: 'standard', rank: 'J', suit: 'diamonds' },
+        { type: 'standard', rank: 'Q', suit: 'clubs' },
+        { type: 'standard', rank: 'K', suit: 'spades' },
+        { type: 'special', name: 'phoenix' }
+      ];
+      const result = validateCombination(cards);
+      expect(result.valid).toBe(true);
+      expect(result.type).toBe('straight');
+      expect(result.phoenixValue).toBe(14);
+      expect(result.highestValue).toBe(14);
+    });
+
+    test('should reject straight with Phoenix when two gaps (e.g. 8, P, J, Q, K)', () => {
+      const cards = [
+        { type: 'standard', rank: '8', suit: 'hearts' },
+        { type: 'special', name: 'phoenix' },
+        { type: 'standard', rank: 'J', suit: 'clubs' },
+        { type: 'standard', rank: 'Q', suit: 'spades' },
+        { type: 'standard', rank: 'K', suit: 'hearts' }
+      ];
+      const result = validateCombination(cards);
+      expect(result.valid).toBe(false);
+    });
+
+    test('Phoenix can fill gap anywhere in straight (9, 10, P, Q, K → Phoenix = 11)', () => {
+      const cards = [
+        { type: 'standard', rank: '9', suit: 'hearts' },
+        { type: 'standard', rank: '10', suit: 'diamonds' },
+        { type: 'special', name: 'phoenix' },
+        { type: 'standard', rank: 'Q', suit: 'spades' },
+        { type: 'standard', rank: 'K', suit: 'hearts' }
+      ];
+      const result = validateCombination(cards);
+      expect(result.valid).toBe(true);
+      expect(result.type).toBe('straight');
+      expect(result.phoenixValue).toBe(11);
+      expect(result.highestValue).toBe(13);
+    });
+
+    test('Phoenix can be bottom of straight when top is Ace (P, A, K, Q, J → Phoenix = 10)', () => {
+      const cards = [
+        { type: 'special', name: 'phoenix' },
+        { type: 'standard', rank: 'A', suit: 'hearts' },
+        { type: 'standard', rank: 'K', suit: 'diamonds' },
+        { type: 'standard', rank: 'Q', suit: 'clubs' },
+        { type: 'standard', rank: 'J', suit: 'spades' }
+      ];
+      const result = validateCombination(cards);
+      expect(result.valid).toBe(true);
+      expect(result.type).toBe('straight');
+      expect(result.phoenixValue).toBe(10);
+      expect(result.highestValue).toBe(14);
+    });
   });
 
   describe('Bombs', () => {

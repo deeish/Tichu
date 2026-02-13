@@ -46,20 +46,18 @@ function handlePlayerWin(game, playerId) {
       game.roundScores = { team1: 0, team2: 0 };
       game.roundScores[`team${firstPlayer.team}`] = 200;
       
-      const tichuDeclarations = game.tichuDeclarations || {};
-      const grandTichuDeclarations = game.grandTichuDeclarations || {};
+      // Tichu/Grand Tichu: +100/+200 only if player got FIRST; otherwise -100/-200 (BUGS.md: can get negative points)
+      const firstPlaceIdDouble = game.playersOut && game.playersOut[0] != null ? String(game.playersOut[0]) : null;
+      const tichuDec = game.tichuDeclarations || {};
+      const grandTichuDec = game.grandTichuDeclarations || {};
       for (const p of game.players) {
-        if (tichuDeclarations[p.id] && game.playersOut.includes(p.id)) {
-          game.roundScores[`team${p.team}`] += 100;
+        const pid = p.id != null ? String(p.id) : null;
+        const gotFirst = firstPlaceIdDouble !== null && pid !== null && firstPlaceIdDouble === pid;
+        if (tichuDec[p.id]) {
+          game.roundScores[`team${p.team}`] += gotFirst ? 100 : -100;
         }
-        if (grandTichuDeclarations[p.id] && game.playersOut.includes(p.id)) {
-          game.roundScores[`team${p.team}`] += 200;
-        }
-        if (tichuDeclarations[p.id] && !game.playersOut.includes(p.id)) {
-          game.roundScores[`team${p.team}`] -= 100;
-        }
-        if (grandTichuDeclarations[p.id] && !game.playersOut.includes(p.id)) {
-          game.roundScores[`team${p.team}`] -= 200;
+        if (grandTichuDec[p.id]) {
+          game.roundScores[`team${p.team}`] += gotFirst ? 200 : -200;
         }
       }
       
@@ -177,21 +175,18 @@ function handlePlayerWin(game, playerId) {
     }
   }
   
-  // Apply Tichu bonuses/penalties
+  // Apply Tichu/Grand Tichu: +100/+200 only if player got FIRST; otherwise -100/-200 (BUGS.md: can get negative points)
+  const firstPlaceId = game.playersOut && game.playersOut[0] != null ? String(game.playersOut[0]) : null;
+  const tichuDeclarations = game.tichuDeclarations || {};
+  const grandTichuDeclarations = game.grandTichuDeclarations || {};
   for (const player of game.players) {
-    const tichuDeclarations = game.tichuDeclarations || {};
-    const grandTichuDeclarations = game.grandTichuDeclarations || {};
-    if (tichuDeclarations[player.id] && game.playersOut.includes(player.id)) {
-      game.roundScores[`team${player.team}`] += 100;
+    const pid = player.id != null ? String(player.id) : null;
+    const gotFirst = firstPlaceId !== null && pid !== null && firstPlaceId === pid;
+    if (tichuDeclarations[player.id]) {
+      game.roundScores[`team${player.team}`] += gotFirst ? 100 : -100;
     }
-    if (grandTichuDeclarations[player.id] && game.playersOut.includes(player.id)) {
-      game.roundScores[`team${player.team}`] += 200;
-    }
-    if (tichuDeclarations[player.id] && !game.playersOut.includes(player.id)) {
-      game.roundScores[`team${player.team}`] -= 100;
-    }
-    if (grandTichuDeclarations[player.id] && !game.playersOut.includes(player.id)) {
-      game.roundScores[`team${player.team}`] -= 200;
+    if (grandTichuDeclarations[player.id]) {
+      game.roundScores[`team${player.team}`] += gotFirst ? 200 : -200;
     }
   }
   

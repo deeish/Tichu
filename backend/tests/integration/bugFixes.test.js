@@ -8,6 +8,7 @@
  */
 
 const { makeMove } = require('../../game/moveHandler');
+const { handlePlayerWin } = require('../../game/scoring');
 const { createTestGame, createCard, createSpecialCard } = require('../utils/testHelpers');
 
 // Prevent actual round restart so we can assert round-ended state and scores
@@ -377,6 +378,38 @@ describe('Bug fixes (BUGS.md)', () => {
       const pairResult = makeMove(game, 'p1', [createCard('7', 'hearts'), createCard('7', 'spades')], 'play');
       expect(pairResult.success).toBe(true);
       expect(game.currentTrick.length).toBe(2);
+    });
+  });
+
+  describe('Tichu/Grand Tichu: penalty when declarer does not get first (BUGS.md)', () => {
+    test('when round ends with declarer not first, team gets -100 (not +100)', () => {
+      const game = createTestGame({
+        state: 'playing',
+        playersOut: ['p2', 'p1', 'p3'],
+        currentTrick: [],
+        passedPlayers: [],
+        hands: {
+          p1: [],
+          p2: [],
+          p3: [],
+          p4: [createCard('2', 'hearts')]
+        },
+        playerStacks: {
+          p1: { cards: [], points: 20 },
+          p2: { cards: [], points: 30 },
+          p3: { cards: [], points: 10 },
+          p4: { cards: [], points: 5 }
+        },
+        scores: { team1: 0, team2: 0 },
+        tichuDeclarations: { p1: true },
+        grandTichuDeclarations: {}
+      });
+      // p1 (team1) declared Tichu but p2 (team1) got first; p1 got second. Trigger round end by p4 going out (tailender).
+      handlePlayerWin(game, 'p4');
+      expect(game.roundEnded).toBe(true);
+      // First place = p2, last place = p4 → p4's 5 goes to p2. Team1 stacks: p1=20, p2=30+5=35 → 55. Then Tichu: p1 declared but not first → -100. Team1 round = 55 - 100 = -45.
+      expect(game.roundScores.team1).toBe(-45);
+      expect(game.scores.team1).toBe(-45);
     });
   });
 });
