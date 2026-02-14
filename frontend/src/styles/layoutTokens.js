@@ -97,21 +97,18 @@ export function getVisibleHandCap(containerWidth) {
   return MAX_HAND_CAP;
 }
 
-// Dock width clamp: small 860–1040, baseline/wide up to 1160
+// Dock width clamp: small 920–1120, baseline/wide up to 1240
 export function getDockWidthClamp(containerWidth) {
-  if (containerWidth <= 1280) return { min: 860, max: 1040 };
-  return { min: 980, max: 1160 };
+  if (containerWidth <= 1280) return { min: 920, max: 1120 };
+  return { min: 1040, max: 1240 };
 }
 
-// Hand rail: horizontal distance between cards (px). Increase step to spread cards out, decrease to pack them.
-export const HAND_RAIL_STEP_MIN = 6;
-export const HAND_RAIL_STEP_MAX = 50; // ← change this to adjust spacing (e.g. 28 = closer, 40 = more spread)
+// Hand rail: horizontal distance between cards (px)
+export const HAND_RAIL_STEP = 65;
 
 export function getHandRailStep(railW, cardW, visibleCount) {
   if (visibleCount <= 1) return 0;
-  const usableW = railW - cardW;
-  const step = usableW / (visibleCount - 1);
-  return Math.min(HAND_RAIL_STEP_MAX, Math.max(HAND_RAIL_STEP_MIN, step));
+  return HAND_RAIL_STEP;
 }
 
 // Z-index hierarchy
