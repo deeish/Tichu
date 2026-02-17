@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Trick from './Trick';
-import GameHud from './GameHud';
 import Card from './Card';
 import CardBack from './CardBack';
 import Drawer from './Drawer';
@@ -25,7 +24,6 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   // ----- UI state (do not reset on game update unless invalidated) -----
   const [selectedCards, setSelectedCards] = useState([]);
   const [sortMode, setSortMode] = useState('none');
-  const [drawerOpen, setDrawerOpen] = useState(() => (typeof window !== 'undefined' && window.innerWidth > 1280));
   const [mahJongWish, setMahJongWish] = useState('');
   const [showWishInput, setShowWishInput] = useState(false);
   const [exchangeAssignments, setExchangeAssignments] = useState([null, null, null]);
@@ -40,7 +38,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
     return current?.id === playerId;
   }, [game?.turnOrder, game?.currentPlayerIndex, playerId]);
 
-  // Sync layout CSS vars and measure table/dock
+  // Sync layout CSS vars and measure table/dock (sidebar always 320px)
   useEffect(() => {
     const root = layoutRef.current;
     if (!root) return;
@@ -48,19 +46,12 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
     const updateDockH = () => {
       root.style.setProperty('--dock-h', `${getDockHeight()}px`);
     };
-    root.style.setProperty('--drawer-w', drawerOpen ? '320px' : '56px');
-    root.classList.toggle('drawer-open', drawerOpen);
+
+    window.addEventListener('resize', updateDockH);
     updateDockH();
 
-    const onResize = () => {
-      updateDockH();
-    };
-
-    window.addEventListener('resize', onResize);
-    onResize();
-
-    return () => window.removeEventListener('resize', onResize);
-  }, [drawerOpen]);
+    return () => window.removeEventListener('resize', updateDockH);
+  }, []);
 
   useEffect(() => {
     const el = tableRef.current;
@@ -94,10 +85,10 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   }, [game?.state]);
 
   const dockH = getDockHeight();
-  const drawerW = drawerOpen ? 320 : 56;
+  const sidebarW = 320;
   const centerRect = useMemo(
-    () => getCenterRect(tableSize.w, tableSize.h, dockH, drawerW),
-    [tableSize.w, tableSize.h, dockH, drawerW]
+    () => getCenterRect(tableSize.w, tableSize.h, dockH, sidebarW),
+    [tableSize.w, tableSize.h, dockH, sidebarW]
   );
   const matSize = useMemo(
     () => getMatSize(centerRect.w, centerRect.h),
@@ -108,8 +99,8 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
     [centerRect, matSize.w, matSize.h]
   );
   const seatPositions = useMemo(
-    () => getSeatPositions(tableSize.w, tableSize.h, dockH, drawerW),
-    [tableSize.w, tableSize.h, dockH, drawerW]
+    () => getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW),
+    [tableSize.w, tableSize.h, dockH, sidebarW]
   );
 
   const opponentsByPosition = useMemo(() => {
@@ -246,14 +237,8 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
 
   return (
     <div className="game-layout" ref={layoutRef}>
-      <GameHud
-        game={game}
-        currentPlayer={currentPlayer}
-        playerId={playerId}
-        isConnected={isConnected}
-      />
-
-      <div className="game-main">
+      <div className="game-left">
+        <div className="game-main">
         <div className="table-column" ref={tableRef}>
           <div className="table-surface">
             {/* Seat panels (absolute) */}
@@ -328,13 +313,6 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
             </div>
           </div>
         </div>
-
-        <Drawer
-          open={drawerOpen}
-          onToggle={() => setDrawerOpen((o) => !o)}
-          game={game}
-          playerId={playerId}
-        />
       </div>
 
       {/* Prompt strip: above dock (wish, exchange, dragon, etc.) */}
@@ -450,7 +428,9 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
           )}
         </HandDock>
       </div>
+      </div>
 
+      <Drawer game={game} playerId={playerId} isConnected={isConnected} />
     </div>
   );
 }

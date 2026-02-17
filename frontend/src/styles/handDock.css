@@ -7,8 +7,9 @@
   height: 100%;
   min-height: 180px;
   background: rgba(0, 0, 0, 0.45);
-  border-radius: var(--radius-dock);
+  border-radius: var(--radius-dock) var(--radius-dock) 0 0;
   border: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: none;
   display: grid;
   grid-template-rows: 44px 1fr;
   padding: 0 var(--s20);

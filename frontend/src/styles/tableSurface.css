@@ -24,20 +24,18 @@
   pointer-events: none;
 }
 
-/* Seat panels: distinct surface (darker than felt) + 1px stroke, 16px padding */
+/* Seat panels: compact, smaller than before */
 .seat-panel {
   position: absolute;
-  width: 320px;
-  height: 88px;
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-panel);
-  padding: var(--s16);
+  padding: var(--s8);
   display: flex;
   align-items: center;
-  gap: var(--s16);
+  gap: var(--s8);
   z-index: var(--z-seats);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(6px);
   box-sizing: border-box;
 }
 
@@ -50,30 +48,30 @@
 }
 
 .seat-avatar {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 12px;
+  font-weight: 600;
+  font-size: 10px;
   color: rgba(255, 255, 255, 0.9);
   flex-shrink: 0;
 }
 
 .seat-acting-chip {
   position: absolute;
-  top: var(--s8);
-  right: var(--s8);
-  font-size: 10px;
+  top: 4px;
+  right: 4px;
+  font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   color: rgba(252, 211, 77, 0.9);
   background: rgba(252, 211, 77, 0.12);
-  padding: 2px 6px;
+  padding: 2px 4px;
   border-radius: var(--radius-pill);
 }
 
@@ -82,12 +80,12 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .seat-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 12px;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
@@ -95,20 +93,20 @@
 }
 
 .seat-meta {
-  font-size: 12px;
+  font-size: 10px;
   color: rgba(255, 255, 255, 0.55);
 }
 
 .seat-hand-fan {
   display: flex;
   align-items: center;
-  margin-top: 4px;
-  transform: scale(0.5);
+  margin-top: 2px;
+  transform: scale(0.38);
   transform-origin: left center;
 }
 
 .seat-hand-fan .card-back {
-  margin-left: -18px;
+  margin-left: -14px;
 }
 
 .seat-hand-fan .card-back:first-child {
@@ -116,7 +114,7 @@
 }
 
 .seat-hand-more {
-  font-size: 10px;
+  font-size: 9px;
   color: rgba(255, 255, 255, 0.5);
   margin-left: 2px;
 }
@@ -124,12 +122,12 @@
 .seat-stack {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
   margin-left: auto;
 }
 
 .seat-stack .card-back {
-  margin-left: -50px;
+  margin-left: -32px;
 }
 
 .seat-stack .card-back:first-child {
@@ -137,7 +135,7 @@
 }
 
 .seat-stack-more {
-  font-size: 12px;
+  font-size: 10px;
   color: rgba(255, 255, 255, 0.6);
   margin-left: 2px;
 }

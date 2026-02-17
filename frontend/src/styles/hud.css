@@ -21,11 +21,28 @@
   min-height: 52px;
 }
 
-.hud-brand {
+.hud-left {
   display: flex;
   align-items: center;
   gap: var(--s12);
   flex-shrink: 0;
+}
+
+.hud-party-code {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: ui-monospace, monospace;
+}
+
+.hud-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s8);
+  padding: 0 var(--s16);
 }
 
 .hud-title {
@@ -52,17 +69,12 @@
   color: #fca5a5;
 }
 
-/* HUD variant: center line + score chips (dark, match dock) */
+/* HUD variant: game info (state message) only under title; scores are in sidebar */
 .game-info--hud {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s24);
   padding: 0;
   background: transparent;
   border: none;
+  text-align: center;
 }
 
 .hud-center-line {
@@ -71,47 +83,9 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1;
-  text-align: center;
-  padding: 0 var(--s16);
+  max-width: 100%;
 }
 
-.hud-score-chips {
-  display: flex;
-  gap: var(--s16);
-  flex-shrink: 0;
-  align-items: center;
-}
-
-.hud-score-chip {
-  width: 130px;
-  min-width: 120px;
-  max-width: 140px;
-  height: 48px;
-  min-height: 44px;
-  max-height: 56px;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-panel);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--s8) var(--s12);
-  box-sizing: border-box;
-  flex-shrink: 0;
-}
-
-.hud-score-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1.2;
-}
-
-.hud-score-label {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
-  margin-top: 2px;
-  line-height: 1.2;
+.game-info--hud .hud-score-chips {
+  display: none;
 }

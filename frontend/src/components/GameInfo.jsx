@@ -33,19 +33,7 @@ function GameInfo({ game, currentPlayer, playerId, variant }) {
   if (variant === 'hud') {
     return (
       <div className="game-info game-info--hud">
-        <div className="hud-center-line">
-          {game.id} · {getStateMessage()}
-        </div>
-        <div className="hud-score-chips">
-          <div className="hud-score-chip">
-            <span className="hud-score-value">{game.scores?.team1 ?? 0}</span>
-            <span className="hud-score-label">Team 1 {formatRoundScore(game.roundScores?.team1)}</span>
-          </div>
-          <div className="hud-score-chip">
-            <span className="hud-score-value">{game.scores?.team2 ?? 0}</span>
-            <span className="hud-score-label">Team 2 {formatRoundScore(game.roundScores?.team2)}</span>
-          </div>
-        </div>
+        <div className="hud-center-line">{getStateMessage()}</div>
       </div>
     );
   }

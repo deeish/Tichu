@@ -14,13 +14,13 @@ export const RADIUS_PILL = 999;
 
 // Fixed structural sizes (px)
 export const HUD_HEIGHT = 64;
-export const SEAT_WIDTH = 320;
-export const SEAT_HEIGHT = 88;
+export const SEAT_WIDTH = 200;
+export const SEAT_HEIGHT = 52;
 export const DRAWER_OPEN_WIDTH = 320;
 export const DRAWER_COLLAPSED_WIDTH = 56;
-export const OUTER_MARGIN = 24;
-export const TOP_BAND = 104; // room for top seat + piles
-export const SEAT_MAT_GAP = 16;
+export const OUTER_MARGIN = 20;
+export const TOP_BAND = 68; // room for top seat + gap (smaller seats)
+export const SEAT_MAT_GAP = 12;
 export const LEFT_BAND = OUTER_MARGIN + SEAT_WIDTH + SEAT_MAT_GAP;
 export const CARD_BACK_W = 56;
 export const CARD_BACK_H = 80;
@@ -50,10 +50,10 @@ export function getCenterRect(tableW, tableH, dockH, drawerW) {
   return { x, y, w, h };
 }
 
-// Play mat size: clamp(860, 70% centerW, 980) x clamp(420, 52% centerH, 520)
+// Play mat size: smaller, ~52% centerW x ~42% centerH for better centering and less space
 export function getMatSize(centerW, centerH) {
-  const matW = Math.min(980, Math.max(860, centerW * 0.7));
-  const matH = Math.min(520, Math.max(420, centerH * 0.52));
+  const matW = Math.min(680, Math.max(520, centerW * 0.52));
+  const matH = Math.min(380, Math.max(280, centerH * 0.42));
   return { w: matW, h: matH };
 }
 
