@@ -121,7 +121,7 @@ export function getDockWidthClamp(containerWidth) {
   return { min: 1040, max: 1240 };
 }
 
-// Hand rail: horizontal distance between cards (px)
+// Hand rail: horizontal distance between cards (px); 60 so 14 cards fit in the rail without clipping
 export const HAND_RAIL_STEP = 65;
 
 export function getHandRailStep(railW, cardW, visibleCount) {

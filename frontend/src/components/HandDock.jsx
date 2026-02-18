@@ -42,7 +42,12 @@ function HandDock({
   const overflowCount = cards.length > visibleCap ? cards.length - visibleCap : 0;
   const step = getHandRailStep(railW, cardSize.w, visibleCount);
   const totalCardRowWidth = visibleCount > 0 ? (visibleCount - 1) * step + cardSize.w : 0;
-  const cardRowLeftOffset = railW > 0 && totalCardRowWidth > 0 ? Math.max(0, (railW - totalCardRowWidth) / 2) : 0;
+  /* Card has border + margin + box-shadow; reserve space so the last card isn't clipped by overflow */
+  const cardRowExtraRight = 24;
+  const cardRowLeftOffset =
+    railW > 0 && totalCardRowWidth > 0
+      ? Math.max(0, (railW - totalCardRowWidth - cardRowExtraRight) / 2)
+      : 0;
 
   const visibleCards = useMemo(() => cards.slice(0, visibleCount), [cards, visibleCount]);
 
