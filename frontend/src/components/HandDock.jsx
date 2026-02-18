@@ -41,6 +41,8 @@ function HandDock({
   const visibleCount = Math.min(cards.length, visibleCap);
   const overflowCount = cards.length > visibleCap ? cards.length - visibleCap : 0;
   const step = getHandRailStep(railW, cardSize.w, visibleCount);
+  const totalCardRowWidth = visibleCount > 0 ? (visibleCount - 1) * step + cardSize.w : 0;
+  const cardRowLeftOffset = railW > 0 && totalCardRowWidth > 0 ? Math.max(0, (railW - totalCardRowWidth) / 2) : 0;
 
   const visibleCards = useMemo(() => cards.slice(0, visibleCount), [cards, visibleCount]);
 
@@ -86,7 +88,7 @@ function HandDock({
                   <div
                     key={key}
                     className={`dock-card-wrap ${isSelected ? 'selected' : ''} ${!playable ? 'disabled' : ''}`}
-                    style={{ left: `${i * step}px` }}
+                    style={{ left: `${cardRowLeftOffset + i * step}px` }}
                   >
                     <Card
                       card={card}

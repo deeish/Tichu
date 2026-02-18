@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react';
 import Trick from './Trick';
 import Card from './Card';
 import CardBack from './CardBack';
@@ -11,10 +11,14 @@ import {
   getMatSize,
   getMatPosition,
   getSeatPositions,
+  TABLE_HEADER_HEIGHT,
+  MAT_VERTICAL_BIAS,
+  MAT_TOP_OFFSET,
   SEAT_WIDTH,
   SEAT_HEIGHT,
   STACK_MAX_BACKS,
   STACK_OFFSET,
+  WON_STACK_GAP,
 } from '../styles/layoutTokens';
 import '../styles/layout.css';
 import '../styles/tableSurface.css';
@@ -96,11 +100,11 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   );
   const matPosition = useMemo(
     () => getMatPosition(centerRect, matSize.w, matSize.h),
-    [centerRect, matSize.w, matSize.h]
+    [centerRect, matSize.w, matSize.h, MAT_VERTICAL_BIAS, MAT_TOP_OFFSET]
   );
   const seatPositions = useMemo(
-    () => getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW),
-    [tableSize.w, tableSize.h, dockH, sidebarW]
+    () => getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize),
+    [tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize]
   );
 
   const opponentsByPosition = useMemo(() => {
@@ -235,13 +239,31 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
 
   const containerWidth = typeof window !== 'undefined' ? window.innerWidth : 1440;
 
+  const getStateMessage = () => {
+    if (!game) return '';
+    const getPlayerName = (pid) => game.players?.find(p => p.id === pid)?.name ?? 'Unknown';
+    switch (game.state) {
+      case 'waiting': return 'Waiting for players...';
+      case 'grand-tichu': return 'Grand Tichu';
+      case 'exchanging': return 'Exchanging';
+      case 'playing': return currentPlayer?.id === playerId ? 'Your turn' : `${getPlayerName(currentPlayer?.id)}'s turn`;
+      case 'finished': return `Team ${game.winner} wins`;
+      default: return game.state || '';
+    }
+  };
+
   return (
     <div className="game-layout" ref={layoutRef}>
       <div className="game-left">
         <div className="game-main">
         <div className="table-column" ref={tableRef}>
           <div className="table-surface">
-            {/* Seat panels (absolute) */}
+            {/* Table header: title + current action (above top seat) */}
+            <div className="table-header" style={{ height: TABLE_HEADER_HEIGHT }}>
+              <h1 className="table-title">Tichu</h1>
+              <div className="table-current-action-box">{getStateMessage()}</div>
+            </div>
+            {/* Seat panels (absolute) + won-cards pile (below left/right, right of top) */}
             {['top', 'left', 'right'].map((pos) => {
               const player = opponentsByPosition[pos];
               const posObj = seatPositions[pos];
@@ -252,44 +274,57 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
               const isActing = currentPlayer?.id === player.id && game.state === 'playing';
               const initials = (player.name || '?').slice(0, 2).toUpperCase();
 
+              const isTop = pos === 'top';
+              const wonStackLeft = isTop
+                ? posObj.x + SEAT_WIDTH + WON_STACK_GAP
+                : posObj.x + (SEAT_WIDTH - 56) / 2;
+              const wonStackTop = isTop
+                ? posObj.y + (SEAT_HEIGHT - 80) / 2
+                : posObj.y + SEAT_HEIGHT + WON_STACK_GAP;
+
               return (
-                <div
-                  key={player.id}
-                  className={`seat-panel seat--${pos} ${isActing ? 'seat--acting' : ''}`}
-                  style={{
-                    left: `${posObj.x}px`,
-                    top: `${posObj.y}px`,
-                    width: SEAT_WIDTH,
-                    height: SEAT_HEIGHT,
-                  }}
-                >
-                  {isActing && <span className="seat-acting-chip">Acting</span>}
-                  <div className="seat-avatar">{initials}</div>
-                  <div className="seat-body">
-                    <span className="seat-name">{player.name}</span>
-                    <span className="seat-meta">Team {player.team} · {handCount} cards</span>
-                    {handCount > 0 && (
-                      <div className="seat-hand-fan">
-                        {Array.from({ length: Math.min(handCount, 10) }).map((_, i) => (
-                          <CardBack key={i} size="small" />
-                        ))}
-                        {handCount > 10 && (
-                          <span className="seat-hand-more">+{handCount - 10}</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {stackCount > 0 && (
-                    <div className="seat-stack">
-                      {Array.from({ length: Math.min(stackCount, STACK_MAX_BACKS) }).map((_, i) => (
-                        <CardBack key={i} size="stack" />
-                      ))}
-                      {stackCount > STACK_MAX_BACKS && (
-                        <span className="seat-stack-more">+{stackCount - STACK_MAX_BACKS}</span>
-                      )}
+                <Fragment key={player.id}>
+                  <div
+                    className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''}`}
+                    style={{
+                      left: `${posObj.x}px`,
+                      top: `${posObj.y}px`,
+                      width: SEAT_WIDTH,
+                      height: SEAT_HEIGHT,
+                    }}
+                  >
+                    {isActing && <span className="seat-acting-chip">Acting</span>}
+                    <div className="seat-avatar">{initials}</div>
+                    <div className="seat-body">
+                      <span className="seat-name">{player.name}</span>
+                      <span className="seat-meta">
+                        <span className="seat-team-pill">Team {player.team ?? 1}</span>
+                        <span className="seat-card-count">{handCount} cards</span>
+                      </span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                  <div
+                    className={`won-cards-pile won-cards-pile--${pos} ${stackCount === 0 ? 'won-cards-pile--empty' : ''}`}
+                    style={{
+                      left: `${wonStackLeft}px`,
+                      top: `${wonStackTop}px`,
+                    }}
+                    aria-label={stackCount > 0 ? `${player.name} won ${stackCount} cards` : `${player.name} won pile (empty)`}
+                  >
+                    {stackCount > 0 ? (
+                      <>
+                        {Array.from({ length: Math.min(stackCount, STACK_MAX_BACKS) }).map((_, i) => (
+                          <div key={i} className="won-cards-pile-card" style={{ top: i * STACK_OFFSET }}>
+                            <CardBack size="stack" />
+                          </div>
+                        ))}
+                        {stackCount > STACK_MAX_BACKS && (
+                          <span className="won-cards-pile-more">+{stackCount - STACK_MAX_BACKS}</span>
+                        )}
+                      </>
+                    ) : null}
+                  </div>
+                </Fragment>
               );
             })}
 
@@ -305,12 +340,40 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
             >
               <div className={`play-mat-zone ${!game.currentTrick?.length ? 'empty' : ''}`}>
                 {game.currentTrick?.length ? (
-                  <Trick trick={game.currentTrick} players={game.players} />
+                  <Trick trick={game.currentTrick} players={game.players} containerWidth={containerWidth} />
                 ) : (
                   <span className="play-mat-empty-msg">No cards played yet</span>
                 )}
               </div>
             </div>
+
+            {/* Current player's won cards: centered above hand dock */}
+            {(() => {
+              const myStack = game.playerStacks?.[playerId];
+              const myStackCount = myStack?.cards?.length ?? 0;
+              const myWonLeft = (tableSize.w - 56) / 2;
+              const myWonTop = tableSize.h - 80 - WON_STACK_GAP;
+              return (
+                <div
+                  className={`won-cards-pile won-cards-pile--mine ${myStackCount === 0 ? 'won-cards-pile--empty' : ''}`}
+                  style={{ left: `${myWonLeft}px`, top: `${myWonTop}px` }}
+                  aria-label={myStackCount > 0 ? `You won ${myStackCount} cards` : 'Your won pile (empty)'}
+                >
+                  {myStackCount > 0 ? (
+                    <>
+                      {Array.from({ length: Math.min(myStackCount, STACK_MAX_BACKS) }).map((_, i) => (
+                        <div key={i} className="won-cards-pile-card" style={{ top: i * STACK_OFFSET }}>
+                          <CardBack size="stack" />
+                        </div>
+                      ))}
+                      {myStackCount > STACK_MAX_BACKS && (
+                        <span className="won-cards-pile-more">+{myStackCount - STACK_MAX_BACKS}</span>
+                      )}
+                    </>
+                  ) : null}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

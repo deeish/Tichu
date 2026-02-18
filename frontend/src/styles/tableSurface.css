@@ -24,54 +24,112 @@
   pointer-events: none;
 }
 
-/* Seat panels: compact, smaller than before */
+/* Table header: title + current action above top seat */
+.table-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s8);
+  padding: var(--s8) var(--s16);
+  z-index: var(--z-seats);
+  pointer-events: none;
+}
+
+.table-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.table-current-action-box {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-panel);
+  padding: var(--s8) var(--s16);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Seat panels: “at the table” look — warm dark panel, clear hierarchy */
 .seat-panel {
   position: absolute;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-panel);
-  padding: var(--s8);
+  background: linear-gradient(145deg, rgba(10, 50, 28, 0.85) 0%, rgba(5, 28, 18, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-dock);
+  padding: 6px var(--s12);
   display: flex;
   align-items: center;
   gap: var(--s8);
   z-index: var(--z-seats);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
   box-sizing: border-box;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .seat-panel.seat--acting {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(252, 211, 77, 0.35);
+  box-shadow: 0 0 0 1px rgba(252, 211, 77, 0.2), 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+.seat-panel.seat--acting::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  background: linear-gradient(180deg, rgba(252, 211, 77, 0.9), rgba(252, 180, 50, 0.6));
+  border-radius: 0 2px 2px 0;
+}
+
+.seat-avatar {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.08) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: #fff;
+  flex-shrink: 0;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
 }
 
 .seat-panel.seat--acting .seat-avatar {
   box-shadow: 0 0 0 2px rgba(252, 211, 77, 0.6);
 }
 
-.seat-avatar {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.9);
-  flex-shrink: 0;
-}
+.seat-panel.seat--team-1 .seat-avatar { border-color: rgba(120, 180, 255, 0.35); }
+.seat-panel.seat--team-2 .seat-avatar { border-color: rgba(255, 140, 120, 0.35); }
 
 .seat-acting-chip {
   position: absolute;
   top: 4px;
-  right: 4px;
+  right: 6px;
   font-size: 9px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: rgba(252, 211, 77, 0.9);
-  background: rgba(252, 211, 77, 0.12);
-  padding: 2px 4px;
+  letter-spacing: 0.04em;
+  color: rgba(252, 211, 77, 0.95);
+  background: rgba(252, 211, 77, 0.15);
+  padding: 2px 5px;
   border-radius: var(--radius-pill);
 }
 
@@ -80,64 +138,81 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 1px;
 }
 
 .seat-name {
   font-weight: 600;
-  font-size: 12px;
+  font-size: 13px;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .seat-meta {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.seat-hand-fan {
   display: flex;
   align-items: center;
-  margin-top: 2px;
-  transform: scale(0.38);
-  transform-origin: left center;
-}
-
-.seat-hand-fan .card-back {
-  margin-left: -14px;
-}
-
-.seat-hand-fan .card-back:first-child {
-  margin-left: 0;
-}
-
-.seat-hand-more {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-left: 2px;
-}
-
-.seat-stack {
-  display: flex;
-  align-items: center;
-  gap: 1px;
-  margin-left: auto;
-}
-
-.seat-stack .card-back {
-  margin-left: -32px;
-}
-
-.seat-stack .card-back:first-child {
-  margin-left: 0;
-}
-
-.seat-stack-more {
+  gap: 6px;
   font-size: 10px;
   color: rgba(255, 255, 255, 0.6);
-  margin-left: 2px;
+}
+
+.seat-team-pill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.seat-card-count {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Won cards pile: below left/right seat, to the right of top seat; reserved spot even when empty */
+.won-cards-pile {
+  position: absolute;
+  width: 56px;
+  min-height: 80px;
+  z-index: var(--z-seats);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.won-cards-pile--empty {
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.won-cards-pile-card {
+  position: absolute;
+  left: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.won-cards-pile-card .card-back {
+  display: block;
+}
+
+.won-cards-pile-more {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
 }
 
 /* Play mat: 1px stroke + soft shadow, slightly different surface (not heavy) */

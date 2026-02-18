@@ -19,13 +19,16 @@ export const SEAT_HEIGHT = 52;
 export const DRAWER_OPEN_WIDTH = 320;
 export const DRAWER_COLLAPSED_WIDTH = 56;
 export const OUTER_MARGIN = 20;
-export const TOP_BAND = 68; // room for top seat + gap (smaller seats)
 export const SEAT_MAT_GAP = 12;
+export const TABLE_HEADER_HEIGHT = 88; // title + current move line above top seat (was 52; increased to fit both)
+export const TABLE_HEADER_SEAT_GAP = 8;
+export const TOP_BAND = TABLE_HEADER_HEIGHT + TABLE_HEADER_SEAT_GAP + SEAT_HEIGHT + SEAT_MAT_GAP; // header + gap + top seat + gap to mat
 export const LEFT_BAND = OUTER_MARGIN + SEAT_WIDTH + SEAT_MAT_GAP;
 export const CARD_BACK_W = 56;
 export const CARD_BACK_H = 80;
 export const STACK_OFFSET = 6;
 export const STACK_MAX_BACKS = 7;
+export const WON_STACK_GAP = 8; // gap between seat panel and "won" cards pile
 
 // Dock height: clamp(180px, 22vh, 240px)
 export function getDockHeight() {
@@ -34,9 +37,9 @@ export function getDockHeight() {
   return Math.min(240, Math.max(180, vh));
 }
 
-// Right band = same as left (space for right seat) + drawer width
-export function getRightBand(drawerWidth) {
-  return LEFT_BAND + drawerWidth;
+// Right band = same as left (space for right seat). Sidebar is in a separate grid column, so we do not subtract its width from the table column.
+export function getRightBand(_drawerWidth) {
+  return LEFT_BAND;
 }
 
 // Center rect inside table (safe area for play mat)
@@ -57,23 +60,32 @@ export function getMatSize(centerW, centerH) {
   return { w: matW, h: matH };
 }
 
-// Play mat position (centered in centerRect)
+// Play mat vertical position: fraction of (centerRect height - mat height) from the top of the center rect.
+// Tune this to move the mat up/down: 0.5 = centered, 0.6 = lower, 0.7 = more room above / fill below.
+export const MAT_VERTICAL_BIAS = 0.90;
+
+// Extra pixels added to the playmat div's "top" (CSS). Increase this to lower the mat and give more room for the top seat.
+export const MAT_TOP_OFFSET = 65;
+
 export function getMatPosition(centerRect, matW, matH) {
+  const y = centerRect.y + (centerRect.h - matH) * MAT_VERTICAL_BIAS + MAT_TOP_OFFSET;
   return {
     x: centerRect.x + (centerRect.w - matW) / 2,
-    y: centerRect.y + (centerRect.h - matH) / 2,
+    y,
   };
 }
 
-// Seat anchor positions (absolute within table).
-// tableW is the table-column width only (drawer is in a separate column), so right seat uses tableW - margin - seat.
-export function getSeatPositions(tableW, tableH, dockH, drawerW) {
-  const seatY = (tableH - SEAT_HEIGHT) / 2;
+// Seat anchor positions (absolute within table). Centered with the play mat.
+// matPosition/matSize are used so top seat aligns with mat horizontal center, left/right with mat vertical center.
+export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition, matSize) {
   const rightX = tableW - OUTER_MARGIN - SEAT_WIDTH;
+  const topSeatY = TABLE_HEADER_HEIGHT + TABLE_HEADER_SEAT_GAP;
+  const matCenterX = matPosition.x + matSize.w / 2;
+  const matCenterY = matPosition.y + matSize.h / 2;
   return {
-    top: { x: Math.round((tableW - SEAT_WIDTH) / 2), y: OUTER_MARGIN },
-    left: { x: OUTER_MARGIN, y: Math.round(seatY) },
-    right: { x: Math.max(LEFT_BAND + 16, rightX), y: Math.round(seatY) },
+    top: { x: Math.round(matCenterX - SEAT_WIDTH / 2), y: topSeatY },
+    left: { x: OUTER_MARGIN, y: Math.round(matCenterY - SEAT_HEIGHT / 2) },
+    right: { x: Math.max(LEFT_BAND + 16, rightX), y: Math.round(matCenterY - SEAT_HEIGHT / 2) },
   };
 }
 
@@ -82,6 +94,12 @@ export function getCardSize(containerWidth) {
   if (containerWidth <= 1280) return { w: 64, h: 92 };
   if (containerWidth >= 1600) return { w: 80, h: 116 };
   return { w: 72, h: 104 };
+}
+
+// Smaller cards for played tricks so multiple fit on the table
+export function getTrickCardSize(containerWidth) {
+  const full = getCardSize(containerWidth);
+  return { w: Math.round(full.w * 0.6), h: Math.round(full.h * 0.6) };
 }
 
 // Slightly smaller cards in the hand dock so rail + actions + hint fit without overflow
