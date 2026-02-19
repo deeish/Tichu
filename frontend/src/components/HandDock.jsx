@@ -21,6 +21,8 @@ function HandDock({
   containerWidth = 1440,
   showDefaultActions = true,
   children,
+  draggable = false,
+  onCardDragStart,
 }) {
   const railRef = useRef(null);
   const [railW, setRailW] = useState(0);
@@ -102,6 +104,8 @@ function HandDock({
                       playable={playable}
                       width={cardSize.w}
                       height={cardSize.h}
+                      draggable={draggable}
+                      onDragStart={onCardDragStart ? (e) => onCardDragStart(e, card) : undefined}
                     />
                   </div>
                 );

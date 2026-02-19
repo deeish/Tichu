@@ -15,6 +15,14 @@
   user-select: none;
 }
 
+.card-draggable {
+  cursor: grab;
+}
+
+.card-draggable:active {
+  cursor: grabbing;
+}
+
 .card:hover {
   transform: translateY(-5px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
@@ -47,9 +55,9 @@
   color: white;
   border-radius: 6px;
   font-weight: bold;
-  font-size: 0.9rem;
+  font-size: 0.9em;
   text-align: center;
-  padding: 8px;
+  padding: 0.5em;
 }
 
 .card-standard {
@@ -63,13 +71,27 @@
 }
 
 .card-rank {
-  font-size: 1.5rem;
+  font-size: 1.5em;
   line-height: 1;
 }
 
 .card-suit {
-  font-size: 2rem;
+  font-size: 2em;
   line-height: 1;
+}
+
+/* When card has no explicit fontSize (scaleContent=false), use fixed sizes for hand/trick */
+.card:not([style*="font-size"]) .card-rank {
+  font-size: 1.5rem;
+}
+
+.card:not([style*="font-size"]) .card-suit {
+  font-size: 2rem;
+}
+
+.card:not([style*="font-size"]) .card-special {
+  font-size: 0.9rem;
+  padding: 8px;
 }
 
 .card.red {

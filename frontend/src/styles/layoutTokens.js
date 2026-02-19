@@ -108,6 +108,13 @@ export function getDockCardSize(containerWidth) {
   return { w: Math.round(full.w * 0.88), h: Math.round(full.h * 0.88) };
 }
 
+// Tiny cards for exchange/seat display (scale from base so they stay proportional and visible)
+export function getExchangeCardSize(containerWidth) {
+  const full = getCardSize(containerWidth);
+  const scale = 0.32;
+  return { w: Math.round(full.w * scale), h: Math.round(full.h * scale) };
+}
+
 // Max hand size is 14; show all cards (no overflow stack)
 export const MAX_HAND_CAP = 14;
 

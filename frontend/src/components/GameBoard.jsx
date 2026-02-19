@@ -11,6 +11,7 @@ import {
   getMatSize,
   getMatPosition,
   getSeatPositions,
+  getExchangeCardSize,
   TABLE_HEADER_HEIGHT,
   MAT_VERTICAL_BIAS,
   MAT_TOP_OFFSET,
@@ -31,6 +32,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   const [mahJongWish, setMahJongWish] = useState('');
   const [showWishInput, setShowWishInput] = useState(false);
   const [exchangeAssignments, setExchangeAssignments] = useState([null, null, null]);
+  const [exchangeDragOverSlot, setExchangeDragOverSlot] = useState(null);
 
   const layoutRef = useRef(null);
   const tableRef = useRef(null);
@@ -122,12 +124,14 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   }, [game?.turnOrder, game?.players, playerId]);
 
   const exchangeRecipients = game?.exchangeRecipients ?? [];
+  const cardMatches = (a, b) =>
+    a && b && a.type === b.type && (a.type === 'standard' ? a.suit === b.suit && a.rank === b.rank : a.name === b.name);
   const displayHand = useMemo(() => {
     if (!myHand?.length) return myHand;
     let base = myHand;
     if (game?.state === 'exchanging' && exchangeAssignments.some(Boolean)) {
       const assigned = exchangeAssignments.filter(Boolean);
-      base = myHand.filter((c) => !assigned.includes(c));
+      base = myHand.filter((c) => !assigned.some((a) => cardMatches(a, c)));
     }
     try {
       if (sortMode === 'asc') return sortCardsByRank(base, true);
@@ -192,6 +196,20 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
     });
   };
 
+  const handleDropOnSlot = (slotIndex, card) => {
+    setExchangeAssignments((prev) => {
+      const n = [...prev];
+      n[slotIndex] = card;
+      return n;
+    });
+    setExchangeDragOverSlot(null);
+  };
+
+  const handleExchangeDragStart = (e, card) => {
+    e.dataTransfer.setData('tichu/card', JSON.stringify(card));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
   const handlePlayCards = () => {
     if (selectedCards.length === 0) return;
     const hasMahJong = selectedCards.some((c) => c.name === 'mahjong');
@@ -223,8 +241,9 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   const canPass = isMyTurn && game?.state === 'playing';
 
   const hintText = useMemo(() => {
+    if (game?.state === 'exchanging') return ''; // exchange instruction shown in play mat center
     if (game?.state !== 'playing') return '';
-    if (selectedCards.length === 0) return 'Select cards to play';
+    if (selectedCards.length === 0) return ''; // "Select cards to play" shown in play mat center when your turn
     if (selectedCards.length === 1) return 'Single';
     if (selectedCards.length === 2) return 'Pair';
     if (selectedCards.length === 3) return 'Triple';
@@ -238,6 +257,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   }
 
   const containerWidth = typeof window !== 'undefined' ? window.innerWidth : 1440;
+  const exchangeCardSize = getExchangeCardSize(containerWidth);
 
   const getStateMessage = () => {
     if (!game) return '';
@@ -274,6 +294,12 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
               const isActing = currentPlayer?.id === player.id && game.state === 'playing';
               const initials = (player.name || '?').slice(0, 2).toUpperCase();
 
+              const isExchanging = game.state === 'exchanging' && !game.exchangeCards?.[playerId];
+              const exchangeSlotIndex = isExchanging ? exchangeRecipients.findIndex((r) => r.id === player.id) : -1;
+              const exchangeAssignedCard = exchangeSlotIndex >= 0 ? exchangeAssignments[exchangeSlotIndex] : null;
+              const isExchangeDropTarget = exchangeSlotIndex >= 0 && !exchangeAssignedCard;
+              const isDragOverThisSeat = exchangeDragOverSlot === exchangeSlotIndex;
+
               const isTop = pos === 'top';
               const wonStackLeft = isTop
                 ? posObj.x + SEAT_WIDTH + WON_STACK_GAP
@@ -285,13 +311,25 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
               return (
                 <Fragment key={player.id}>
                   <div
-                    className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''}`}
+                    className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''} ${isExchangeDropTarget ? 'seat--exchange-drop' : ''} ${isDragOverThisSeat ? 'seat--exchange-drag-over' : ''}`}
                     style={{
                       left: `${posObj.x}px`,
                       top: `${posObj.y}px`,
                       width: SEAT_WIDTH,
                       height: SEAT_HEIGHT,
                     }}
+                    onDragOver={isExchangeDropTarget ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setExchangeDragOverSlot(exchangeSlotIndex); } : undefined}
+                    onDragLeave={isExchangeDropTarget ? () => setExchangeDragOverSlot(null) : undefined}
+                    onDrop={isExchangeDropTarget ? (e) => {
+                      e.preventDefault();
+                      setExchangeDragOverSlot(null);
+                      const raw = e.dataTransfer.getData('tichu/card');
+                      if (!raw) return;
+                      try {
+                        const card = JSON.parse(raw);
+                        handleDropOnSlot(exchangeSlotIndex, card);
+                      } catch (_) {}
+                    } : undefined}
                   >
                     {isActing && <span className="seat-acting-chip">Acting</span>}
                     <div className="seat-avatar">{initials}</div>
@@ -302,6 +340,11 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
                         <span className="seat-card-count">{handCount} cards</span>
                       </span>
                     </div>
+                    {isExchanging && exchangeAssignedCard && (
+                      <div className="seat-exchange-card" onClick={() => handleRemoveFromSlot(exchangeSlotIndex)} title="Click to remove">
+                        <Card card={exchangeAssignedCard} width={exchangeCardSize.w} height={exchangeCardSize.h} compact />
+                      </div>
+                    )}
                   </div>
                   <div
                     className={`won-cards-pile won-cards-pile--${pos} ${stackCount === 0 ? 'won-cards-pile--empty' : ''}`}
@@ -341,6 +384,10 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
               <div className={`play-mat-zone ${!game.currentTrick?.length ? 'empty' : ''}`}>
                 {game.currentTrick?.length ? (
                   <Trick trick={game.currentTrick} players={game.players} containerWidth={containerWidth} />
+                ) : game?.state === 'exchanging' && !game.exchangeCards?.[playerId] ? (
+                  <span className="play-mat-empty-msg play-mat-empty-msg--instruction">Drag a card to each player, or click to assign to next slot</span>
+                ) : game?.state === 'playing' && currentPlayer?.id === playerId && selectedCards.length === 0 ? (
+                  <span className="play-mat-empty-msg play-mat-empty-msg--instruction">Select cards to play</span>
                 ) : (
                   <span className="play-mat-empty-msg">No cards played yet</span>
                 )}
@@ -403,40 +450,6 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
         </div>
       )}
 
-      {game.state === 'exchanging' && !game.exchangeCards?.[playerId] && (
-        <div className="prompt-strip">
-          <p>Assign 1 card to each recipient. Click a card, then it fills the next slot.</p>
-          <div className="exchange-slots-inline">
-            {exchangeRecipients.map((rec, i) => (
-              <div key={rec.id} className="exchange-slot-inline">
-                <span>To {rec.name}</span>
-                {exchangeAssignments[i] ? (
-                  <div className="exchange-slot-card" onClick={() => handleRemoveFromSlot(i)}>
-                    <Card card={exchangeAssignments[i]} playable />
-                  </div>
-                ) : (
-                  <span className="exchange-slot-empty">—</span>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="prompt-actions">
-            <button
-              type="button"
-              className="dock-btn dock-btn-primary"
-              disabled={exchangeAssignments.some((x) => !x)}
-              onClick={() => {
-                if (exchangeAssignments.some((x) => !x)) return;
-                socket.emit('exchange-cards', exchangeAssignments);
-                setExchangeAssignments([null, null, null]);
-              }}
-            >
-              Exchange ({exchangeAssignments.filter(Boolean).length}/3)
-            </button>
-          </div>
-        </div>
-      )}
-
       {game.dragonOpponentSelection?.playerId === playerId && (
         <div className="prompt-strip">
           <p>Dragon — choose who receives the trick</p>
@@ -473,7 +486,23 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
           containerWidth={containerWidth}
           primaryLabel={selectedIsBomb ? 'Play bomb' : `Play (${selectedCards.length})`}
           showDefaultActions={game.state !== 'grand-tichu'}
+          draggable={game.state === 'exchanging'}
+          onCardDragStart={game.state === 'exchanging' ? handleExchangeDragStart : undefined}
         >
+          {game.state === 'exchanging' && !game.exchangeCards?.[playerId] && (
+            <button
+              type="button"
+              className="dock-btn dock-btn-primary"
+              disabled={exchangeAssignments.some((x) => !x)}
+              onClick={() => {
+                if (exchangeAssignments.some((x) => !x)) return;
+                socket.emit('exchange-cards', exchangeAssignments);
+                setExchangeAssignments([null, null, null]);
+              }}
+            >
+              Exchange ({exchangeAssignments.filter(Boolean).length}/3)
+            </button>
+          )}
           {game.state === 'grand-tichu' && !game.cardsRevealed?.[playerId] && (
             <>
               <button type="button" className="dock-btn dock-btn-secondary dock-btn-rail" onClick={() => socket.emit('reveal-remaining-cards')}>
