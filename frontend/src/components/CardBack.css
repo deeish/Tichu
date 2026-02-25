@@ -60,3 +60,27 @@
   width: 80px;
   height: 112px;
 }
+
+/* Neutral: no red — dark gray only, subtle inner frame (e.g. won pile) */
+.card-back--neutral .card-back-pattern {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%);
+}
+
+.card-back--neutral .card-back-pattern::before {
+  border: 2px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.card-back--neutral .card-back-pattern::after {
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(255, 255, 255, 0.04) 4px,
+    rgba(255, 255, 255, 0.04) 8px
+  ) !important;
+}
+
+.card-back--neutral {
+  border-color: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}

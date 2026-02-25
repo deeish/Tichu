@@ -7,12 +7,15 @@ const {
   declareGrandTichu,
   revealRemainingCards,
   declareTichu,
+  undeclareTichu,
+  undeclareGrandTichu,
   exchangeCards,
   completeExchange,
   makeMove,
   selectDragonOpponent,
   getPlayerView
 } = require('../game/gameState');
+const { getBotMove, getDragonOpponentChoice } = require('../game/simpleBot');
 const { assignRandomTeamsToGame, startGame, generateGameId } = require('./gameManager');
 
 /**
@@ -256,6 +259,36 @@ function setupSocketHandlers(io, games, players) {
       }
     });
 
+    socket.on('undeclare-tichu', () => {
+      const playerInfo = players.get(socket.id);
+      if (!playerInfo) return;
+      
+      const game = games.get(playerInfo.gameId);
+      if (!game) return;
+      
+      const result = undeclareTichu(game, socket.id);
+      if (result.success) {
+        broadcastGameUpdate(io, game);
+      } else {
+        socket.emit('error', { message: result.error });
+      }
+    });
+
+    socket.on('undeclare-grand-tichu', () => {
+      const playerInfo = players.get(socket.id);
+      if (!playerInfo) return;
+      
+      const game = games.get(playerInfo.gameId);
+      if (!game) return;
+      
+      const result = undeclareGrandTichu(game, socket.id);
+      if (result.success) {
+        broadcastGameUpdate(io, game);
+      } else {
+        socket.emit('error', { message: result.error });
+      }
+    });
+
     // Card exchange
     socket.on('exchange-cards', (cards) => {
       const playerInfo = players.get(socket.id);
@@ -288,6 +321,20 @@ function setupSocketHandlers(io, games, players) {
           if (!exchangeResult.success) {
             socket.emit('error', { message: exchangeResult.error });
             return;
+          }
+          // Test games: have one test player "call Tichu" (use a different one than Grand Tichu so both tags are visible)
+          const testPlayers = game.players.filter(p => p.isTestPlayer);
+          const tichuPlayer = testPlayers.length >= 2 ? testPlayers[1] : testPlayers[0];
+          if (tichuPlayer && !game.grandTichuDeclarations?.[tichuPlayer.id]) {
+            game.tichuDeclarations = game.tichuDeclarations || {};
+            game.tichuDeclarations[tichuPlayer.id] = true;
+          } else if (testPlayers.length > 0 && !game.grandTichuDeclarations?.[testPlayers[0].id]) {
+            game.tichuDeclarations = game.tichuDeclarations || {};
+            game.tichuDeclarations[testPlayers[0].id] = true;
+          }
+          // Start bot turns so test players play until it's the human's turn
+          if (game.players.some(p => p.isTestPlayer)) {
+            setTimeout(() => handleTestPlayerTurn(game, games, io), 500);
           }
         }
         
@@ -352,28 +399,57 @@ function setupSocketHandlers(io, games, players) {
       }
     });
 
-    // Auto-handle test player turns
+    // Auto-handle test player turns: play real moves via simpleBot, or select Dragon opponent
     function handleTestPlayerTurn(game, games, io) {
       if (!game || game.state !== 'playing') return;
-      
+
+      // If Dragon player must choose opponent and they're a test player, auto-select
+      if (game.dragonOpponentSelection) {
+        const dragonPlayerId = game.dragonOpponentSelection.playerId;
+        const dragonPlayer = game.players.find(p => p.id === dragonPlayerId);
+        if (dragonPlayer?.isTestPlayer) {
+          const opponentId = getDragonOpponentChoice(game, dragonPlayerId);
+          if (opponentId) {
+            const result = selectDragonOpponent(game, dragonPlayerId, opponentId);
+            if (result.success) {
+              broadcastGameUpdate(io, game);
+              if (result.trickWon) {
+                io.to(game.id).emit('trick-won', { winner: result.winner });
+              }
+              setTimeout(() => handleTestPlayerTurn(game, games, io), 500);
+            }
+          }
+        }
+        return;
+      }
+
       const currentPlayer = game.turnOrder[game.currentPlayerIndex];
       if (!currentPlayer || !currentPlayer.isTestPlayer) return;
-      
-      // Test players automatically pass
-      const result = makeMove(game, currentPlayer.id, [], 'pass');
+
+      const move = getBotMove(game, currentPlayer.id);
+      if (!move) return;
+
+      const result = makeMove(
+        game,
+        currentPlayer.id,
+        move.cards || [],
+        move.action || 'play',
+        move.mahJongWish || null
+      );
       if (result.success) {
         broadcastGameUpdate(io, game);
-        
-        if (result.trickWon) {
-          io.to(game.id).emit('trick-won', {
-            winner: result.winner
+
+        if (result.playerWon) {
+          io.to(game.id).emit('player-won-round', {
+            playerId: currentPlayer.id,
+            tichuBonus: result.tichuBonus
           });
         }
-        
-        // Check if next player is also a test player
-        setTimeout(() => {
-          handleTestPlayerTurn(game, games, io);
-        }, 500);
+        if (result.trickWon) {
+          io.to(game.id).emit('trick-won', { winner: result.winner });
+        }
+
+        setTimeout(() => handleTestPlayerTurn(game, games, io), 500);
       }
     }
 

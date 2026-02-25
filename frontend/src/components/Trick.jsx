@@ -1,5 +1,5 @@
 import Card from './Card';
-import { getTrickCardSize } from '../styles/layoutTokens';
+import { getWonPileCardSize } from '../styles/layoutTokens';
 import './Trick.css';
 
 function Trick({ trick, players, containerWidth = 1440 }) {
@@ -11,7 +11,7 @@ function Trick({ trick, players, containerWidth = 1440 }) {
     );
   }
 
-  const cardSize = getTrickCardSize(containerWidth);
+  const cardSize = getWonPileCardSize(containerWidth);
   const getPlayerName = (playerId) => {
     const player = players.find(p => p.id === playerId);
     return player ? player.name : 'Unknown';

@@ -49,6 +49,9 @@
 }
 
 .table-current-action-box {
+  display: flex;
+  align-items: center;
+  gap: var(--s8);
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-panel);
@@ -60,6 +63,24 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+.table-header-declaration-pill {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(250, 204, 21, 0.25);
+  color: rgba(253, 224, 71, 1);
+  border: 1px solid rgba(250, 204, 21, 0.45);
+}
+
+.table-header-declaration-pill--grand {
+  background: rgba(251, 146, 60, 0.3);
+  color: rgba(253, 186, 116, 1);
+  border-color: rgba(251, 146, 60, 0.5);
 }
 
 /* Seat panels: “at the table” look — warm dark panel, clear hierarchy */
@@ -146,10 +167,19 @@
   pointer-events: none;
 }
 
-.seat-acting-chip {
+/* Badges (Acting + Tichu/Grand Tichu) in one corner so they don't overlap */
+.seat-badges {
   position: absolute;
   top: 4px;
   right: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  z-index: 1;
+}
+
+.seat-acting-chip {
   font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
@@ -158,6 +188,7 @@
   background: rgba(252, 211, 77, 0.15);
   padding: 2px 5px;
   border-radius: var(--radius-pill);
+  white-space: nowrap;
 }
 
 .seat-body {
@@ -169,6 +200,13 @@
   gap: 1px;
 }
 
+.seat-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .seat-name {
   font-weight: 600;
   font-size: 13px;
@@ -177,6 +215,25 @@
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.2;
+}
+
+.seat-declaration-pill {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(250, 204, 21, 0.25);
+  color: rgba(253, 224, 71, 1);
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  white-space: nowrap;
+}
+
+.seat-declaration-pill--grand {
+  background: rgba(251, 146, 60, 0.3);
+  color: rgba(253, 186, 116, 1);
+  border-color: rgba(251, 146, 60, 0.5);
 }
 
 .seat-meta {
@@ -202,16 +259,20 @@
   color: rgba(255, 255, 255, 0.9);
 }
 
-/* Won cards pile: below left/right seat, to the right of top seat; reserved spot even when empty */
+/* Won cards pile: single card back represents the stack (width/height set inline) */
 .won-cards-pile {
   position: absolute;
-  width: 56px;
-  min-height: 80px;
   z-index: var(--z-seats);
   pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  outline: none;
+  box-shadow: none;
+}
+
+.won-cards-pile:focus {
+  outline: none;
 }
 
 .won-cards-pile--empty {
@@ -223,26 +284,34 @@
 .won-cards-pile-card {
   position: absolute;
   left: 0;
+  top: 0;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
-.won-cards-pile-card .card-back {
+/* Won pile: plain gray card back — no red, no inner frame, no tint (fully overrides CardBack.css) */
+.won-cards-pile .won-cards-pile-card .card-back {
   display: block;
+  outline: none !important;
+  border: 1px solid rgba(0, 0, 0, 0.5) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  background: #252525 !important;
 }
 
-.won-cards-pile-more {
-  position: absolute;
-  left: 50%;
-  bottom: -14px;
-  transform: translateX(-50%);
-  font-size: 10px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  white-space: nowrap;
+.won-cards-pile .won-cards-pile-card .card-back .card-back-pattern {
+  background: #252525 !important;
 }
 
-/* Play mat: 1px stroke + soft shadow, slightly different surface (not heavy) */
+.won-cards-pile .won-cards-pile-card .card-back .card-back-pattern::before,
+.won-cards-pile .won-cards-pile-card .card-back .card-back-pattern::after {
+  display: none !important;
+}
+
+.won-cards-pile .won-cards-pile-card .card-back:focus,
+.won-cards-pile .won-cards-pile-card .card-back:focus-visible {
+  outline: none !important;
+}
+
+/* Play mat: thin padding so the zone can be ~95% and the border stays subtle */
 .play-mat {
   position: absolute;
   background: rgba(0, 0, 0, 0.25);
@@ -251,19 +320,26 @@
   z-index: var(--z-mat);
   display: flex;
   flex-direction: column;
-  padding: var(--s16);
+  align-items: center;
+  justify-content: center;
+  padding: var(--s8);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   box-sizing: border-box;
 }
 
+/* Game field: 95% of play mat so a small outer border shows; minimal padding */
 .play-mat-zone {
-  flex: 1;
+  width: 95%;
+  height: 95%;
+  margin: auto;
+  flex: none;
   min-height: 140px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--s16);
+  padding: var(--s8);
+  box-sizing: border-box;
 }
 
 .play-mat-zone.empty {
@@ -284,12 +360,22 @@
 
 .play-mat-zone .trick {
   width: 100%;
-  max-width: 640px;
+  height: 100%;
+  max-width: none;
   background: rgba(255, 255, 255, 0.04);
   border-radius: var(--radius-panel);
-  padding: var(--s12);
+  padding: var(--s8);
   margin: 0;
   box-shadow: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.play-mat-zone .trick .trick-plays {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
 }
 
 .play-mat-zone .trick.empty {

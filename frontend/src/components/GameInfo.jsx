@@ -18,7 +18,7 @@ function GameInfo({ game, currentPlayer, playerId, variant }) {
       case 'waiting':
         return 'Waiting for players...';
       case 'grand-tichu':
-        return 'Grand Tichu';
+        return 'Grand';
       case 'exchanging':
         return 'Exchanging';
       case 'playing':
@@ -73,11 +73,11 @@ function GameInfo({ game, currentPlayer, playerId, variant }) {
 
       {game.grandTichuDeclarations && Object.keys(game.grandTichuDeclarations).length > 0 && (
         <div className="declarations">
-          <h4>Grand Tichu Declarations:</h4>
+          <h4>Grand Declarations:</h4>
           {Object.entries(game.grandTichuDeclarations).map(([pid, declared]) => (
             declared && (
               <span key={pid} className="declaration grand">
-                {getPlayerName(pid)}: Grand Tichu
+                {getPlayerName(pid)}: Grand
               </span>
             )
           ))}

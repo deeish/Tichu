@@ -7,7 +7,7 @@
 
 // Re-export all functions from split modules
 const { initializeGame } = require('./initialization');
-const { declareGrandTichu, revealRemainingCards, declareTichu } = require('./declarations');
+const { declareGrandTichu, revealRemainingCards, declareTichu, undeclareTichu, undeclareGrandTichu } = require('./declarations');
 const { getExchangeRecipients, exchangeCards, completeExchange } = require('./exchange');
 const { makeMove } = require('./moveHandler');
 const { selectDragonOpponent } = require('./trickManager');
@@ -18,6 +18,8 @@ module.exports = {
   declareGrandTichu,
   revealRemainingCards,
   declareTichu,
+  undeclareTichu,
+  undeclareGrandTichu,
   exchangeCards,
   completeExchange,
   makeMove,

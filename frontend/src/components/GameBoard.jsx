@@ -4,21 +4,20 @@ import Card from './Card';
 import CardBack from './CardBack';
 import Drawer from './Drawer';
 import HandDock from './HandDock';
-import { sortCardsByRank } from '../utils/cardUtils';
+import { sortCardsByRank, cardKey } from '../utils/cardUtils';
 import {
   getDockHeight,
   getCenterRect,
   getMatSize,
   getMatPosition,
   getSeatPositions,
+  getWonPileCardSize,
   getExchangeCardSize,
   TABLE_HEADER_HEIGHT,
   MAT_VERTICAL_BIAS,
   MAT_TOP_OFFSET,
   SEAT_WIDTH,
   SEAT_HEIGHT,
-  STACK_MAX_BACKS,
-  STACK_OFFSET,
   WON_STACK_GAP,
 } from '../styles/layoutTokens';
 import '../styles/layout.css';
@@ -33,6 +32,11 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   const [showWishInput, setShowWishInput] = useState(false);
   const [exchangeAssignments, setExchangeAssignments] = useState([null, null, null]);
   const [exchangeDragOverSlot, setExchangeDragOverSlot] = useState(null);
+  const [exchangeDraggingCard, setExchangeDraggingCard] = useState(null);
+  const [handOrderOverride, setHandOrderOverride] = useState(null);
+  // Optimistic glow for Tichu buttons so click/unclick feels instant; cleared when game state updates
+  const [optimisticTichu, setOptimisticTichu] = useState(null);
+  const [optimisticGrandTichu, setOptimisticGrandTichu] = useState(null);
 
   const layoutRef = useRef(null);
   const tableRef = useRef(null);
@@ -43,6 +47,15 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
     const current = game.turnOrder[game.currentPlayerIndex];
     return current?.id === playerId;
   }, [game?.turnOrder, game?.currentPlayerIndex, playerId]);
+
+  // Clear optimistic state only when server confirms undeclared (falsy). Avoid clearing on
+  // every update so a stale game-update (e.g. from a bot move) doesn’t bring the glow back after unclick.
+  useEffect(() => {
+    if (game?.tichuDeclarations?.[playerId] == null) setOptimisticTichu(null);
+  }, [game?.tichuDeclarations?.[playerId], playerId]);
+  useEffect(() => {
+    if (game?.grandTichuDeclarations?.[playerId] == null) setOptimisticGrandTichu(null);
+  }, [game?.grandTichuDeclarations?.[playerId], playerId]);
 
   // Sync layout CSS vars and measure table/dock (sidebar always 320px)
   useEffect(() => {
@@ -142,6 +155,31 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
     }
   }, [myHand, sortMode, game?.state, exchangeAssignments]);
 
+  const orderedHand = useMemo(() => {
+    if (!displayHand?.length) return displayHand;
+    if (!handOrderOverride?.length) return displayHand;
+    const keyToCard = new Map(displayHand.map((c) => [cardKey(c), c]));
+    const ordered = [];
+    for (const k of handOrderOverride) {
+      const c = keyToCard.get(k);
+      if (c) {
+        ordered.push(c);
+        keyToCard.delete(k);
+      }
+    }
+    keyToCard.forEach((c) => ordered.push(c));
+    return ordered;
+  }, [displayHand, handOrderOverride]);
+
+  const handleSortModeChange = useCallback((mode) => {
+    setSortMode(mode);
+    setHandOrderOverride(null);
+  }, []);
+
+  const handleHandReorder = useCallback((newOrderedCards) => {
+    setHandOrderOverride(newOrderedCards.map(cardKey));
+  }, []);
+
   const currentPlayer = game?.turnOrder?.[game?.currentPlayerIndex];
 
   const isBomb = useCallback(() => {
@@ -206,8 +244,24 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   };
 
   const handleExchangeDragStart = (e, card) => {
-    e.dataTransfer.setData('tichu/card', JSON.stringify(card));
+    try {
+      const data = JSON.stringify(card);
+      e.dataTransfer.setData('tichu/card', data);
+      e.dataTransfer.setData('text/plain', data);
+    } catch (_) {
+      e.dataTransfer.setData('text/plain', String(card?.name ?? card?.rank ?? ''));
+    }
     e.dataTransfer.effectAllowed = 'move';
+    const cardEl = (e.target && e.target.closest && e.target.closest('.card')) || e.target;
+    if (cardEl && typeof cardEl.getBoundingClientRect === 'function') {
+      const rect = cardEl.getBoundingClientRect();
+      e.dataTransfer.setDragImage(cardEl, e.clientX - rect.left, e.clientY - rect.top);
+    }
+    requestAnimationFrame(() => setExchangeDraggingCard(card));
+  };
+
+  const handleExchangeDragEnd = () => {
+    setExchangeDraggingCard(null);
   };
 
   const handlePlayCards = () => {
@@ -258,13 +312,14 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
 
   const containerWidth = typeof window !== 'undefined' ? window.innerWidth : 1440;
   const exchangeCardSize = getExchangeCardSize(containerWidth);
+  const wonCardSize = getWonPileCardSize(containerWidth);
 
   const getStateMessage = () => {
     if (!game) return '';
     const getPlayerName = (pid) => game.players?.find(p => p.id === pid)?.name ?? 'Unknown';
     switch (game.state) {
       case 'waiting': return 'Waiting for players...';
-      case 'grand-tichu': return 'Grand Tichu';
+      case 'grand-tichu': return 'Grand';
       case 'exchanging': return 'Exchanging';
       case 'playing': return currentPlayer?.id === playerId ? 'Your turn' : `${getPlayerName(currentPlayer?.id)}'s turn`;
       case 'finished': return `Team ${game.winner} wins`;
@@ -281,7 +336,14 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
             {/* Table header: title + current action (above top seat) */}
             <div className="table-header" style={{ height: TABLE_HEADER_HEIGHT }}>
               <h1 className="table-title">Tichu</h1>
-              <div className="table-current-action-box">{getStateMessage()}</div>
+              <div className="table-current-action-box">
+                {getStateMessage()}
+                {currentPlayer?.id === playerId && (game.grandTichuDeclarations?.[playerId] || game.tichuDeclarations?.[playerId]) && (
+                  <span className={`table-header-declaration-pill ${game.grandTichuDeclarations?.[playerId] ? 'table-header-declaration-pill--grand' : ''}`}>
+                    {game.grandTichuDeclarations?.[playerId] ? 'Grand' : 'Tichu'}
+                  </span>
+                )}
+              </div>
             </div>
             {/* Seat panels (absolute) + won-cards pile (below left/right, right of top) */}
             {['top', 'left', 'right'].map((pos) => {
@@ -303,9 +365,9 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
               const isTop = pos === 'top';
               const wonStackLeft = isTop
                 ? posObj.x + SEAT_WIDTH + WON_STACK_GAP
-                : posObj.x + (SEAT_WIDTH - 56) / 2;
+                : posObj.x + (SEAT_WIDTH - wonCardSize.w) / 2;
               const wonStackTop = isTop
-                ? posObj.y + (SEAT_HEIGHT - 80) / 2
+                ? posObj.y + (SEAT_HEIGHT - wonCardSize.h) / 2
                 : posObj.y + SEAT_HEIGHT + WON_STACK_GAP;
 
               return (
@@ -323,7 +385,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
                     onDrop={isExchangeDropTarget ? (e) => {
                       e.preventDefault();
                       setExchangeDragOverSlot(null);
-                      const raw = e.dataTransfer.getData('tichu/card');
+                      const raw = e.dataTransfer.getData('tichu/card') || e.dataTransfer.getData('text/plain');
                       if (!raw) return;
                       try {
                         const card = JSON.parse(raw);
@@ -331,10 +393,21 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
                       } catch (_) {}
                     } : undefined}
                   >
-                    {isActing && <span className="seat-acting-chip">Acting</span>}
+                    {(isActing || game.grandTichuDeclarations?.[player.id] || game.tichuDeclarations?.[player.id]) && (
+                      <div className="seat-badges">
+                        {isActing && <span className="seat-acting-chip">Acting</span>}
+                        {(game.grandTichuDeclarations?.[player.id] || game.tichuDeclarations?.[player.id]) && (
+                          <span className={`seat-declaration-pill ${game.grandTichuDeclarations?.[player.id] ? 'seat-declaration-pill--grand' : ''}`}>
+                            {game.grandTichuDeclarations?.[player.id] ? 'Grand' : 'Tichu'}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="seat-avatar">{initials}</div>
                     <div className="seat-body">
-                      <span className="seat-name">{player.name}</span>
+                      <div className="seat-name-row">
+                        <span className="seat-name">{player.name}</span>
+                      </div>
                       <span className="seat-meta">
                         <span className="seat-team-pill">Team {player.team ?? 1}</span>
                         <span className="seat-card-count">{handCount} cards</span>
@@ -351,27 +424,22 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
                     style={{
                       left: `${wonStackLeft}px`,
                       top: `${wonStackTop}px`,
+                      width: wonCardSize.w,
+                      minHeight: wonCardSize.h,
                     }}
                     aria-label={stackCount > 0 ? `${player.name} won ${stackCount} cards` : `${player.name} won pile (empty)`}
                   >
                     {stackCount > 0 ? (
-                      <>
-                        {Array.from({ length: Math.min(stackCount, STACK_MAX_BACKS) }).map((_, i) => (
-                          <div key={i} className="won-cards-pile-card" style={{ top: i * STACK_OFFSET }}>
-                            <CardBack size="stack" />
-                          </div>
-                        ))}
-                        {stackCount > STACK_MAX_BACKS && (
-                          <span className="won-cards-pile-more">+{stackCount - STACK_MAX_BACKS}</span>
-                        )}
-                      </>
+                      <div className="won-cards-pile-card">
+                        <CardBack size="stack" width={wonCardSize.w} height={wonCardSize.h} neutral />
+                      </div>
                     ) : null}
                   </div>
                 </Fragment>
               );
             })}
 
-            {/* Play mat (absolute, inside centerRect) */}
+            {/* Play mat (fills most of the center zone) */}
             <div
               className="play-mat"
               style={{
@@ -398,25 +466,23 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
             {(() => {
               const myStack = game.playerStacks?.[playerId];
               const myStackCount = myStack?.cards?.length ?? 0;
-              const myWonLeft = (tableSize.w - 56) / 2;
-              const myWonTop = tableSize.h - 80 - WON_STACK_GAP;
+              const myWonLeft = (tableSize.w - wonCardSize.w) / 2;
+              const myWonTop = tableSize.h - wonCardSize.h - WON_STACK_GAP;
               return (
                 <div
                   className={`won-cards-pile won-cards-pile--mine ${myStackCount === 0 ? 'won-cards-pile--empty' : ''}`}
-                  style={{ left: `${myWonLeft}px`, top: `${myWonTop}px` }}
+                  style={{
+                    left: `${myWonLeft}px`,
+                    top: `${myWonTop}px`,
+                    width: wonCardSize.w,
+                    minHeight: wonCardSize.h,
+                  }}
                   aria-label={myStackCount > 0 ? `You won ${myStackCount} cards` : 'Your won pile (empty)'}
                 >
                   {myStackCount > 0 ? (
-                    <>
-                      {Array.from({ length: Math.min(myStackCount, STACK_MAX_BACKS) }).map((_, i) => (
-                        <div key={i} className="won-cards-pile-card" style={{ top: i * STACK_OFFSET }}>
-                          <CardBack size="stack" />
-                        </div>
-                      ))}
-                      {myStackCount > STACK_MAX_BACKS && (
-                        <span className="won-cards-pile-more">+{myStackCount - STACK_MAX_BACKS}</span>
-                      )}
-                    </>
+                    <div className="won-cards-pile-card">
+                      <CardBack size="stack" width={wonCardSize.w} height={wonCardSize.h} neutral />
+                    </div>
                   ) : null}
                 </div>
               );
@@ -472,12 +538,12 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
 
       <div className="hand-dock-wrapper">
         <HandDock
-          cards={displayHand}
+          cards={orderedHand}
           selectedCards={game.state === 'exchanging' ? [] : selectedCards}
           onCardClick={handleCardClick}
           playable={game.state === 'exchanging' || game.state === 'playing'}
           sortMode={sortMode}
-          onSortModeChange={setSortMode}
+          onSortModeChange={handleSortModeChange}
           canPlay={canPlay}
           canPass={canPass}
           onPlay={handlePlayCards}
@@ -488,6 +554,9 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
           showDefaultActions={game.state !== 'grand-tichu'}
           draggable={game.state === 'exchanging'}
           onCardDragStart={game.state === 'exchanging' ? handleExchangeDragStart : undefined}
+          onCardDragEnd={game.state === 'exchanging' ? handleExchangeDragEnd : undefined}
+          exchangeDraggingCard={game.state === 'exchanging' ? exchangeDraggingCard : null}
+          onReorder={game.state === 'playing' ? handleHandReorder : undefined}
         >
           {game.state === 'exchanging' && !game.exchangeCards?.[playerId] && (
             <button
@@ -503,18 +572,36 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
               Exchange ({exchangeAssignments.filter(Boolean).length}/3)
             </button>
           )}
-          {game.state === 'grand-tichu' && !game.cardsRevealed?.[playerId] && (
+          {game.state === 'grand-tichu' && (!game.cardsRevealed?.[playerId] || game.grandTichuDeclarations?.[playerId]) && (
             <>
-              <button type="button" className="dock-btn dock-btn-secondary dock-btn-rail" onClick={() => socket.emit('reveal-remaining-cards')}>
-                Reveal cards
-              </button>
-              <button type="button" className="dock-btn dock-btn-primary" onClick={() => socket.emit('declare-grand-tichu')}>
+              {!game.cardsRevealed?.[playerId] && (
+                <button type="button" className="dock-btn dock-btn-secondary dock-btn-rail" onClick={() => socket.emit('reveal-remaining-cards')}>
+                  Reveal cards
+                </button>
+              )}
+              <button
+                type="button"
+                className={`dock-btn dock-btn-primary ${(optimisticGrandTichu === true || (optimisticGrandTichu !== false && game.grandTichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
+                onClick={() => {
+                  const declared = optimisticGrandTichu === true || (optimisticGrandTichu !== false && game.grandTichuDeclarations?.[playerId]);
+                  setOptimisticGrandTichu(!declared);
+                  declared ? socket.emit('undeclare-grand-tichu') : socket.emit('declare-grand-tichu');
+                }}
+              >
                 Grand Tichu (+200)
               </button>
             </>
           )}
           {game.state === 'playing' && isMyTurn && !game.firstCardPlayed?.[playerId] && (
-            <button type="button" className="dock-btn dock-btn-secondary" onClick={() => socket.emit('declare-tichu')}>
+            <button
+              type="button"
+              className={`dock-btn dock-btn-secondary ${(optimisticTichu === true || (optimisticTichu !== false && game.tichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
+              onClick={() => {
+                const declared = optimisticTichu === true || (optimisticTichu !== false && game.tichuDeclarations?.[playerId]);
+                setOptimisticTichu(!declared);
+                declared ? socket.emit('undeclare-tichu') : socket.emit('declare-tichu');
+              }}
+            >
               Tichu (+100)
             </button>
           )}

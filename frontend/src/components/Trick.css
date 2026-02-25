@@ -4,6 +4,9 @@
   padding: 1rem;
   margin: 1rem 0;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .trick.empty {
@@ -23,6 +26,29 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  max-height: 220px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+.trick-plays::-webkit-scrollbar {
+  width: 6px;
+}
+
+.trick-plays::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.trick-plays::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+}
+
+.trick-plays::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
 }
 
 .trick-play {

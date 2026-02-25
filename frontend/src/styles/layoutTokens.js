@@ -53,10 +53,10 @@ export function getCenterRect(tableW, tableH, dockH, drawerW) {
   return { x, y, w, h };
 }
 
-// Play mat size: smaller, ~52% centerW x ~42% centerH for better centering and less space
+// Play mat size: use most of the center zone (~92% width, ~88% height) so the mat and trick area feel large
 export function getMatSize(centerW, centerH) {
-  const matW = Math.min(680, Math.max(520, centerW * 0.52));
-  const matH = Math.min(380, Math.max(280, centerH * 0.42));
+  const matW = Math.max(400, centerW * 0.92);
+  const matH = Math.max(300, centerH * 0.88);
   return { w: matW, h: matH };
 }
 
@@ -106,6 +106,13 @@ export function getTrickCardSize(containerWidth) {
 export function getDockCardSize(containerWidth) {
   const full = getCardSize(containerWidth);
   return { w: Math.round(full.w * 0.88), h: Math.round(full.h * 0.88) };
+}
+
+// Won pile and trick display (same size so won cards match the pile)
+export function getWonPileCardSize(containerWidth) {
+  const full = getCardSize(containerWidth);
+  const scale = 0.7;
+  return { w: Math.round(full.w * scale), h: Math.round(full.h * scale) };
 }
 
 // Tiny cards for exchange/seat display (scale from base so they stay proportional and visible)

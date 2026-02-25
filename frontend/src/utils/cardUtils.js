@@ -50,6 +50,15 @@ export function sortCardsByRank(cards, ascending = true) {
 }
 
 /**
+ * Stable unique key for a card (for hand reorder / identity)
+ */
+export function cardKey(card) {
+  if (!card) return '';
+  if (card.type === 'standard') return `${card.suit}-${card.rank}`;
+  return card.name || card.type || '';
+}
+
+/**
  * Groups cards by rank
  */
 function groupByRank(cards) {

@@ -1,6 +1,6 @@
 import './Card.css';
 
-function Card({ card, onClick, selected = false, playable = false, width, height, draggable = false, onDragStart, compact = false }) {
+function Card({ card, onClick, selected = false, playable = false, width, height, draggable = false, onDragStart, onDragEnd, compact = false }) {
   if (!card) return null;
 
   const sizeStyle =
@@ -21,6 +21,12 @@ function Card({ card, onClick, selected = false, playable = false, width, height
   const handleDragStart = (e) => {
     if (onDragStart && draggable) {
       onDragStart(e, card);
+    }
+  };
+
+  const handleDragEnd = (e) => {
+    if (onDragEnd && draggable) {
+      onDragEnd(e);
     }
   };
 
@@ -55,8 +61,9 @@ function Card({ card, onClick, selected = false, playable = false, width, height
       className={`card ${selected ? 'selected' : ''} ${playable ? 'playable' : ''} ${isSpecial ? 'special' : ''} ${draggable ? 'card-draggable' : ''}`}
       style={sizeStyle}
       onClick={handleClick}
-      draggable={draggable}
+      draggable={draggable ? "true" : "false"}
       onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
     >
       {isSpecial ? (
         <div className="card-special">

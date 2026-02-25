@@ -3,6 +3,13 @@
  * Handles player declarations and card revelation
  */
 
+function cardMatch(a, b) {
+  if (!a || !b) return false;
+  if (a.type !== b.type) return false;
+  if (a.type === 'standard') return a.suit === b.suit && a.rank === b.rank;
+  return a.name === b.name;
+}
+
 /**
  * Handles Grand Tichu declaration
  * Rule: Players cannot call both Tichu and Grand Tichu (one or the other).
@@ -77,8 +84,57 @@ function declareTichu(game, playerId) {
   return { success: true, game };
 }
 
+/**
+ * Undo Tichu declaration (only before first card is played).
+ */
+function undeclareTichu(game, playerId) {
+  if (game.state !== 'playing') {
+    return { success: false, error: 'Not the right phase to undeclare Tichu' };
+  }
+  if (!game.tichuDeclarations || !game.tichuDeclarations[playerId]) {
+    return { success: false, error: 'You have not declared Tichu' };
+  }
+  if (game.firstCardPlayed[playerId]) {
+    return { success: false, error: 'Cannot undeclare Tichu after playing a card' };
+  }
+  const currentPlayer = game.turnOrder[game.currentPlayerIndex];
+  if (currentPlayer.id !== playerId) {
+    return { success: false, error: 'Can only undeclare Tichu on your turn' };
+  }
+  delete game.tichuDeclarations[playerId];
+  return { success: true, game };
+}
+
+/**
+ * Undo Grand Tichu declaration (only in grand-tichu phase, before leaving).
+ * Puts the 6 remaining cards back to unrevealed.
+ */
+function undeclareGrandTichu(game, playerId) {
+  if (game.state !== 'grand-tichu') {
+    return { success: false, error: 'Not the right phase to undeclare Grand Tichu' };
+  }
+  if (!game.grandTichuDeclarations || !game.grandTichuDeclarations[playerId]) {
+    return { success: false, error: 'You have not declared Grand Tichu' };
+  }
+  if (!game.cardsRevealed[playerId] || !game.remainingCards[playerId]) {
+    return { success: false, error: 'Cannot undeclare Grand Tichu' };
+  }
+  const remaining = game.remainingCards[playerId];
+  let hand = game.hands[playerId] || [];
+  for (const toRemove of remaining) {
+    const idx = hand.findIndex((c) => cardMatch(c, toRemove));
+    if (idx >= 0) hand = hand.slice(0, idx).concat(hand.slice(idx + 1));
+  }
+  game.hands[playerId] = hand;
+  game.cardsRevealed[playerId] = false;
+  delete game.grandTichuDeclarations[playerId];
+  return { success: true, game };
+}
+
 module.exports = {
   declareGrandTichu,
   revealRemainingCards,
-  declareTichu
+  declareTichu,
+  undeclareTichu,
+  undeclareGrandTichu
 };

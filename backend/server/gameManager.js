@@ -40,12 +40,30 @@ function assignRandomTeamsToGame(game) {
   console.log(`Teams assigned: ${game.players.map(p => `${p.name} (Team ${p.team})`).join(', ')}`);
 }
 
+/**
+ * Test game setup: set one player as Grand Tichu (so we can see the tag).
+ * Mah Jong is left wherever the deal put it.
+ */
+function setupTestGameRigging(game) {
+  if (!game.players.some(p => p.isTestPlayer)) return;
+
+  // One test player has already called Grand Tichu (so we can see the tag)
+  const grandTichuPlayer = game.players.find((p, i) => i > 0 && p.isTestPlayer);
+  if (grandTichuPlayer) {
+    game.grandTichuDeclarations = game.grandTichuDeclarations || {};
+    game.grandTichuDeclarations[grandTichuPlayer.id] = true;
+  }
+}
+
 function startGame(gameId, games, broadcastGameUpdate) {
   const game = games.get(gameId);
   if (!game) return;
 
   // Initialize the game (deal cards, set up state)
   initializeGame(game);
+
+  // Test games: one bot has Grand Tichu (Mah Jong stays where dealt)
+  setupTestGameRigging(game);
   
   // Broadcast game started to all players
   broadcastGameUpdate(game);
