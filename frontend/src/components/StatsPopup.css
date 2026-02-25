@@ -1,0 +1,117 @@
+.stats-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: stats-popup-fade-in 0.2s ease;
+}
+
+@keyframes stats-popup-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.stats-popup {
+  background: linear-gradient(160deg, rgba(18, 45, 28, 0.98) 0%, rgba(8, 28, 18, 0.99) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  max-width: 820px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: stats-popup-scale-in 0.2s ease;
+}
+
+@keyframes stats-popup-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.stats-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stats-popup-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.stats-popup-close {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.7);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.stats-popup-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.stats-popup-body {
+  padding: 1.5rem;
+  overflow: auto;
+}
+
+.stats-popup-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+}
+
+.stats-popup-th {
+  text-align: center;
+  padding: 0.75rem 0.85rem;
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stats-popup-tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.stats-popup-tr:last-child {
+  border-bottom: none;
+}
+
+.stats-popup-td {
+  text-align: center;
+  padding: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.stats-popup-td:first-child {
+  font-weight: 600;
+  color: #fff;
+}

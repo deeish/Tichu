@@ -295,6 +295,11 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       cards,
       combination: validation
     });
+
+    // Record bomb played for stats (only when bomb is actually played)
+    if (game.playerStats && game.playerStats[playerId]) {
+      game.playerStats[playerId].bombs = (game.playerStats[playerId].bombs || 0) + 1;
+    }
     
     // Wish fulfillment: bomb containing the wished rank clears the wish (four-of-a-kind or straight-flush)
     if (game.mahJongWish && game.mahJongWish.mustPlay && cards.some(c =>

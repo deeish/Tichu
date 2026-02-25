@@ -124,6 +124,20 @@ function completeExchange(game) {
     ...game.players.slice(0, mahJongIndex)
   ];
   game.currentPlayerIndex = 0;
+
+  // After exchange: record how many of each special card each player has this round (cumulative stats)
+  if (game.playerStats) {
+    for (const player of game.players) {
+      const hand = game.hands[player.id] || [];
+      const stats = game.playerStats[player.id];
+      if (stats) {
+        stats.dog = (stats.dog || 0) + hand.filter(c => c.name === 'dog').length;
+        stats.phoenix = (stats.phoenix || 0) + hand.filter(c => c.name === 'phoenix').length;
+        stats.dragon = (stats.dragon || 0) + hand.filter(c => c.name === 'dragon').length;
+        stats.mahJong = (stats.mahJong || 0) + hand.filter(c => c.name === 'mahjong').length;
+      }
+    }
+  }
   
   game.state = 'playing';
   

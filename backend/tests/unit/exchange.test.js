@@ -232,5 +232,33 @@ describe('Card Exchange', () => {
       // So p2 should be lead player
       expect(game.leadPlayer).toBe('p2');
     });
+
+    test('should increment playerStats (dog, phoenix, dragon, mahJong) from post-exchange hands', () => {
+      game.playerStats = {
+        p1: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0 },
+        p2: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0 },
+        p3: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0 },
+        p4: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0 },
+      };
+      // Put one special in each player's hand (after exchange we count these)
+      game.hands.p1.push({ type: 'special', name: 'dog' });
+      game.hands.p2.push({ type: 'special', name: 'phoenix' });
+      game.hands.p3.push({ type: 'special', name: 'dragon' });
+      game.hands.p4.push({ type: 'special', name: 'mahjong' });
+      game.exchangeCards = {
+        p1: [game.hands.p1[0], game.hands.p1[1], game.hands.p1[2]],
+        p2: [game.hands.p2[0], game.hands.p2[1], game.hands.p2[2]],
+        p3: [game.hands.p3[0], game.hands.p3[1], game.hands.p3[2]],
+        p4: [game.hands.p4[0], game.hands.p4[1], game.hands.p4[2]],
+      };
+
+      const result = completeExchange(game);
+
+      expect(result.success).toBe(true);
+      expect(game.playerStats.p1.dog).toBe(1);
+      expect(game.playerStats.p2.phoenix).toBe(1);
+      expect(game.playerStats.p3.dragon).toBe(1);
+      expect(game.playerStats.p4.mahJong).toBe(1);
+    });
   });
 });

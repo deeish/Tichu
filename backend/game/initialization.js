@@ -72,6 +72,18 @@ function initializeGame(game) {
   game.players.forEach(player => {
     game.playerStacks[player.id] = { cards: [], points: 0 };
   });
+
+  // Cumulative stats across rounds (do not reset) - special cards at round start, bombs played, placement, points
+  if (!game.playerStats) {
+    game.playerStats = {};
+    game.players.forEach(player => {
+      game.playerStats[player.id] = {
+        dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0,
+        points: 0, firstPlace: 0, lastPlace: 0,
+        tichuCalls: 0, tichuWins: 0, grandCalls: 0, grandWins: 0
+      };
+    });
+  }
   
   // Phase 1: Grand Tichu declarations (after seeing 8 cards)
   game.state = 'grand-tichu';

@@ -60,7 +60,13 @@ describe('Bomb Interrupts', () => {
       },
       trickHistory: [],
       dragonPlayed: null,
-      dragonOpponentSelection: null
+      dragonOpponentSelection: null,
+      playerStats: {
+        p1: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0 },
+        p2: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0 },
+        p3: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0 },
+        p4: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0 },
+      }
     };
   });
 
@@ -120,6 +126,7 @@ describe('Bomb Interrupts', () => {
     expect(bombResult.bombPlayed).toBe(true);
     expect(game.currentTrick.length).toBe(2); // Both plays in trick
     expect(game.leadPlayer).toBe('p3'); // Bomb player becomes lead
+    expect(game.playerStats.p3.bombs).toBe(1); // Stats: bomb counted when actually played
   });
 
   test('should clear passed players when bomb is played', () => {

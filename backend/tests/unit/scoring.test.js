@@ -44,7 +44,13 @@ describe('Scoring Logic', () => {
       scores: { team1: 0, team2: 0 },
       roundScores: { team1: 0, team2: 0 },
       roundEnded: false,
-      state: 'playing'
+      state: 'playing',
+      playerStats: {
+        p1: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0, points: 0, firstPlace: 0, lastPlace: 0, tichuCalls: 0, tichuWins: 0, grandCalls: 0, grandWins: 0 },
+        p2: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0, points: 0, firstPlace: 0, lastPlace: 0, tichuCalls: 0, tichuWins: 0, grandCalls: 0, grandWins: 0 },
+        p3: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0, points: 0, firstPlace: 0, lastPlace: 0, tichuCalls: 0, tichuWins: 0, grandCalls: 0, grandWins: 0 },
+        p4: { dog: 0, phoenix: 0, dragon: 0, mahJong: 0, bombs: 0, points: 0, firstPlace: 0, lastPlace: 0, tichuCalls: 0, tichuWins: 0, grandCalls: 0, grandWins: 0 },
+      }
     };
   });
 
@@ -72,6 +78,12 @@ describe('Scoring Logic', () => {
     expect(mockGame.playerStacks.p4.points).toBe(0); // Last place gets 0
     expect(mockGame.roundScores.team1).toBe(45); // 30 + 15
     expect(mockGame.roundScores.team2).toBe(10); // 10 + 0
+
+    // playerStats: points (contributed to team), first place, last place
+    expect(mockGame.playerStats.p1.points).toBe(30); // p1's final stack points
+    expect(mockGame.playerStats.p4.points).toBe(0);
+    expect(mockGame.playerStats.p1.firstPlace).toBe(1); // p1 was first out
+    expect(mockGame.playerStats.p4.lastPlace).toBe(1); // p4 was last (tailender)
   });
 
   test('should transfer last place points to first place', () => {
@@ -150,5 +162,58 @@ describe('Scoring Logic', () => {
     expect(mockGame.roundScores.team1).toBe(200); // Double victory base
     expect(mockGame.roundScores.team2).toBe(0);
     expect(mockGame.roundEnded).toBe(true);
+  });
+
+  describe('playerStats: points (team), first place, last place', () => {
+    function triggerTailenderRoundEnd(game) {
+      game.playerStacks.p1.points = 25;
+      game.playerStacks.p2.points = 15;
+      game.playerStacks.p3.points = 10;
+      game.playerStacks.p4.points = 5;
+      game.playersOut = ['p1', 'p2'];
+      game.hands.p1 = [];
+      game.hands.p2 = [];
+      game.hands.p3 = [];
+      game.hands.p4 = [{ type: 'standard', rank: '2', suit: 'hearts' }];
+      handlePlayerWin(game, 'p3');
+    }
+
+    test('should add each player\'s final stack points to playerStats.points when round ends', () => {
+      triggerTailenderRoundEnd(mockGame);
+      // After last-place transfer: p1 has 25+5=30, p4 has 0; p2 and p3 unchanged
+      expect(mockGame.playerStats.p1.points).toBe(30);
+      expect(mockGame.playerStats.p2.points).toBe(15);
+      expect(mockGame.playerStats.p3.points).toBe(10);
+      expect(mockGame.playerStats.p4.points).toBe(0);
+    });
+
+    test('should increment playerStats.firstPlace for the player who went out first when round ends', () => {
+      triggerTailenderRoundEnd(mockGame);
+      expect(mockGame.playerStats.p1.firstPlace).toBe(1);
+      expect(mockGame.playerStats.p2.firstPlace).toBe(0);
+      expect(mockGame.playerStats.p3.firstPlace).toBe(0);
+      expect(mockGame.playerStats.p4.firstPlace).toBe(0);
+    });
+
+    test('should increment playerStats.lastPlace for the tailender when round ends', () => {
+      triggerTailenderRoundEnd(mockGame);
+      expect(mockGame.playerStats.p1.lastPlace).toBe(0);
+      expect(mockGame.playerStats.p2.lastPlace).toBe(0);
+      expect(mockGame.playerStats.p3.lastPlace).toBe(0);
+      expect(mockGame.playerStats.p4.lastPlace).toBe(1);
+    });
+
+    test('should record Tichu and Grand calls and wins when round ends', () => {
+      mockGame.tichuDeclarations = { p1: true, p3: true }; // p1 and p3 declared Tichu
+      mockGame.grandTichuDeclarations = { p2: true };     // p2 declared Grand
+      triggerTailenderRoundEnd(mockGame);
+      // First place = p1 (went out first), so Tichu win for p1 only; Grand declarer p2 did not get first
+      expect(mockGame.playerStats.p1.tichuCalls).toBe(1);
+      expect(mockGame.playerStats.p1.tichuWins).toBe(1);
+      expect(mockGame.playerStats.p3.tichuCalls).toBe(1);
+      expect(mockGame.playerStats.p3.tichuWins).toBe(0);
+      expect(mockGame.playerStats.p2.grandCalls).toBe(1);
+      expect(mockGame.playerStats.p2.grandWins).toBe(0);
+    });
   });
 });

@@ -63,6 +63,7 @@ function handlePlayerWin(game, playerId) {
       
       game.roundEnded = true;
       game.state = 'round-ended';
+      updatePlayerStatsForRoundEnd(game);
       if (game.scores) {
         game.scores.team1 = (game.scores.team1 || 0) + game.roundScores.team1;
         game.scores.team2 = (game.scores.team2 || 0) + game.roundScores.team2;
@@ -148,6 +149,34 @@ function handlePlayerWin(game, playerId) {
   
   // Round ended - finalize scoring
   // Finish order: playersOut[0] = 1st, playersOut[1] = 2nd, playersOut[2] = 3rd, playersOut[3] = 4th (last)
+
+  function updatePlayerStatsForRoundEnd(game) {
+    if (!game.playerStats || !game.playersOut || game.playersOut.length !== 4) return;
+    for (const player of game.players) {
+      const stack = game.playerStacks[player.id];
+      if (stack && game.playerStats[player.id]) {
+        game.playerStats[player.id].points = (game.playerStats[player.id].points || 0) + (stack.points || 0);
+      }
+    }
+    const firstId = game.playersOut[0];
+    const lastId = game.playersOut[3];
+    if (game.playerStats[firstId]) game.playerStats[firstId].firstPlace = (game.playerStats[firstId].firstPlace || 0) + 1;
+    if (game.playerStats[lastId]) game.playerStats[lastId].lastPlace = (game.playerStats[lastId].lastPlace || 0) + 1;
+
+    // Tichu / Grand Tichu: record call and whether they got first (win)
+    for (const [pid, declared] of Object.entries(game.tichuDeclarations || {})) {
+      if (declared && game.playerStats[pid]) {
+        game.playerStats[pid].tichuCalls = (game.playerStats[pid].tichuCalls || 0) + 1;
+        if (String(pid) === String(firstId)) game.playerStats[pid].tichuWins = (game.playerStats[pid].tichuWins || 0) + 1;
+      }
+    }
+    for (const [pid, declared] of Object.entries(game.grandTichuDeclarations || {})) {
+      if (declared && game.playerStats[pid]) {
+        game.playerStats[pid].grandCalls = (game.playerStats[pid].grandCalls || 0) + 1;
+        if (String(pid) === String(firstId)) game.playerStats[pid].grandWins = (game.playerStats[pid].grandWins || 0) + 1;
+      }
+    }
+  }
   
   // Last place penalty: last player gives all their points to first place
   // This includes negative points (from Phoenix) - last place transfers ALL points
@@ -165,6 +194,8 @@ function handlePlayerWin(game, playerId) {
       game.playerStacks[lastPlaceId].points = 0; // Last place gets 0 points
     }
   }
+
+  updatePlayerStatsForRoundEnd(game);
   
   // Calculate team scores from player stacks
   game.roundScores = { team1: 0, team2: 0 };
