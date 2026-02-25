@@ -393,14 +393,16 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
                       } catch (_) {}
                     } : undefined}
                   >
-                    {(isActing || game.grandTichuDeclarations?.[player.id] || game.tichuDeclarations?.[player.id]) && (
+                    {(game.grandTichuDeclarations?.[player.id] || game.tichuDeclarations?.[player.id]) && (
+                      <div className="seat-declaration-float">
+                        <span className={`seat-declaration-pill ${game.grandTichuDeclarations?.[player.id] ? 'seat-declaration-pill--grand' : ''}`}>
+                          {game.grandTichuDeclarations?.[player.id] ? 'Grand' : 'Tichu'}
+                        </span>
+                      </div>
+                    )}
+                    {isActing && (
                       <div className="seat-badges">
-                        {isActing && <span className="seat-acting-chip">Acting</span>}
-                        {(game.grandTichuDeclarations?.[player.id] || game.tichuDeclarations?.[player.id]) && (
-                          <span className={`seat-declaration-pill ${game.grandTichuDeclarations?.[player.id] ? 'seat-declaration-pill--grand' : ''}`}>
-                            {game.grandTichuDeclarations?.[player.id] ? 'Grand' : 'Tichu'}
-                          </span>
-                        )}
+                        <span className="seat-acting-chip">Acting</span>
                       </div>
                     )}
                     <div className="seat-avatar">{initials}</div>

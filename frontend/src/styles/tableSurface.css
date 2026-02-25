@@ -167,7 +167,26 @@
   pointer-events: none;
 }
 
-/* Badges (Acting + Tichu/Grand Tichu) in one corner so they don't overlap */
+/* Grand/Tichu pill: floating above the seat panel, attached like a tab */
+.seat-declaration-float {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+}
+
+.seat-declaration-float .seat-declaration-pill {
+  display: inline-block;
+  /* Tab shape: rounded top, flat bottom so it sits on the panel */
+  border-radius: 6px 6px 0 0;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* Badges (Acting) in one corner */
 .seat-badges {
   position: absolute;
   top: 4px;
