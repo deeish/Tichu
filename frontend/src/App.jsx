@@ -44,6 +44,8 @@ function App() {
   const [playerId, setPlayerId] = useState(null)
   const [showEndGameTest, setShowEndGameTest] = useState(false)
   const [showStatsPopup, setShowStatsPopup] = useState(false)
+  // 'start' | 'join' | null — null = show only the two main buttons
+  const [landingMode, setLandingMode] = useState(null)
 
   useEffect(() => {
     socket.on('connect', () => {
@@ -114,11 +116,12 @@ function App() {
   }
 
   const handleJoinGame = () => {
-    if (!playerName.trim() || !gameId.trim()) {
-      alert('Please enter your name and game ID')
+    if (!gameId.trim()) {
+      alert('Please enter the party code')
       return
     }
-    socket.emit('join-game', { gameId, playerName })
+    const name = playerName.trim() || 'Player'
+    socket.emit('join-game', { gameId, playerName: name })
   }
 
   const handleCreateTestGame = () => {
@@ -173,68 +176,107 @@ function App() {
   }
 
   return (
-    <div className="app">
-      <header>
-        <h1>🎴 Tichu</h1>
-        <p>Status: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</p>
-      </header>
+    <div className="landing">
+      {!gameState ? (
+        <div className="landing-content">
+          <header className="landing-header">
+            <h1>{landingMode === 'join' ? 'Tichu' : 'Welcome to Tichu'}</h1>
+            <p className="landing-subtitle">
+              {isConnected ? 'Connected' : 'Connecting…'}
+            </p>
+          </header>
 
-      <main>
-        {!gameState ? (
-          <div className="lobby">
-            <div className="input-group">
+          {landingMode == null ? (
+            <div className="landing-actions">
+              <div className="landing-buttons">
+                <button type="button" className="landing-btn" onClick={() => setLandingMode('start')}>
+                  Start Party
+                </button>
+                <button type="button" className="landing-btn" onClick={() => setLandingMode('join')}>
+                  Join Party
+                </button>
+              </div>
+            </div>
+          ) : landingMode === 'start' ? (
+            <div className="landing-actions">
               <input
                 type="text"
-                placeholder="Your Name"
+                className="landing-input"
+                placeholder="Your name"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
               />
-            </div>
-
-            <div className="actions">
-              <button onClick={handleCreateGame}>Create Game</button>
-              <div className="join-section">
-                <input
-                  type="text"
-                  placeholder="Game ID"
-                  value={gameId}
-                  onChange={(e) => setGameId(e.target.value.toUpperCase())}
-                />
-                <button onClick={handleJoinGame}>Join Game</button>
-              </div>
-              <div className="test-section">
-                <button onClick={handleCreateTestGame} className="btn-test">
-                  🧪 Create Test Game (Auto 4 Players)
+              <div className="landing-buttons">
+                <button type="button" className="landing-btn" onClick={handleCreateGame}>
+                  Create game
                 </button>
-                <p className="test-hint">Skip lobby - instantly start testing game logic</p>
-                <button onClick={() => setShowEndGameTest(true)} className="btn-test btn-test-endgame">
-                  🏁 Test End Game Screen
+              </div>
+              <button type="button" className="landing-back" onClick={() => setLandingMode(null)}>
+                ← Back
+              </button>
+            </div>
+          ) : (
+            <div className="landing-join-menu">
+              <label className="landing-join-label">Join Party</label>
+              <input
+                type="text"
+                className="landing-input landing-join-input"
+                placeholder="abcd"
+                value={gameId}
+                onChange={(e) => setGameId(e.target.value.toUpperCase())}
+              />
+              <div className="landing-join-buttons">
+                <button type="button" className="landing-join-back" onClick={() => setLandingMode(null)}>
+                  Back
                 </button>
-                <p className="test-hint">Preview the finished-game screen to design changes</p>
+                <button type="button" className="landing-join-submit" onClick={handleJoinGame}>
+                  Join
+                </button>
               </div>
             </div>
-          </div>
-        ) : gameState.state === 'waiting' ? (
-          <div className="game">
-            <div className="game-info">
-              <h2>Game: {gameState.id}</h2>
-              <p>State: {gameState.state}</p>
-              <p>Players: {gameState.players.length}/4</p>
-            </div>
+          )}
 
-            <div className="players">
-              {gameState.players.map((player, index) => (
-                <div key={player.id} className="player">
-                  <p>{player.name}</p>
-                  <p>Team {player.team}</p>
-                </div>
-              ))}
+          {landingMode !== 'join' && (
+            <div className="landing-secondary">
+              <button type="button" className="landing-link" onClick={handleCreateTestGame}>
+                Quick test game (4 players)
+              </button>
+              <button type="button" className="landing-link" onClick={() => setShowEndGameTest(true)}>
+                Test end game screen
+              </button>
             </div>
+          )}
 
-            <p>Waiting for players... ({gameState.players.length}/4)</p>
+          <footer className="landing-footer">
+            {landingMode !== 'join' && (
+              <>
+                <a href="https://en.wikipedia.org/wiki/Tichu" target="_blank" rel="noopener noreferrer" className="landing-footer-link">
+                  How to play
+                </a>
+                <button type="button" className="landing-footer-link landing-footer-btn" onClick={() => {}}>
+                  Submit feedback
+                </button>
+              </>
+            )}
+            <p className="landing-credit">Created by Dylan Salmo</p>
+          </footer>
+        </div>
+      ) : gameState.state === 'waiting' ? (
+        <div className="landing-content landing-waiting">
+          <header className="landing-header">
+            <h1>Game {gameState.id}</h1>
+            <p className="landing-subtitle">Waiting for players ({gameState.players.length}/4)</p>
+          </header>
+          <div className="waiting-players">
+            {gameState.players.map((player) => (
+              <div key={player.id} className="waiting-player">
+                <span className="waiting-player-name">{player.name}</span>
+                <span className="waiting-player-team">Team {player.team}</span>
+              </div>
+            ))}
           </div>
-        ) : null}
-      </main>
+        </div>
+      ) : null}
     </div>
   )
 }

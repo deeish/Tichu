@@ -10,151 +10,304 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
+  color: #333;
 }
 
-.app {
-  max-width: 1200px;
-  margin: 0 auto;
+/* Landing page: dark background a bit lighter than in-game #1a1a2e */
+.landing {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 2rem;
+  background: linear-gradient(165deg, #252542 0%, #222238 50%, #1e2438 100%);
+  color: rgba(255, 255, 255, 0.9);
 }
 
-header {
-  text-align: center;
-  color: white;
-  margin-bottom: 2rem;
+.landing::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 90% 70% at 50% 35%, rgba(20, 80, 45, 0.15) 0%, transparent 55%);
+  pointer-events: none;
 }
 
-header h1 {
-  font-size: 3rem;
-  margin-bottom: 0.5rem;
-}
-
-.lobby {
-  background: white;
-  border-radius: 1rem;
-  padding: 2rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-}
-
-.input-group {
-  margin-bottom: 1.5rem;
-}
-
-.input-group input {
+.landing-content {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  padding: 0.75rem;
-  font-size: 1rem;
-  border: 2px solid #ddd;
-  border-radius: 0.5rem;
-  transition: border-color 0.3s;
-}
-
-.input-group input:focus {
-  outline: none;
-  border-color: #667eea;
-}
-
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.actions button {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: background 0.3s;
-}
-
-.actions button:hover {
-  background: #5568d3;
-}
-
-.join-section {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.join-section input {
-  flex: 1;
-  padding: 0.75rem;
-  font-size: 1rem;
-  border: 2px solid #ddd;
-  border-radius: 0.5rem;
-}
-
-.test-section {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 2px dashed #ddd;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-test {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: white;
-  border: none;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  font-weight: bold;
-  transition: all 0.3s;
-  min-width: 250px;
-}
-
-.btn-test:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
-}
-
-.test-hint {
-  font-size: 0.85rem;
-  color: #666;
-  font-style: italic;
-  margin: 0;
-}
-
-.game {
-  background: white;
-  border-radius: 1rem;
-  padding: 2rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-}
-
-.game-info {
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid #eee;
-}
-
-.players {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.player {
-  padding: 1rem;
-  background: #f5f5f5;
-  border-radius: 0.5rem;
   text-align: center;
 }
 
-.player p:first-child {
-  font-weight: bold;
-  margin-bottom: 0.5rem;
+.landing-header {
+  margin-bottom: 2rem;
+}
+
+.landing-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.35rem;
+}
+
+.landing-subtitle {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 400;
+}
+
+.landing-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.landing-input {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  font-size: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.landing-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.landing-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.landing-buttons {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.landing-btn {
+  flex: 1;
+  padding: 0.85rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.08) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.landing-btn:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.12) 100%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
+}
+
+.landing-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.landing-btn:focus-visible {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+}
+
+.landing-back {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.landing-back:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Join Party — match reference: label, single input, Back + Join */
+.landing-join-menu {
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.landing-join-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  text-align: left;
+}
+
+.landing-join-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.landing-join-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.landing-join-input:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.9);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.landing-join-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.landing-join-back,
+.landing-join-submit {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.landing-join-back {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.landing-join-back:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.landing-join-submit {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.landing-join-submit:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.landing-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.landing-link {
+  padding: 0.5rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.landing-link:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.landing-footer {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.landing-footer-link {
+  font-size: 0.9rem;
+  color: #a5b4fc;
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.landing-footer-link:hover {
+  text-decoration: underline;
+  color: #c7d2fe;
+}
+
+.landing-footer-btn {
+  align-self: center;
+}
+
+.landing-credit {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Waiting room */
+.landing-waiting .landing-header {
+  margin-bottom: 1.5rem;
+}
+
+.waiting-players {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.waiting-player {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.waiting-player-name {
+  font-weight: 500;
+  color: #fff;
+}
+
+.waiting-player-team {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
 }
 
 /* End game test view: full GameBoard with mock finished game + back button */
