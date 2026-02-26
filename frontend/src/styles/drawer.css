@@ -317,3 +317,46 @@
   font-size: 12px;
   color: rgba(255, 255, 255, 0.5);
 }
+
+/* ----- Settings tab: table theme ----- */
+.drawer-settings-section {
+  margin: 0;
+}
+
+.drawer-settings-heading {
+  margin: 0 0 var(--s12) 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.drawer-theme-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s8);
+}
+
+.drawer-theme-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-panel);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.drawer-theme-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.drawer-theme-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}

@@ -27,8 +27,25 @@ import '../styles/layout.css';
 import '../styles/tableSurface.css';
 import './GameBoard.css';
 
+const THEME_STORAGE_KEY = 'tichu-table-theme';
+const THEMES = ['classic', 'velvet', 'midnight', 'ember', 'forest', 'ocean', 'sunset', 'royal', 'slate', 'autumn', 'jade', 'noir'];
+
 function GameBoard({ game, socket, playerId, isConnected = true }) {
   // ----- UI state (do not reset on game update unless invalidated) -----
+  const [tableTheme, setTableTheme] = useState(() => {
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      return THEMES.includes(saved) ? saved : 'velvet';
+    } catch {
+      return 'velvet';
+    }
+  });
+  const handleTableThemeChange = useCallback((theme) => {
+    setTableTheme(theme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (_) {}
+  }, []);
   const [selectedCards, setSelectedCards] = useState([]);
   const [sortMode, setSortMode] = useState('none');
   const [mahJongWish, setMahJongWish] = useState('');
@@ -331,7 +348,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   };
 
   return (
-    <div className="game-layout" ref={layoutRef}>
+    <div className="game-layout" ref={layoutRef} data-theme={tableTheme === 'classic' ? undefined : tableTheme}>
       <div className="game-left">
         <div className="game-main">
         <div className="table-column" ref={tableRef}>
@@ -639,7 +656,13 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
       </div>
       </div>
 
-      <Drawer game={game} playerId={playerId} isConnected={isConnected} />
+      <Drawer
+          game={game}
+          playerId={playerId}
+          isConnected={isConnected}
+          tableTheme={tableTheme}
+          onTableThemeChange={handleTableThemeChange}
+        />
     </div>
   );
 }

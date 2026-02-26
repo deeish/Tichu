@@ -1,7 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
 import '../styles/drawer.css';
 
-const TABS = ['Chat', 'Players', 'Log'];
+const TABS = ['Chat', 'Players', 'Log', 'Theme'];
+
+const THEME_OPTIONS = [
+  { value: 'classic', label: 'Classic' },
+  { value: 'velvet', label: 'Velvet' },
+  { value: 'midnight', label: 'Midnight' },
+  { value: 'ember', label: 'Ember' },
+  { value: 'forest', label: 'Forest' },
+  { value: 'ocean', label: 'Ocean' },
+  { value: 'sunset', label: 'Sunset' },
+  { value: 'royal', label: 'Royal' },
+  { value: 'slate', label: 'Slate' },
+  { value: 'autumn', label: 'Autumn' },
+  { value: 'jade', label: 'Jade' },
+  { value: 'noir', label: 'Noir' },
+];
 
 function getPlayerName(players, playerId) {
   if (!players?.length) return 'Unknown';
@@ -84,7 +99,7 @@ function formatRoundScore(r) {
   return n > 0 ? `+${n}` : n;
 }
 
-function Drawer({ game, playerId, isConnected }) {
+function Drawer({ game, playerId, isConnected, tableTheme = 'velvet', onTableThemeChange = () => {} }) {
   const [activeTab, setActiveTab] = useState('Chat');
 
   return (
@@ -141,6 +156,26 @@ function Drawer({ game, playerId, isConnected }) {
           {activeTab === 'Log' && (
             <div className="drawer-panel-inner">
               <p className="drawer-placeholder">Game log will appear here.</p>
+            </div>
+          )}
+          {activeTab === 'Theme' && (
+            <div className="drawer-panel-inner">
+              <section className="drawer-settings-section" aria-labelledby="theme-label">
+                <h3 id="theme-label" className="drawer-settings-heading">Table theme</h3>
+                <div className="drawer-theme-options" role="group">
+                  {THEME_OPTIONS.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`drawer-theme-btn ${tableTheme === value ? 'active' : ''}`}
+                      onClick={() => onTableThemeChange(value)}
+                      aria-pressed={tableTheme === value}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </section>
             </div>
           )}
         </div>
