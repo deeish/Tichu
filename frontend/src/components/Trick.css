@@ -31,24 +31,38 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
+  /* Overlay scrollbar: track hidden; thumb only on hover so the bar isn't always visible */
 }
 
+/* WebKit: hide track; show thumb only when hovering the trick area */
 .trick-plays::-webkit-scrollbar {
   width: 6px;
 }
 
 .trick-plays::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
+  background: transparent;
   border-radius: 3px;
 }
 
 .trick-plays::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.25);
+  background: transparent;
   border-radius: 3px;
+}
+
+.trick-plays:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .trick-plays::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.35);
+}
+
+/* Firefox: thin scrollbar, subtle so it doesn't dominate when not needed */
+@supports (scrollbar-width: thin) {
+  .trick-plays {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  }
 }
 
 .trick-play {
