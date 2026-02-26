@@ -99,6 +99,91 @@ function formatRoundScore(r) {
   return n > 0 ? `+${n}` : n;
 }
 
+/** Mock round log for visuals; backend will supply game.roundLog later. */
+function getMockRoundLog(players) {
+  const names = (players || []).map((p) => p.name);
+  if (names.length < 4) names.push('Player 2', 'Player 3', 'Player 4');
+  return [
+    {
+      round: 1,
+      players: [
+        { playerId: '1', playerName: names[0] || 'Player 1', team: 1, breakdown: [{ label: "2×5", points: 10 }, { label: "1×10", points: 10 }, { label: "3×K", points: 30 }], tichu: 100, grandTichu: null, total: 150 },
+        { playerId: '2', playerName: names[1] || 'Player 2', team: 2, breakdown: [{ label: "1×10", points: 10 }, { label: "2×K", points: 20 }], tichu: -100, grandTichu: null, total: -70 },
+        { playerId: '3', playerName: names[2] || 'Player 3', team: 1, breakdown: [{ label: "1×5", points: 5 }, { label: "1×Dragon", points: 25 }], tichu: null, grandTichu: null, total: 30 },
+        { playerId: '4', playerName: names[3] || 'Player 4', team: 2, breakdown: [{ label: "2×10", points: 20 }, { label: "1×Phoenix", points: -25 }], tichu: null, grandTichu: -200, total: -205 },
+      ],
+    },
+    {
+      round: 2,
+      players: [
+        { playerId: '1', playerName: names[0] || 'Player 1', team: 1, breakdown: [{ label: "1×10", points: 10 }, { label: "2×K", points: 20 }], tichu: null, grandTichu: null, total: 30 },
+        { playerId: '2', playerName: names[1] || 'Player 2', team: 2, breakdown: [{ label: "3×5", points: 15 }, { label: "1×10", points: 10 }], tichu: 100, grandTichu: null, total: 125 },
+        { playerId: '3', playerName: names[2] || 'Player 3', team: 1, breakdown: [{ label: "1×Dragon", points: 25 }], tichu: null, grandTichu: 200, total: 225 },
+        { playerId: '4', playerName: names[3] || 'Player 4', team: 2, breakdown: [], tichu: -100, grandTichu: null, total: -100 },
+      ],
+    },
+  ];
+}
+
+function GameLogPanel({ game, playerId }) {
+  // Use server roundLog when it's an array. Missing/empty in real games → empty state; test game with no log → mock for testing.
+  const isTestGame = game?.players?.some((p) => p.isTestPlayer);
+  const serverLog = game?.roundLog != null && Array.isArray(game.roundLog) ? game.roundLog : null;
+  const roundLog =
+    serverLog !== null ? serverLog : isTestGame ? getMockRoundLog(game?.players) : [];
+  const isYou = (id) => id === playerId;
+
+  return (
+    <div className="drawer-log-panel">
+      <div className="drawer-log-heading">Points per round</div>
+      <div className="drawer-log-rounds">
+        {roundLog.map((entry) => (
+          <section key={entry.round} className="drawer-log-round" aria-label={`Round ${entry.round}`}>
+            <h4 className="drawer-log-round-title">Round {entry.round}</h4>
+            <ul className="drawer-log-player-list">
+              {entry.players.map((p) => (
+                <li key={`${entry.round}-${p.playerId}`} className={isYou(p.playerId) ? 'drawer-log-player--you' : ''}>
+                  <div className="drawer-log-player-header">
+                    <span className="drawer-log-player-name">{p.playerName}</span>
+                    <span className="drawer-log-player-team">Team {p.team}</span>
+                  </div>
+                  <div className="drawer-log-player-breakdown">
+                    {p.breakdown && p.breakdown.length > 0 ? (
+                      p.breakdown.map((item, i) => (
+                        <span key={i} className="drawer-log-breakdown-item">
+                          {item.label} ({item.points}){i < p.breakdown.length - 1 ? ',' : ''}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="drawer-log-breakdown-item drawer-log-breakdown-item--muted">—</span>
+                    )}
+                    {p.tichu != null && (
+                      <span className="drawer-log-breakdown-item drawer-log-breakdown-item--tichu">
+                        {p.breakdown?.length ? ', ' : ''}Tichu {p.tichu >= 0 ? `+${p.tichu}` : p.tichu}
+                      </span>
+                    )}
+                    {p.grandTichu != null && (
+                      <span className="drawer-log-breakdown-item drawer-log-breakdown-item--grand">
+                        {p.breakdown?.length || p.tichu != null ? ', ' : ''}Grand {p.grandTichu >= 0 ? `+${p.grandTichu}` : p.grandTichu}
+                      </span>
+                    )}
+                  </div>
+                  <div className="drawer-log-player-total">
+                    Total: <strong>{p.total >= 0 ? `+${p.total}` : p.total}</strong>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+      {roundLog.length === 0 && (
+        <p className="drawer-log-empty">No rounds yet. Points will appear here as the game progresses.</p>
+      )}
+    </div>
+  );
+}
+
 function Drawer({ game, playerId, isConnected, tableTheme = 'velvet', onTableThemeChange = () => {} }) {
   const [activeTab, setActiveTab] = useState('Chat');
 
@@ -154,8 +239,8 @@ function Drawer({ game, playerId, isConnected, tableTheme = 'velvet', onTableThe
             </div>
           )}
           {activeTab === 'Log' && (
-            <div className="drawer-panel-inner">
-              <p className="drawer-placeholder">Game log will appear here.</p>
+            <div className="drawer-panel-inner drawer-panel-inner--log">
+              <GameLogPanel game={game} playerId={playerId} />
             </div>
           )}
           {activeTab === 'Theme' && (

@@ -13,7 +13,7 @@ jest.mock('../../game/initialization', () => ({
   initializeGame: mockInitializeGame
 }));
 
-const { handlePlayerWin } = require('../../game/scoring');
+const { handlePlayerWin, buildRoundLogEntry, appendRoundToLog } = require('../../game/scoring');
 
 describe('Scoring Logic', () => {
   let mockGame;
@@ -214,6 +214,97 @@ describe('Scoring Logic', () => {
       expect(mockGame.playerStats.p3.tichuWins).toBe(0);
       expect(mockGame.playerStats.p2.grandCalls).toBe(1);
       expect(mockGame.playerStats.p2.grandWins).toBe(0);
+    });
+  });
+
+  describe('round log', () => {
+    test('appendRoundToLog is called when round ends and populates game.roundLog', () => {
+      mockGame.playerStacks.p1.points = 25;
+      mockGame.playerStacks.p2.points = 15;
+      mockGame.playerStacks.p3.points = 10;
+      mockGame.playerStacks.p4.points = 5;
+      mockGame.playersOut = ['p1', 'p2'];
+      mockGame.hands.p1 = [];
+      mockGame.hands.p2 = [];
+      mockGame.hands.p3 = [];
+      mockGame.hands.p4 = [{ type: 'standard', rank: '2', suit: 'hearts' }];
+      handlePlayerWin(mockGame, 'p3');
+
+      expect(mockGame.roundLog).toBeDefined();
+      expect(Array.isArray(mockGame.roundLog)).toBe(true);
+      expect(mockGame.roundLog.length).toBe(1);
+      const entry = mockGame.roundLog[0];
+      expect(entry.round).toBe(1);
+      expect(entry.players.length).toBe(4);
+      entry.players.forEach((p) => {
+        expect(p).toHaveProperty('playerId');
+        expect(p).toHaveProperty('playerName');
+        expect(p).toHaveProperty('team');
+        expect(p).toHaveProperty('breakdown');
+        expect(p).toHaveProperty('tichu');
+        expect(p).toHaveProperty('grandTichu');
+        expect(p).toHaveProperty('total');
+      });
+      // After last-place transfer: p1 has 30, p4 has 0
+      const p1Entry = entry.players.find((p) => p.playerId === 'p1');
+      const p4Entry = entry.players.find((p) => p.playerId === 'p4');
+      expect(p1Entry.total).toBe(30);
+      expect(p4Entry.total).toBe(0);
+    });
+
+    test('buildRoundLogEntry returns null when playersOut length is not 4', () => {
+      mockGame.playersOut = ['p1', 'p2'];
+      expect(buildRoundLogEntry(mockGame)).toBeNull();
+      mockGame.playersOut = [];
+      expect(buildRoundLogEntry(mockGame)).toBeNull();
+    });
+
+    test('buildRoundLogEntry builds breakdown from stack cards and applies Tichu/Grand', () => {
+      mockGame.playersOut = ['p1', 'p2', 'p3', 'p4'];
+      mockGame.playerStacks.p1.cards = [
+        { type: 'standard', rank: '5', suit: 'hearts' },
+        { type: 'standard', rank: '5', suit: 'spades' },
+        { type: 'standard', rank: 'K', suit: 'clubs' }
+      ];
+      mockGame.playerStacks.p1.points = 20; // 5+5+10
+      mockGame.playerStacks.p2.cards = [];
+      mockGame.playerStacks.p2.points = 0;
+      mockGame.playerStacks.p3.cards = [{ type: 'special', name: 'dragon' }];
+      mockGame.playerStacks.p3.points = 25;
+      mockGame.playerStacks.p4.cards = [{ type: 'special', name: 'phoenix' }];
+      mockGame.playerStacks.p4.points = -25;
+      mockGame.tichuDeclarations = { p1: true };
+      mockGame.grandTichuDeclarations = { p4: true };
+
+      const entry = buildRoundLogEntry(mockGame);
+      expect(entry).not.toBeNull();
+      expect(entry.round).toBe(1);
+      const p1 = entry.players.find((p) => p.playerId === 'p1');
+      const p3 = entry.players.find((p) => p.playerId === 'p3');
+      const p4 = entry.players.find((p) => p.playerId === 'p4');
+
+      expect(p1.breakdown).toEqual(expect.arrayContaining([{ label: '2×5', points: 10 }, { label: '1×K', points: 10 }]));
+      expect(p1.tichu).toBe(100);
+      expect(p1.grandTichu).toBeNull();
+      expect(p1.total).toBe(120); // 20 + 100
+
+      expect(p3.breakdown).toEqual([{ label: '1×Dragon', points: 25 }]);
+      expect(p3.tichu).toBeNull();
+      expect(p3.grandTichu).toBeNull();
+      expect(p3.total).toBe(25);
+
+      expect(p4.breakdown).toEqual([{ label: '1×Phoenix', points: -25 }]);
+      expect(p4.tichu).toBeNull();
+      expect(p4.grandTichu).toBe(-200);
+      expect(p4.total).toBe(-225);
+    });
+
+    test('appendRoundToLog creates roundLog array if missing', () => {
+      expect(mockGame.roundLog).toBeUndefined();
+      mockGame.playersOut = ['p1', 'p2', 'p3', 'p4'];
+      appendRoundToLog(mockGame);
+      expect(mockGame.roundLog).toBeDefined();
+      expect(mockGame.roundLog.length).toBe(1);
     });
   });
 });

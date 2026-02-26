@@ -59,6 +59,13 @@ function startGame(gameId, games, broadcastGameUpdate) {
   const game = games.get(gameId);
   if (!game) return;
 
+  // Clear round log at start of each new game (so Log tab is empty until rounds complete).
+  // Keep log for test games so the Log tab can still show mock/previous data for testing.
+  const isTestGame = game.players.some((p) => p.isTestPlayer);
+  if (!isTestGame) {
+    game.roundLog = [];
+  }
+
   // Initialize the game (deal cards, set up state)
   initializeGame(game);
 

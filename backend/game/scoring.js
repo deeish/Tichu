@@ -9,6 +9,87 @@ const { getCardPoints } = require('./deck');
 const { WINNING_SCORE } = require('../config/gameRules');
 
 /**
+ * Build a human-readable point label for a card (for round log breakdown)
+ */
+function getCardPointLabel(card) {
+  if (card.type === 'special') {
+    if (card.name === 'dragon') return 'Dragon';
+    if (card.name === 'phoenix') return 'Phoenix';
+    return null;
+  }
+  if (card.rank === '5') return '5';
+  if (card.rank === '10') return '10';
+  if (card.rank === 'K') return 'K';
+  return null;
+}
+
+/**
+ * Build one round-log entry from current game state (after round end, before next round).
+ * Matches frontend shape: { round, players: [ { playerId, playerName, team, breakdown, tichu, grandTichu, total } ] }
+ */
+function buildRoundLogEntry(game) {
+  if (!game.players || game.players.length === 0 || !game.playersOut || game.playersOut.length !== 4) {
+    return null;
+  }
+  const firstPlaceId = game.playersOut[0] != null ? String(game.playersOut[0]) : null;
+  const tichuDec = game.tichuDeclarations || {};
+  const grandTichuDec = game.grandTichuDeclarations || {};
+
+  const players = game.players.map((player) => {
+    const pid = player.id != null ? String(player.id) : null;
+    const gotFirst = firstPlaceId !== null && pid !== null && firstPlaceId === pid;
+    const stack = game.playerStacks && game.playerStacks[player.id] ? game.playerStacks[player.id] : { cards: [], points: 0 };
+
+    const breakdownMap = {};
+    for (const card of stack.cards || []) {
+      const label = getCardPointLabel(card);
+      if (label == null) continue;
+      const pts = getCardPoints(card);
+      const key = label;
+      if (!breakdownMap[key]) breakdownMap[key] = { count: 0, points: 0 };
+      breakdownMap[key].count += 1;
+      breakdownMap[key].points += pts;
+    }
+    const breakdown = Object.entries(breakdownMap).map(([label, { count, points }]) => ({
+      label: count > 1 ? `${count}×${label}` : `1×${label}`,
+      points
+    })).sort((a, b) => b.points - a.points);
+
+    let tichu = null;
+    if (tichuDec[player.id]) tichu = gotFirst ? 100 : -100;
+    let grandTichu = null;
+    if (grandTichuDec[player.id]) grandTichu = gotFirst ? 200 : -200;
+
+    const cardTotal = stack.points || 0;
+    const total = cardTotal + (tichu ?? 0) + (grandTichu ?? 0);
+
+    return {
+      playerId: player.id,
+      playerName: player.name || `Player ${player.id}`,
+      team: player.team ?? 1,
+      breakdown,
+      tichu,
+      grandTichu,
+      total
+    };
+  });
+
+  const roundNumber = Array.isArray(game.roundLog) ? game.roundLog.length + 1 : 1;
+  return { round: roundNumber, players };
+}
+
+/**
+ * Append current round to game.roundLog (creates roundLog if missing).
+ * Call once when round has ended, after last-place transfer and Tichu/Grand applied.
+ */
+function appendRoundToLog(game) {
+  const entry = buildRoundLogEntry(game);
+  if (!entry) return;
+  if (!game.roundLog) game.roundLog = [];
+  game.roundLog.push(entry);
+}
+
+/**
  * Handles when a player empties their hand
  */
 function handlePlayerWin(game, playerId) {
@@ -68,6 +149,7 @@ function handlePlayerWin(game, playerId) {
         game.scores.team1 = (game.scores.team1 || 0) + game.roundScores.team1;
         game.scores.team2 = (game.scores.team2 || 0) + game.roundScores.team2;
       }
+      appendRoundToLog(game);
       if (game.scores && (game.scores.team1 >= WINNING_SCORE || game.scores.team2 >= WINNING_SCORE)) {
         game.state = 'finished';
         // If both hit 1000 in same round, team with more points wins; else first to 1000 wins
@@ -227,6 +309,7 @@ function handlePlayerWin(game, playerId) {
     game.scores.team2 = (game.scores.team2 || 0) + game.roundScores.team2;
   }
   
+appendRoundToLog(game);
   if (game.scores && (game.scores.team1 >= WINNING_SCORE || game.scores.team2 >= WINNING_SCORE)) {
     game.state = 'finished';
     // If both hit 1000 in same round, team with more points wins; else first to 1000 wins
@@ -234,10 +317,12 @@ function handlePlayerWin(game, playerId) {
   } else {
     initializeGame(game);
   }
-  
+
   return { success: true, game, playerWon: true, roundEnded: true };
 }
 
 module.exports = {
-  handlePlayerWin
+  handlePlayerWin,
+  buildRoundLogEntry,
+  appendRoundToLog
 };

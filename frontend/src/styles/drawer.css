@@ -289,6 +289,133 @@
   font-style: italic;
 }
 
+/* ----- Log tab: points per round ----- */
+.drawer-panel-inner--log {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.drawer-log-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.drawer-log-heading {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: var(--s12);
+}
+
+.drawer-log-rounds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s16);
+}
+
+.drawer-log-round {
+  margin: 0;
+}
+
+.drawer-log-round-title {
+  margin: 0 0 var(--s8) 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.drawer-log-player-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s8);
+}
+
+.drawer-log-player-list li {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-panel);
+  padding: var(--s8) var(--s12);
+}
+
+.drawer-log-player-list li.drawer-log-player--you {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.drawer-log-player-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.drawer-log-player-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.drawer-log-player-team {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.drawer-log-player-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 4px;
+}
+
+.drawer-log-breakdown-item {
+  white-space: nowrap;
+}
+
+.drawer-log-breakdown-item--muted {
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+.drawer-log-breakdown-item--tichu {
+  color: rgba(253, 224, 71, 0.95);
+}
+
+.drawer-log-breakdown-item--grand {
+  color: rgba(251, 146, 60, 0.95);
+}
+
+.drawer-log-player-total {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.drawer-log-player-total strong {
+  font-weight: 700;
+  color: #fff;
+}
+
+.drawer-log-empty {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  font-style: italic;
+}
+
 .drawer-players {
   list-style: none;
   margin: 0;
