@@ -17,6 +17,44 @@
   margin: 0 var(--s8);
 }
 
+/* Mah Jong wish: single row of rank buttons (no dropdown) */
+.wish-rank-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin: var(--s12) 0 0;
+}
+
+.wish-rank-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.wish-rank-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.wish-rank-btn--selected {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.wish-rank-btn--selected:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .exchange-slots-inline {
   display: flex;
   flex-wrap: wrap;

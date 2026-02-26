@@ -30,6 +30,9 @@ export const STACK_OFFSET = 6;
 export const STACK_MAX_BACKS = 7;
 export const WON_STACK_GAP = 8; // gap between seat panel and "won" cards pile
 
+/** Vertical offset from top of table surface for the wished-card panel (works at any viewport size) */
+export const WISHED_CARD_PANEL_TOP = 12;
+
 // Dock height: clamp(180px, 22vh, 240px)
 export function getDockHeight() {
   if (typeof window === 'undefined') return 200;

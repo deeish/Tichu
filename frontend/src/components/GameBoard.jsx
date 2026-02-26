@@ -16,9 +16,12 @@ import {
   TABLE_HEADER_HEIGHT,
   MAT_VERTICAL_BIAS,
   MAT_TOP_OFFSET,
+  OUTER_MARGIN,
   SEAT_WIDTH,
   SEAT_HEIGHT,
+  SEAT_MAT_GAP,
   WON_STACK_GAP,
+  WISHED_CARD_PANEL_TOP,
 } from '../styles/layoutTokens';
 import '../styles/layout.css';
 import '../styles/tableSurface.css';
@@ -441,6 +444,28 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
               );
             })}
 
+            {/* Wished card: top-left; offset from layoutTokens so it works at any viewport size */}
+            {game.mahJongWish?.wishedRank && (
+              <div
+                className="wished-card-panel"
+                aria-live="polite"
+                style={{
+                  left: `${OUTER_MARGIN}px`,
+                  top: `${WISHED_CARD_PANEL_TOP}px`,
+                }}
+              >
+                <span className="wished-card-label">Wished card</span>
+                <div className="wished-card-display">
+                  <Card
+                    card={{ type: 'standard', rank: game.mahJongWish.wishedRank, suit: 'hearts' }}
+                    width={44}
+                    height={62}
+                    compact
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Play mat (fills most of the center zone) */}
             <div
               className="play-mat"
@@ -497,16 +522,19 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
       {showWishInput && (
         <div className="prompt-strip">
           <p>Mah Jong wish — choose a rank</p>
-          <select
-            value={mahJongWish}
-            onChange={(e) => setMahJongWish(e.target.value)}
-            className="prompt-select"
-          >
-            <option value="">Select rank...</option>
+          <div className="wish-rank-grid" role="group" aria-label="Wish rank">
             {['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'].map((r) => (
-              <option key={r} value={r}>{r}</option>
+              <button
+                key={r}
+                type="button"
+                className={`wish-rank-btn ${mahJongWish === r ? 'wish-rank-btn--selected' : ''}`}
+                onClick={() => setMahJongWish(mahJongWish === r ? '' : r)}
+                aria-pressed={mahJongWish === r}
+              >
+                {r}
+              </button>
             ))}
-          </select>
+          </div>
           <div className="prompt-actions">
             <button type="button" className="dock-btn dock-btn-primary" onClick={handlePlayCards} disabled={!mahJongWish}>
               Play with wish
