@@ -4,7 +4,7 @@ import GameBoard from './components/GameBoard'
 import StatsPopup from './components/StatsPopup'
 import './App.css'
 
-const socket = io('http://localhost:3001')
+const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001')
 
 // Mock game in finished state for testing the end game screen
 const MOCK_FINISHED_GAME = {

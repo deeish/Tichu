@@ -8,9 +8,10 @@ dist/
 build/
 *.log
 
-# Environment variables
+# Environment variables (keep .env.example committed)
 .env
 .env.local
+.env.*.local
 
 # IDE
 .vscode/
@@ -21,3 +22,6 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Deploy / tooling
+.vercel

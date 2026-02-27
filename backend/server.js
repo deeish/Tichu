@@ -9,16 +9,18 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const { setupSocketHandlers } = require('./server/socketHandlers');
 
+const corsOrigin = process.env.FRONTEND_ORIGIN || '*';
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "*",
+    origin: corsOrigin,
     methods: ["GET", "POST"]
   }
 });
 
-app.use(cors());
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 
 // Store active games
