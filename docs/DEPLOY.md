@@ -4,6 +4,8 @@
 - **Frontend (Vercel):** https://vercel.com/deeishs-projects/tichu
 - **Backend (Render):** https://dashboard.render.com/web/srv-d6gf1o8gjchc73c3ruc0
 
+**Live backend URL** (use this in Vercel’s `VITE_SOCKET_URL`): `https://tichu-ba5d.onrender.com`
+
 This guide assumes your code is in a **GitHub** repo. If not, create a repo and push first.
 
 ---

@@ -666,6 +666,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
           game={game}
           playerId={playerId}
           isConnected={isConnected}
+          socket={socket}
           tableTheme={tableTheme}
           onTableThemeChange={handleTableThemeChange}
         />

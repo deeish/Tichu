@@ -24,7 +24,7 @@ function getPlayerName(players, playerId) {
   return p?.name ?? 'Unknown';
 }
 
-function ChatPanel({ playerId, players }) {
+function ChatPanel({ playerId, players, socket }) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const inputRef = useRef(null);
@@ -34,11 +34,20 @@ function ChatPanel({ playerId, players }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    if (!socket) return;
+    const onChat = (data) => {
+      setMessages((prev) => [...prev, { id: data.id ?? `${data.senderId}-${Date.now()}`, text: data.text, senderId: data.senderId, senderName: data.senderName }]);
+    };
+    socket.on('chat-message', onChat);
+    return () => socket.off('chat-message', onChat);
+  }, [socket]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const trimmed = message.trim();
-    if (!trimmed) return;
-    setMessages((prev) => [...prev, { id: Date.now(), text: trimmed, senderId: playerId }]);
+    if (!trimmed || !socket) return;
+    socket.emit('chat-message', trimmed);
     setMessage('');
     inputRef.current?.focus();
   };
@@ -53,7 +62,7 @@ function ChatPanel({ playerId, players }) {
             <ul className="drawer-chat-list">
               {messages.map((m) => {
                 const isOwn = m.senderId === playerId;
-                const senderName = getPlayerName(players, m.senderId);
+                const senderName = m.senderName ?? getPlayerName(players, m.senderId);
                 return (
                   <li
                     key={m.id}
@@ -184,7 +193,7 @@ function GameLogPanel({ game, playerId }) {
   );
 }
 
-function Drawer({ game, playerId, isConnected, tableTheme = 'velvet', onTableThemeChange = () => {} }) {
+function Drawer({ game, playerId, isConnected, socket, tableTheme = 'velvet', onTableThemeChange = () => {} }) {
   const [activeTab, setActiveTab] = useState('Chat');
 
   return (
@@ -225,7 +234,7 @@ function Drawer({ game, playerId, isConnected, tableTheme = 'velvet', onTableThe
           ))}
         </div>
         <div className="drawer-panel">
-          {activeTab === 'Chat' && <ChatPanel playerId={playerId} players={game?.players} />}
+          {activeTab === 'Chat' && <ChatPanel playerId={playerId} players={game?.players} socket={socket} />}
           {activeTab === 'Players' && game?.players && (
             <div className="drawer-panel-inner">
               <ul className="drawer-players">

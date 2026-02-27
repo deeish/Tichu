@@ -260,6 +260,23 @@ function setupSocketHandlers(io, games, players) {
       socket.leave(playerInfo.gameId);
     });
 
+    socket.on('chat-message', (text) => {
+      const playerInfo = players.get(socket.id);
+      if (!playerInfo) return;
+      const game = games.get(playerInfo.gameId);
+      if (!game) return;
+      const trimmed = typeof text === 'string' ? text.trim() : '';
+      if (!trimmed) return;
+      const sender = game.players.find(p => p.id === socket.id || p.socketId === socket.id);
+      const senderName = sender?.name ?? 'Someone';
+      io.to(playerInfo.gameId).emit('chat-message', {
+        senderId: socket.id,
+        senderName,
+        text: trimmed,
+        id: `${socket.id}-${Date.now()}`
+      });
+    });
+
     socket.on('disconnect', () => {
       const playerInfo = players.get(socket.id);
       if (playerInfo) {
