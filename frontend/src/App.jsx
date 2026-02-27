@@ -68,14 +68,12 @@ function App() {
     })
 
     socket.on('game-created', (data) => {
-      console.log('[game-created] socket.id:', socket.id, '| players:', data?.game?.players?.map(p => ({ id: p.id, socketId: p.socketId, name: p.name, team: p.team })))
       setGameState(data.game)
       setGameId(data.gameId)
       setPlayerId(socket.id)
     })
 
     socket.on('player-joined', (data) => {
-      console.log('[player-joined] socket.id:', socket.id, '| players:', data?.game?.players?.map(p => ({ id: p.id, socketId: p.socketId, name: p.name, team: p.team })))
       setGameState(data.game)
       setPlayerId(socket.id)
     })
@@ -90,21 +88,13 @@ function App() {
 
     socket.on('game-state', (data) => {
       if (!data?.game || !Array.isArray(data.game?.players)) return
-      const teams = data.game.players.map(p => `${p.name}:Team ${p.team ?? 1}`).join(', ')
-      console.log('[game-state] I am socket', socket.id, '| received team update → applying. Players:', teams)
       const nextGame = JSON.parse(JSON.stringify(data.game))
       setGameStateRef.current(nextGame)
       setGameStateVersion(v => v + 1)
     })
 
-    socket.on('player-won-round', (data) => {
-      console.log('Player won round:', data)
-      // Game state will be updated via game-update
-    })
-
-    socket.on('trick-won', (data) => {
-      console.log('Trick won by:', data)
-    })
+    socket.on('player-won-round', () => {})
+    socket.on('trick-won', () => {})
 
     socket.on('player-left', (data) => {
       setGameState(data.game)
@@ -128,13 +118,6 @@ function App() {
       socket.off('error')
     }
   }, [])
-
-  // Debug: log this client's lobby view whenever lobby state changes (compare across tabs to see who received updates)
-  useEffect(() => {
-    if (!gameState || gameState.state !== 'waiting' || !gameState.players?.length) return
-    const view = gameState.players.map(p => `${p.name}=Team${p.team ?? 1}`).join(', ')
-    console.log('[lobby view] I am', socket.id, '| my screen shows:', view)
-  }, [gameState])
 
   const handleCreateGame = () => {
     if (!playerName.trim()) {
@@ -174,23 +157,14 @@ function App() {
   const setMyTeam = (team) => {
     if (team !== 1 && team !== 2) return
     const sid = socket?.id ?? myId
-    console.log('[setMyTeam] clicked team:', team, '| socket.id:', socket?.id, '| myId:', myId, '| sid:', sid)
-    if (!sid) {
-      console.log('[setMyTeam] early return: no sid')
-      return
-    }
-    const playersSnapshot = gameState?.players ?? []
-    const meMatch = playersSnapshot.find(isMe)
-    console.log('[setMyTeam] players in state:', playersSnapshot.map(p => ({ id: p.id, socketId: p.socketId, name: p.name, team: p.team })), '| isMe match:', meMatch ? { id: meMatch.id, team: meMatch.team } : 'NONE')
+    if (!sid) return
     socket.emit('set-player-team', Number(team))
     setGameState((prev) => {
       if (!prev?.players) return prev
-      const next = {
+      return {
         ...prev,
         players: prev.players.map((p) => (isMe(p) ? { ...p, team: Number(team) } : p)),
       }
-      console.log('[setMyTeam] optimistic update applied, new teams:', next.players.map(p => ({ id: p.id, team: p.team })))
-      return next
     })
   }
 
@@ -365,11 +339,6 @@ function App() {
         </div>
       ) : gameState && !inActiveGame ? (
         <div className="landing-content lobby" key={`lobby-${gameState.id}-v${gameStateVersion}-${(gameState.players || []).map(p => `${p.id ?? p.socketId}:${p.team ?? 1}`).join('|')}`}>
-          {(() => {
-            const teamsSnapshot = (gameState.players || []).map(p => ({ name: p.name, team: p.team ?? 1 }))
-            console.log('[LOBBY RENDER] socket', socket.id, '| UI is rendering with teams:', teamsSnapshot)
-            return null
-          })()}
           <header className="lobby-header">
             <h1 className="lobby-title">Tichu</h1>
             <p className="lobby-code">{gameState.id}</p>
