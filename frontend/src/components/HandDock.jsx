@@ -25,7 +25,7 @@ function HandDock({
   draggable = false,
   onCardDragStart,
   onCardDragEnd,
-  exchangeDraggingCard = null,
+  exchangeDraggingIndex = null,
   onReorder,
 }) {
   const railRef = useRef(null);
@@ -196,7 +196,7 @@ function HandDock({
                 // React reuses one DOM node and the other can render invisible but keep layout.
                 const key = `card-${i}-${cardKey(card)}`;
                 const isDraggingThis = reorderDrag && i === reorderDrag.currentDropIndex;
-                const isExchangeDraggingThis = exchangeDraggingCard && cardKey(card) === cardKey(exchangeDraggingCard);
+                const isExchangeDraggingThis = exchangeDraggingIndex === i;
                 return (
                   <div
                     key={key}
@@ -223,7 +223,7 @@ function HandDock({
                       width={cardSize.w}
                       height={cardSize.h}
                       draggable={isExchangeDrag}
-                      onDragStart={isExchangeDrag && onCardDragStart ? (e) => onCardDragStart(e, card) : undefined}
+                      onDragStart={isExchangeDrag && onCardDragStart ? (e) => onCardDragStart(e, card, i) : undefined}
                       onDragEnd={isExchangeDrag && onCardDragEnd ? onCardDragEnd : undefined}
                     />
                   </div>

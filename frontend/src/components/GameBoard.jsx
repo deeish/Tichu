@@ -52,7 +52,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   const [showWishInput, setShowWishInput] = useState(false);
   const [exchangeAssignments, setExchangeAssignments] = useState([null, null, null]);
   const [exchangeDragOverSlot, setExchangeDragOverSlot] = useState(null);
-  const [exchangeDraggingCard, setExchangeDraggingCard] = useState(null);
+  const [exchangeDraggingIndex, setExchangeDraggingIndex] = useState(null);
   const [handOrderOverride, setHandOrderOverride] = useState(null);
   // Optimistic glow for Tichu buttons so click/unclick feels instant; cleared when game state updates
   const [optimisticTichu, setOptimisticTichu] = useState(null);
@@ -120,7 +120,10 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   }, [game?.state, myHand]);
 
   useEffect(() => {
-    if (game?.state !== 'exchanging') setExchangeAssignments([null, null, null]);
+    if (game?.state !== 'exchanging') {
+      setExchangeAssignments([null, null, null]);
+      setExchangeDraggingIndex(null);
+    }
   }, [game?.state]);
 
   const dockH = getDockHeight();
@@ -160,11 +163,12 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   const cardMatches = (a, b) =>
     a && b && a.type === b.type && (a.type === 'standard' ? a.suit === b.suit && a.rank === b.rank : a.name === b.name);
   const displayHand = useMemo(() => {
-    if (!myHand?.length) return myHand;
-    let base = myHand;
+    const safeHand = (myHand || []).filter(Boolean);
+    if (!safeHand.length) return safeHand;
+    let base = safeHand;
     if (game?.state === 'exchanging' && exchangeAssignments.some(Boolean)) {
       const assigned = exchangeAssignments.filter(Boolean);
-      base = myHand.filter((c) => !assigned.some((a) => cardMatches(a, c)));
+      base = safeHand.filter((c) => !assigned.some((a) => cardMatches(a, c)));
     }
     try {
       if (sortMode === 'asc') return sortCardsByRank(base, true);
@@ -261,9 +265,10 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
       return n;
     });
     setExchangeDragOverSlot(null);
+    setExchangeDraggingIndex(null);
   };
 
-  const handleExchangeDragStart = (e, card) => {
+  const handleExchangeDragStart = (e, card, index) => {
     try {
       const data = JSON.stringify(card);
       e.dataTransfer.setData('tichu/card', data);
@@ -277,11 +282,12 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
       const rect = cardEl.getBoundingClientRect();
       e.dataTransfer.setDragImage(cardEl, e.clientX - rect.left, e.clientY - rect.top);
     }
-    requestAnimationFrame(() => setExchangeDraggingCard(card));
+    // Defer so the native drag isn't interrupted by a re-render (fixes drop-on-seat in some browsers)
+    requestAnimationFrame(() => setExchangeDraggingIndex(index));
   };
 
   const handleExchangeDragEnd = () => {
-    setExchangeDraggingCard(null);
+    setExchangeDraggingIndex(null);
   };
 
   const handlePlayCards = () => {
@@ -602,7 +608,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
           draggable={game.state === 'exchanging'}
           onCardDragStart={game.state === 'exchanging' ? handleExchangeDragStart : undefined}
           onCardDragEnd={game.state === 'exchanging' ? handleExchangeDragEnd : undefined}
-          exchangeDraggingCard={game.state === 'exchanging' ? exchangeDraggingCard : null}
+          exchangeDraggingIndex={game.state === 'exchanging' ? exchangeDraggingIndex : null}
           onReorder={game.state === 'playing' ? handleHandReorder : undefined}
         >
           {game.state === 'exchanging' && !game.exchangeCards?.[playerId] && (
