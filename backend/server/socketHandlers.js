@@ -42,9 +42,9 @@ function setupSocketHandlers(io, games, players) {
       games.set(gameId, game);
       players.set(socket.id, { gameId, playerName });
       socket.join(gameId);
-      
+      const roomAfter = io.sockets.adapter.rooms.get(gameId);
       socket.emit('game-created', { gameId, game });
-      console.log(`Game ${gameId} created by ${playerName}`);
+      console.log(`Game ${gameId} created by ${playerName} (${socket.id}). Sockets in room: ${roomAfter ? roomAfter.size : 0}`);
     });
 
     // Test mode: Create game with 4 players immediately
@@ -114,29 +114,150 @@ function setupSocketHandlers(io, games, players) {
         return;
       }
 
-      // Assign team temporarily (will be randomized when 4 players join)
-      const team = game.players.length < 2 ? 1 : 2;
+      // New joiners start on team 1; they can change to any team in the lobby
       const player = {
         id: socket.id,
         socketId: socket.id,
         name: playerName,
-        team: team
+        team: 1
       };
 
       game.players.push(player);
       players.set(socket.id, { gameId, playerName });
       socket.join(gameId);
+      const roomAfter = io.sockets.adapter.rooms.get(gameId);
+      console.log(`${playerName} (${socket.id}) joined game ${gameId} (${game.players.length}/4). Sockets now in room: ${roomAfter ? roomAfter.size : 0}. Waiting for host to start.`);
 
       io.to(gameId).emit('player-joined', { player, game });
-      console.log(`${playerName} joined game ${gameId}`);
+      // NO AUTO-START: Game only starts when host emits 'start-game'. Do not call startGame or broadcastGameUpdate here.
+    });
 
-      // Start game when 4 players are ready
-      if (game.players.length === 4) {
-        // Randomly assign teams before starting
-        assignRandomTeamsToGame(game);
-        const broadcastFn = (game) => broadcastGameUpdate(io, game);
-        startGame(gameId, games, broadcastFn);
+    socket.on('start-game', () => {
+      const playerInfo = players.get(socket.id);
+      if (!playerInfo) {
+        socket.emit('error', { message: 'Not in a game' });
+        return;
       }
+      const game = games.get(playerInfo.gameId);
+      if (!game || game.state !== 'waiting') {
+        socket.emit('error', { message: 'Game not found or already started' });
+        return;
+      }
+      const isHost = game.players[0]?.id === socket.id;
+      if (!isHost) {
+        socket.emit('error', { message: 'Only the host can start the game' });
+        return;
+      }
+      if (game.players.length !== 4) {
+        socket.emit('error', { message: 'Need 4 players to start' });
+        return;
+      }
+      const team1Count = game.players.filter(p => p.team === 1).length;
+      const team2Count = game.players.filter(p => p.team === 2).length;
+      if (team1Count !== 2 || team2Count !== 2) {
+        socket.emit('error', { message: 'Each team must have exactly 2 players. Currently: Team 1 has ' + team1Count + ', Team 2 has ' + team2Count + '.' });
+        return;
+      }
+      // Use lobby team choices; do not overwrite with assignRandomTeamsToGame
+      const broadcastFn = (g) => broadcastGameUpdate(io, g);
+      startGame(playerInfo.gameId, games, broadcastFn);
+      // Explicitly send game-update to the host (their own view, not players[0] which may have changed after seating)
+      const gameAfter = games.get(playerInfo.gameId);
+      if (gameAfter) {
+        const hostView = getPlayerView(gameAfter, socket.id);
+        socket.emit('game-update', { game: hostView });
+      }
+    });
+
+    socket.on('update-player-name', (playerName) => {
+      const playerInfo = players.get(socket.id);
+      if (!playerInfo) {
+        socket.emit('error', { message: 'Not in a game' });
+        return;
+      }
+      const game = games.get(playerInfo.gameId);
+      if (!game || game.state !== 'waiting') {
+        socket.emit('error', { message: 'Game not found or already started' });
+        return;
+      }
+      const name = String(playerName || '').trim() || 'Player';
+      const player = game.players.find(p => p.id === socket.id);
+      if (!player) {
+        socket.emit('error', { message: 'Player not in game' });
+        return;
+      }
+      player.name = name;
+      players.set(socket.id, { gameId: playerInfo.gameId, playerName: name });
+      const payload = { game: JSON.parse(JSON.stringify(game)) };
+      io.in(playerInfo.gameId).emit('game-state', payload);
+    });
+
+    socket.on('set-player-team', (teamOrPayload) => {
+      const playerInfo = players.get(socket.id);
+      console.log('[set-player-team] received', { socketId: socket.id, playerInfo: playerInfo ? { gameId: playerInfo.gameId } : null, teamOrPayload });
+      if (!playerInfo) {
+        console.log('[set-player-team] early return: no playerInfo for socket.id');
+        return;
+      }
+      const game = games.get(playerInfo.gameId);
+      if (!game || game.state !== 'waiting') {
+        console.log('[set-player-team] early return: no game or state not waiting', { hasGame: !!game, state: game?.state });
+        return;
+      }
+      const team = typeof teamOrPayload === 'object' && teamOrPayload != null && 'team' in teamOrPayload
+        ? teamOrPayload.team
+        : teamOrPayload;
+      const t = Number(team) === 1 ? 1 : Number(team) === 2 ? 2 : 1;
+      const player = game.players.find(p => p.id === socket.id || p.socketId === socket.id);
+      if (!player) {
+        console.log('[set-player-team] early return: player not found in game.players', { socketId: socket.id, playerIds: game.players.map(p => ({ id: p.id, socketId: p.socketId })) });
+        return;
+      }
+      if (!player.id) player.id = socket.id;
+      player.team = t;
+      const payload = { game: JSON.parse(JSON.stringify(game)) };
+      console.log('[set-player-team] updated', player.name, 'to team', t, '| teams:', payload.game.players.map(p => ({ name: p.name, team: p.team })));
+      // Send to each player by socket id so every client gets the update (no reliance on room)
+      const sent = new Set();
+      game.players.forEach((p) => {
+        const sid = p.socketId || p.id;
+        if (sid && !sent.has(sid)) {
+          sent.add(sid);
+          io.to(sid).emit('game-state', payload);
+        }
+      });
+      console.log('[set-player-team] sent game-state to', sent.size, 'sockets:', [...sent]);
+    });
+
+    socket.on('randomize-teams', () => {
+      const playerInfo = players.get(socket.id);
+      if (!playerInfo) return;
+      const game = games.get(playerInfo.gameId);
+      if (!game || game.state !== 'waiting') return;
+      const isHost = game.players[0]?.id === socket.id;
+      if (!isHost) return;
+      if (game.players.length !== 4) return;
+      assignRandomTeamsToGame(game);
+      const payload = { game: JSON.parse(JSON.stringify(game)) };
+      game.players.forEach((p) => {
+        const sid = p.socketId || p.id;
+        if (sid) io.to(sid).emit('game-state', payload);
+      });
+    });
+
+    socket.on('leave-game', () => {
+      const playerInfo = players.get(socket.id);
+      if (!playerInfo) return;
+      const game = games.get(playerInfo.gameId);
+      if (game) {
+        game.players = game.players.filter(p => p.id !== socket.id);
+        socket.to(playerInfo.gameId).emit('player-left', { playerId: socket.id, game });
+        if (game.players.length === 0) {
+          games.delete(playerInfo.gameId);
+        }
+      }
+      players.delete(socket.id);
+      socket.leave(playerInfo.gameId);
     });
 
     socket.on('disconnect', () => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { io } from 'socket.io-client'
 import GameBoard from './components/GameBoard'
 import StatsPopup from './components/StatsPopup'
@@ -38,6 +38,10 @@ const MOCK_FINISHED_GAME = {
 
 function App() {
   const [gameState, setGameState] = useState(null)
+  const [gameStateVersion, setGameStateVersion] = useState(0)
+  const setGameStateRef = useRef(setGameState)
+  setGameStateRef.current = setGameState
+
   const [playerName, setPlayerName] = useState('')
   const [gameId, setGameId] = useState('')
   const [isConnected, setIsConnected] = useState(false)
@@ -46,26 +50,34 @@ function App() {
   const [showStatsPopup, setShowStatsPopup] = useState(false)
   // 'start' | 'join' | null — null = show only the two main buttons
   const [landingMode, setLandingMode] = useState(null)
+  // Lobby: editing own name (show input + save)
+  const [editingMyName, setEditingMyName] = useState(false)
+  const [lobbyNameDraft, setLobbyNameDraft] = useState('')
 
   useEffect(() => {
-    socket.on('connect', () => {
+    const onConnect = () => {
       setIsConnected(true)
       setPlayerId(socket.id)
       console.log('Connected to server')
-    })
+    }
+    if (socket.connected) onConnect()
+    socket.on('connect', onConnect)
 
     socket.on('disconnect', () => {
       setIsConnected(false)
     })
 
     socket.on('game-created', (data) => {
+      console.log('[game-created] socket.id:', socket.id, '| players:', data?.game?.players?.map(p => ({ id: p.id, socketId: p.socketId, name: p.name, team: p.team })))
       setGameState(data.game)
       setGameId(data.gameId)
       setPlayerId(socket.id)
     })
 
     socket.on('player-joined', (data) => {
+      console.log('[player-joined] socket.id:', socket.id, '| players:', data?.game?.players?.map(p => ({ id: p.id, socketId: p.socketId, name: p.name, team: p.team })))
       setGameState(data.game)
+      setPlayerId(socket.id)
     })
 
     socket.on('game-started', (data) => {
@@ -77,7 +89,12 @@ function App() {
     })
 
     socket.on('game-state', (data) => {
-      setGameState(data.game)
+      if (!data?.game || !Array.isArray(data.game?.players)) return
+      const teams = data.game.players.map(p => `${p.name}:Team ${p.team ?? 1}`).join(', ')
+      console.log('[game-state] I am socket', socket.id, '| received team update → applying. Players:', teams)
+      const nextGame = JSON.parse(JSON.stringify(data.game))
+      setGameStateRef.current(nextGame)
+      setGameStateVersion(v => v + 1)
     })
 
     socket.on('player-won-round', (data) => {
@@ -89,23 +106,35 @@ function App() {
       console.log('Trick won by:', data)
     })
 
+    socket.on('player-left', (data) => {
+      setGameState(data.game)
+    })
+
     socket.on('error', (data) => {
       alert(data.message)
     })
 
     return () => {
-      socket.off('connect')
+      socket.off('connect', onConnect)
       socket.off('disconnect')
       socket.off('game-created')
       socket.off('player-joined')
       socket.off('game-started')
       socket.off('game-update')
       socket.off('game-state')
+      socket.off('player-left')
       socket.off('player-won-round')
       socket.off('trick-won')
       socket.off('error')
     }
   }, [])
+
+  // Debug: log this client's lobby view whenever lobby state changes (compare across tabs to see who received updates)
+  useEffect(() => {
+    if (!gameState || gameState.state !== 'waiting' || !gameState.players?.length) return
+    const view = gameState.players.map(p => `${p.name}=Team${p.team ?? 1}`).join(', ')
+    console.log('[lobby view] I am', socket.id, '| my screen shows:', view)
+  }, [gameState])
 
   const handleCreateGame = () => {
     if (!playerName.trim()) {
@@ -124,12 +153,85 @@ function App() {
     socket.emit('join-game', { gameId, playerName: name })
   }
 
+  const handleLeaveParty = () => {
+    socket.emit('leave-game')
+    setGameState(null)
+    setGameId('')
+  }
+
+  const handleStartGame = () => {
+    socket.emit('start-game')
+  }
+
+  const myId = playerId ?? socket?.id
+
+  const isMe = (player) => {
+    if (!player || (!myId && !socket?.id)) return false
+    const id = player.id ?? player.socketId
+    return id === myId || id === socket?.id || player.socketId === socket?.id
+  }
+
+  const setMyTeam = (team) => {
+    if (team !== 1 && team !== 2) return
+    const sid = socket?.id ?? myId
+    console.log('[setMyTeam] clicked team:', team, '| socket.id:', socket?.id, '| myId:', myId, '| sid:', sid)
+    if (!sid) {
+      console.log('[setMyTeam] early return: no sid')
+      return
+    }
+    const playersSnapshot = gameState?.players ?? []
+    const meMatch = playersSnapshot.find(isMe)
+    console.log('[setMyTeam] players in state:', playersSnapshot.map(p => ({ id: p.id, socketId: p.socketId, name: p.name, team: p.team })), '| isMe match:', meMatch ? { id: meMatch.id, team: meMatch.team } : 'NONE')
+    socket.emit('set-player-team', Number(team))
+    setGameState((prev) => {
+      if (!prev?.players) return prev
+      const next = {
+        ...prev,
+        players: prev.players.map((p) => (isMe(p) ? { ...p, team: Number(team) } : p)),
+      }
+      console.log('[setMyTeam] optimistic update applied, new teams:', next.players.map(p => ({ id: p.id, team: p.team })))
+      return next
+    })
+  }
+
+  const handleRandomizeTeams = () => {
+    socket.emit('randomize-teams')
+  }
+
+  const startEditMyName = () => {
+    const me = gameState?.players?.find(isMe)
+    if (me) {
+      setLobbyNameDraft(me.name || '')
+      setEditingMyName(true)
+    }
+  }
+
+  const saveMyName = () => {
+    const name = lobbyNameDraft.trim() || 'Player'
+    socket.emit('update-player-name', name)
+    setEditingMyName(false)
+    setGameState((prev) => {
+      if (!prev?.players || !myId) return prev
+      return {
+        ...prev,
+        players: prev.players.map((p) => (p.id === myId ? { ...p, name } : p)),
+      }
+    })
+  }
+
+  const cancelEditMyName = () => {
+    setEditingMyName(false)
+  }
+
   const handleCreateTestGame = () => {
     const name = playerName.trim() || 'Test Player'
     socket.emit('create-test-game', name)
   }
 
-  const inActiveGame = gameState && gameState.state !== 'waiting';
+  // Only show game board when game has actually started (host clicked Start game).
+  // Stay in lobby for 'waiting' or any unexpected state so joiners never see the game until host starts.
+  const ACTIVE_GAME_STATES = ['grand-tichu', 'exchanging', 'playing', 'round-ended', 'finished']
+  const inActiveGame = gameState && ACTIVE_GAME_STATES.includes(gameState.state)
 
   if (showEndGameTest) {
     return (
@@ -166,12 +268,14 @@ function App() {
 
   if (inActiveGame) {
     return (
-      <GameBoard
-        game={gameState}
-        socket={socket}
-        playerId={playerId || socket.id}
-        isConnected={isConnected}
-      />
+      <div className="game-fade-in">
+        <GameBoard
+          game={gameState}
+          socket={socket}
+          playerId={playerId || socket.id}
+          isConnected={isConnected}
+        />
+      </div>
     );
   }
 
@@ -180,7 +284,7 @@ function App() {
       {!gameState ? (
         <div className="landing-content">
           <header className="landing-header">
-            <h1>{landingMode === 'join' ? 'Tichu' : 'Welcome to Tichu'}</h1>
+            <h1>{landingMode === 'join' || landingMode === 'start' ? 'Tichu' : 'Welcome to Tichu'}</h1>
             <p className="landing-subtitle">
               {isConnected ? 'Connected' : 'Connecting…'}
             </p>
@@ -236,7 +340,7 @@ function App() {
             </div>
           )}
 
-          {landingMode !== 'join' && (
+          {landingMode == null && (
             <div className="landing-secondary">
               <button type="button" className="landing-link" onClick={handleCreateTestGame}>
                 Quick test game (4 players)
@@ -247,34 +351,140 @@ function App() {
             </div>
           )}
 
-          <footer className="landing-footer">
-            {landingMode !== 'join' && (
-              <>
-                <a href="https://en.wikipedia.org/wiki/Tichu" target="_blank" rel="noopener noreferrer" className="landing-footer-link">
-                  How to play
-                </a>
-                <button type="button" className="landing-footer-link landing-footer-btn" onClick={() => {}}>
-                  Submit feedback
-                </button>
-              </>
-            )}
-            <p className="landing-credit">Created by Dylan Salmo</p>
-          </footer>
+          {landingMode == null && (
+            <footer className="landing-footer">
+              <a href="https://en.wikipedia.org/wiki/Tichu" target="_blank" rel="noopener noreferrer" className="landing-footer-link">
+                How to play
+              </a>
+              <button type="button" className="landing-footer-link landing-footer-btn" onClick={() => {}}>
+                Submit feedback
+              </button>
+              <p className="landing-credit">Created by Dylan Salmo</p>
+            </footer>
+          )}
         </div>
-      ) : gameState.state === 'waiting' ? (
-        <div className="landing-content landing-waiting">
-          <header className="landing-header">
-            <h1>Game {gameState.id}</h1>
-            <p className="landing-subtitle">Waiting for players ({gameState.players.length}/4)</p>
+      ) : gameState && !inActiveGame ? (
+        <div className="landing-content lobby" key={`lobby-${gameState.id}-v${gameStateVersion}-${(gameState.players || []).map(p => `${p.id ?? p.socketId}:${p.team ?? 1}`).join('|')}`}>
+          {(() => {
+            const teamsSnapshot = (gameState.players || []).map(p => ({ name: p.name, team: p.team ?? 1 }))
+            console.log('[LOBBY RENDER] socket', socket.id, '| UI is rendering with teams:', teamsSnapshot)
+            return null
+          })()}
+          <header className="lobby-header">
+            <h1 className="lobby-title">Tichu</h1>
+            <p className="lobby-code">{gameState.id}</p>
           </header>
-          <div className="waiting-players">
-            {gameState.players.map((player) => (
-              <div key={player.id} className="waiting-player">
-                <span className="waiting-player-name">{player.name}</span>
-                <span className="waiting-player-team">Team {player.team}</span>
-              </div>
-            ))}
-          </div>
+
+          <section className="lobby-card lobby-players-card">
+            <h2 className="lobby-card-title">
+              Players
+              <span className="lobby-badge">{gameState.players.length}</span>
+            </h2>
+            <div className="lobby-players">
+              {gameState.players.map((player, index) => {
+                const isHost = gameState.players[0]?.id === player.id || gameState.players[0]?.socketId === player.socketId
+                const isYou = isMe(player)
+                const isEditingThis = isYou && editingMyName
+                const rowKey = player.id ?? player.socketId ?? `player-${index}`
+                const team = player.team === 2 ? 2 : 1
+                return (
+                  <div key={`${rowKey}-team${team}`} className={`lobby-player ${isHost ? 'lobby-player-host' : ''}`}>
+                    {isEditingThis ? (
+                      <div className="lobby-player-edit-row">
+                        <input
+                          type="text"
+                          className="lobby-player-name-input"
+                          value={lobbyNameDraft}
+                          onChange={(e) => setLobbyNameDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveMyName()
+                            if (e.key === 'Escape') cancelEditMyName()
+                          }}
+                          autoFocus
+                        />
+                        <button type="button" className="lobby-player-save" onClick={saveMyName}>
+                          Save
+                        </button>
+                        <button type="button" className="lobby-player-cancel" onClick={cancelEditMyName}>
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="lobby-player-left">
+                          <span className="lobby-player-name">{player.name}</span>
+                          {isYou && (
+                            <button
+                              type="button"
+                              className="lobby-player-edit"
+                              onClick={startEditMyName}
+                              title="Edit name"
+                              aria-label="Edit name"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                            </button>
+                          )}
+                        </span>
+                        <span className="lobby-player-right">
+                          {isYou && isHost && <span className="lobby-player-role">You, Host</span>}
+                          {isYou && !isHost && <span className="lobby-player-role">You</span>}
+                          {isYou ? (
+                            <span className="lobby-team-picker" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                className={`lobby-team-btn ${team === 1 ? 'lobby-team-btn-active' : ''}`}
+                                onClick={() => setMyTeam(1)}
+                              >
+                                Team 1
+                              </button>
+                              <button
+                                type="button"
+                                className={`lobby-team-btn ${team === 2 ? 'lobby-team-btn-active' : ''}`}
+                                onClick={() => setMyTeam(2)}
+                              >
+                                Team 2
+                              </button>
+                            </span>
+                          ) : (
+                            <span className="lobby-player-team-badge">Team {team}</span>
+                          )}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+
+          {isMe(gameState.players[0]) && (
+            <div className="lobby-start-wrap">
+              {gameState.players.length === 4 && (
+                <button
+                  type="button"
+                  className="lobby-randomize"
+                  onClick={handleRandomizeTeams}
+                >
+                  Randomize teams
+                </button>
+              )}
+              <button
+                type="button"
+                className="lobby-start"
+                onClick={handleStartGame}
+                disabled={gameState.players.length !== 4}
+              >
+                Start game
+              </button>
+              {gameState.players.length !== 4 && (
+                <p className="lobby-start-hint">Need 4 players to start</p>
+              )}
+            </div>
+          )}
+
+          <button type="button" className="lobby-leave" onClick={handleLeaveParty}>
+            Leave party
+          </button>
         </div>
       ) : null}
     </div>
