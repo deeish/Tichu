@@ -3,6 +3,7 @@
  * Handles all WebSocket communication with clients
  */
 
+const crypto = require('crypto');
 const {
   declareGrandTichu,
   revealRemainingCards,
@@ -18,6 +19,17 @@ const {
 const { getBotMove, getDragonOpponentChoice } = require('../game/simpleBot');
 const { assignRandomTeamsToGame, startGame, generateGameId } = require('./gameManager');
 
+function generateId() {
+  return crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+}
+
+/** Resolve socket to stable player id (for game logic). Returns null if not in game or disconnected. */
+function getPlayerIdInGame(game, socketId) {
+  if (!game?.players) return null;
+  const p = game.players.find((x) => x.socketId === socketId || x.id === socketId);
+  return p && !p.disconnected ? p.id : null;
+}
+
 /**
  * Sets up all socket event handlers
  */
@@ -27,9 +39,11 @@ function setupSocketHandlers(io, games, players) {
 
     socket.on('create-game', (playerName) => {
       const gameId = generateGameId();
+      const playerId = generateId();
+      const token = generateId();
       const game = {
         id: gameId,
-        players: [{ id: socket.id, socketId: socket.id, name: playerName, team: 1 }],
+        players: [{ id: playerId, socketId: socket.id, name: playerName, team: 1, token }],
         state: 'waiting',
         deck: [],
         hands: {},
@@ -38,12 +52,13 @@ function setupSocketHandlers(io, games, players) {
         scores: { team1: 0, team2: 0 },
         turnOrder: []
       };
-      
+
       games.set(gameId, game);
       players.set(socket.id, { gameId, playerName });
       socket.join(gameId);
       const roomAfter = io.sockets.adapter.rooms.get(gameId);
-      socket.emit('game-created', { gameId, game });
+      const view = getPlayerView(game, socket.id);
+      socket.emit('game-created', { gameId, game: view, playerToken: token });
       console.log(`Game ${gameId} created by ${playerName} (${socket.id}). Sockets in room: ${roomAfter ? roomAfter.size : 0}`);
     });
 
@@ -77,16 +92,18 @@ function setupSocketHandlers(io, games, players) {
       
       // Create 4 test players (first one is the real socket, others are virtual)
       testPlayerNames.forEach((name, index) => {
-        const playerId = index === 0 ? socket.id : `test-${gameId}-${index}`;
+        const playerId = index === 0 ? generateId() : `test-${gameId}-${index}`;
         const team = teamAssignment[index];
+        const token = index === 0 ? generateId() : null;
         game.players.push({
           id: playerId,
-          socketId: index === 0 ? socket.id : null, // Only first player has real socket
+          socketId: index === 0 ? socket.id : null,
           name: name,
           team: team,
-          isTestPlayer: index > 0 // Mark test players
+          token: token,
+          isTestPlayer: index > 0
         });
-        
+
         if (index === 0) {
           players.set(socket.id, { gameId, playerName: name });
         }
@@ -109,27 +126,54 @@ function setupSocketHandlers(io, games, players) {
         return;
       }
 
-      if (game.players.length >= 4) {
+      const name = String(playerName || '').trim() || 'Player';
+      const disconnectedSlot = game.players.find((p) => p.disconnected);
+
+      if (game.players.length >= 4 && !disconnectedSlot) {
         socket.emit('error', { message: 'Game is full' });
         return;
       }
 
-      // New joiners start on team 1; they can change to any team in the lobby
+      if (disconnectedSlot) {
+        // Fill the disconnected slot so they can rejoin with the code (e.g. after accidentally leaving or losing token)
+        const token = generateId();
+        disconnectedSlot.socketId = socket.id;
+        disconnectedSlot.token = token;
+        disconnectedSlot.name = name;
+        disconnectedSlot.disconnected = false;
+        delete disconnectedSlot.disconnectedAt;
+
+        players.set(socket.id, { gameId, playerName: name });
+        socket.join(gameId);
+        const roomAfter = io.sockets.adapter.rooms.get(gameId);
+        console.log(`${name} (${socket.id}) rejoined game ${gameId} by filling disconnected slot. Sockets in room: ${roomAfter ? roomAfter.size : 0}.`);
+
+        const view = getPlayerView(game, socket.id);
+        socket.emit('player-joined', { player: disconnectedSlot, game: view, playerToken: token });
+        socket.to(gameId).emit('player-joined', { player: { ...disconnectedSlot, token: undefined }, game });
+        broadcastGameUpdate(io, game);
+        return;
+      }
+
+      const playerId = generateId();
+      const token = generateId();
       const player = {
-        id: socket.id,
+        id: playerId,
         socketId: socket.id,
-        name: playerName,
-        team: 1
+        name,
+        team: 1,
+        token
       };
 
       game.players.push(player);
-      players.set(socket.id, { gameId, playerName });
+      players.set(socket.id, { gameId, playerName: name });
       socket.join(gameId);
       const roomAfter = io.sockets.adapter.rooms.get(gameId);
-      console.log(`${playerName} (${socket.id}) joined game ${gameId} (${game.players.length}/4). Sockets now in room: ${roomAfter ? roomAfter.size : 0}. Waiting for host to start.`);
+      console.log(`${name} (${socket.id}) joined game ${gameId} (${game.players.length}/4). Sockets now in room: ${roomAfter ? roomAfter.size : 0}. Waiting for host to start.`);
 
-      io.to(gameId).emit('player-joined', { player, game });
-      // NO AUTO-START: Game only starts when host emits 'start-game'. Do not call startGame or broadcastGameUpdate here.
+      const view = getPlayerView(game, socket.id);
+      socket.emit('player-joined', { player, game: view, playerToken: token });
+      socket.to(gameId).emit('player-joined', { player: { ...player, token: undefined }, game });
     });
 
     socket.on('start-game', () => {
@@ -143,13 +187,18 @@ function setupSocketHandlers(io, games, players) {
         socket.emit('error', { message: 'Game not found or already started' });
         return;
       }
-      const isHost = game.players[0]?.id === socket.id;
+      const isHost = game.players[0]?.socketId === socket.id;
       if (!isHost) {
         socket.emit('error', { message: 'Only the host can start the game' });
         return;
       }
       if (game.players.length !== 4) {
         socket.emit('error', { message: 'Need 4 players to start' });
+        return;
+      }
+      const disconnected = game.players.filter((p) => p.disconnected);
+      if (disconnected.length > 0) {
+        socket.emit('error', { message: 'All players must be connected to start. Waiting for: ' + disconnected.map((p) => p.name).join(', ') });
         return;
       }
       const team1Count = game.players.filter(p => p.team === 1).length;
@@ -181,15 +230,16 @@ function setupSocketHandlers(io, games, players) {
         return;
       }
       const name = String(playerName || '').trim() || 'Player';
-      const player = game.players.find(p => p.id === socket.id);
+      const player = game.players.find(p => p.socketId === socket.id);
       if (!player) {
         socket.emit('error', { message: 'Player not in game' });
         return;
       }
       player.name = name;
       players.set(socket.id, { gameId: playerInfo.gameId, playerName: name });
-      const payload = { game: JSON.parse(JSON.stringify(game)) };
-      io.in(playerInfo.gameId).emit('game-state', payload);
+      game.players.forEach((p) => {
+        if (p.socketId) io.to(p.socketId).emit('game-state', { game: getPlayerView(game, p.socketId) });
+      });
     });
 
     socket.on('set-player-team', (teamOrPayload) => {
@@ -208,25 +258,18 @@ function setupSocketHandlers(io, games, players) {
         ? teamOrPayload.team
         : teamOrPayload;
       const t = Number(team) === 1 ? 1 : Number(team) === 2 ? 2 : 1;
-      const player = game.players.find(p => p.id === socket.id || p.socketId === socket.id);
+      const player = game.players.find(p => p.socketId === socket.id || p.id === socket.id);
       if (!player) {
         console.log('[set-player-team] early return: player not found in game.players', { socketId: socket.id, playerIds: game.players.map(p => ({ id: p.id, socketId: p.socketId })) });
         return;
       }
-      if (!player.id) player.id = socket.id;
       player.team = t;
-      const payload = { game: JSON.parse(JSON.stringify(game)) };
-      console.log('[set-player-team] updated', player.name, 'to team', t, '| teams:', payload.game.players.map(p => ({ name: p.name, team: p.team })));
-      // Send to each player by socket id so every client gets the update (no reliance on room)
-      const sent = new Set();
+      console.log('[set-player-team] updated', player.name, 'to team', t);
       game.players.forEach((p) => {
-        const sid = p.socketId || p.id;
-        if (sid && !sent.has(sid)) {
-          sent.add(sid);
-          io.to(sid).emit('game-state', payload);
+        if (p.socketId) {
+          io.to(p.socketId).emit('game-state', { game: getPlayerView(game, p.socketId) });
         }
       });
-      console.log('[set-player-team] sent game-state to', sent.size, 'sockets:', [...sent]);
     });
 
     socket.on('randomize-teams', () => {
@@ -234,14 +277,12 @@ function setupSocketHandlers(io, games, players) {
       if (!playerInfo) return;
       const game = games.get(playerInfo.gameId);
       if (!game || game.state !== 'waiting') return;
-      const isHost = game.players[0]?.id === socket.id;
+      const isHost = game.players[0]?.socketId === socket.id;
       if (!isHost) return;
       if (game.players.length !== 4) return;
       assignRandomTeamsToGame(game);
-      const payload = { game: JSON.parse(JSON.stringify(game)) };
       game.players.forEach((p) => {
-        const sid = p.socketId || p.id;
-        if (sid) io.to(sid).emit('game-state', payload);
+        if (p.socketId) io.to(p.socketId).emit('game-state', { game: getPlayerView(game, p.socketId) });
       });
     });
 
@@ -249,12 +290,12 @@ function setupSocketHandlers(io, games, players) {
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       const game = games.get(playerInfo.gameId);
-      if (game) {
-        game.players = game.players.filter(p => p.id !== socket.id);
-        socket.to(playerInfo.gameId).emit('player-left', { playerId: socket.id, game });
-        if (game.players.length === 0) {
-          games.delete(playerInfo.gameId);
-        }
+      const leaving = game?.players.find((p) => p.socketId === socket.id);
+      if (game && leaving) {
+        game.players = game.players.filter((p) => p.id !== leaving.id);
+        if (game.hands) delete game.hands[leaving.id];
+        socket.to(playerInfo.gameId).emit('player-left', { playerId: leaving.id, game });
+        if (game.players.length === 0) games.delete(playerInfo.gameId);
       }
       players.delete(socket.id);
       socket.leave(playerInfo.gameId);
@@ -267,25 +308,55 @@ function setupSocketHandlers(io, games, players) {
       if (!game) return;
       const trimmed = typeof text === 'string' ? text.trim() : '';
       if (!trimmed) return;
-      const sender = game.players.find(p => p.id === socket.id || p.socketId === socket.id);
+      const sender = game.players.find(p => p.socketId === socket.id || p.id === socket.id);
       const senderName = sender?.name ?? 'Someone';
       io.to(playerInfo.gameId).emit('chat-message', {
-        senderId: socket.id,
+        senderId: sender?.id ?? socket.id,
         senderName,
         text: trimmed,
         id: `${socket.id}-${Date.now()}`
       });
     });
 
+    socket.on('rejoin', ({ gameId, playerToken }) => {
+      const game = games.get(gameId);
+      if (!game) {
+        socket.emit('error', { message: 'Game not found' });
+        return;
+      }
+      const player = game.players.find((p) => p.token === playerToken);
+      if (!player) {
+        socket.emit('error', { message: 'Invalid rejoin token' });
+        return;
+      }
+      if (!player.disconnected) {
+        socket.emit('error', { message: 'Already in game' });
+        return;
+      }
+      player.socketId = socket.id;
+      player.disconnected = false;
+      delete player.disconnectedAt;
+      players.set(socket.id, { gameId, playerName: player.name });
+      socket.join(gameId);
+      const view = getPlayerView(game, socket.id);
+      socket.emit('game-state', { game: view });
+      broadcastGameUpdate(io, game);
+      console.log('Player rejoined:', player.name, socket.id, 'game', gameId);
+    });
+
     socket.on('disconnect', () => {
       const playerInfo = players.get(socket.id);
       if (playerInfo) {
         const game = games.get(playerInfo.gameId);
-        if (game) {
-          game.players = game.players.filter(p => p.id !== socket.id);
-          io.to(playerInfo.gameId).emit('player-left', { playerId: socket.id, game });
+        const p = game?.players.find((x) => x.socketId === socket.id);
+        if (game && p) {
+          p.disconnected = true;
+          p.disconnectedAt = Date.now();
+          p.socketId = null;
+          broadcastGameUpdate(io, game);
         }
         players.delete(socket.id);
+        if (game) socket.leave(game.id);
       }
       console.log('Player disconnected:', socket.id);
     });
@@ -294,11 +365,11 @@ function setupSocketHandlers(io, games, players) {
     socket.on('declare-grand-tichu', () => {
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
-      
       const game = games.get(playerInfo.gameId);
       if (!game) return;
-      
-      const result = declareGrandTichu(game, socket.id);
+      const playerId = getPlayerIdInGame(game, socket.id);
+      if (!playerId) return;
+      const result = declareGrandTichu(game, playerId);
       if (result.success) {
         // Check if all players have revealed cards (either declared Grand Tichu or revealed manually)
         const allRevealed = game.players.every(p => game.cardsRevealed[p.id]);
@@ -337,10 +408,11 @@ function setupSocketHandlers(io, games, players) {
       const game = games.get(playerInfo.gameId);
       if (!game) return;
       
-      const result = revealRemainingCards(game, socket.id);
+      const playerId = getPlayerIdInGame(game, socket.id);
+      if (!playerId) return;
+      const result = revealRemainingCards(game, playerId);
       if (result.success) {
-        // Check if all players have revealed cards
-        const allRevealed = game.players.every(p => game.cardsRevealed[p.id]);
+        const allRevealed = game.players.every((p) => game.cardsRevealed[p.id]);
         
         if (allRevealed) {
           // Auto-advance to exchange phase
@@ -389,7 +461,9 @@ function setupSocketHandlers(io, games, players) {
       const game = games.get(playerInfo.gameId);
       if (!game) return;
       
-      const result = declareTichu(game, socket.id);
+      const playerId = getPlayerIdInGame(game, socket.id);
+      if (!playerId) return;
+      const result = declareTichu(game, playerId);
       if (result.success) {
         broadcastGameUpdate(io, game);
       } else {
@@ -404,7 +478,9 @@ function setupSocketHandlers(io, games, players) {
       const game = games.get(playerInfo.gameId);
       if (!game) return;
       
-      const result = undeclareTichu(game, socket.id);
+      const playerId = getPlayerIdInGame(game, socket.id);
+      if (!playerId) return;
+      const result = undeclareTichu(game, playerId);
       if (result.success) {
         broadcastGameUpdate(io, game);
       } else {
@@ -419,7 +495,9 @@ function setupSocketHandlers(io, games, players) {
       const game = games.get(playerInfo.gameId);
       if (!game) return;
       
-      const result = undeclareGrandTichu(game, socket.id);
+      const playerId = getPlayerIdInGame(game, socket.id);
+      if (!playerId) return;
+      const result = undeclareGrandTichu(game, playerId);
       if (result.success) {
         broadcastGameUpdate(io, game);
       } else {
@@ -435,9 +513,11 @@ function setupSocketHandlers(io, games, players) {
       const game = games.get(playerInfo.gameId);
       if (!game) return;
       
-      const result = exchangeCards(game, socket.id, cards);
+      const playerId = getPlayerIdInGame(game, socket.id);
+      if (!playerId) return;
+      const result = exchangeCards(game, playerId, cards);
       if (result.success) {
-        game.exchangeComplete[socket.id] = true;
+        game.exchangeComplete[playerId] = true;
         
         // For test games, auto-exchange for test players
         const testPlayers = game.players.filter(p => p.isTestPlayer);
@@ -490,13 +570,14 @@ function setupSocketHandlers(io, games, players) {
       const game = games.get(playerInfo.gameId);
       if (!game) return;
       
-      const result = makeMove(game, socket.id, cards || [], action || 'play', mahJongWish || null);
+      const playerId = getPlayerIdInGame(game, socket.id);
+      if (!playerId) return;
+      const result = makeMove(game, playerId, cards || [], action || 'play', mahJongWish || null);
       if (result.success) {
         broadcastGameUpdate(io, game);
-        
         if (result.playerWon) {
           io.to(playerInfo.gameId).emit('player-won-round', {
-            playerId: socket.id,
+            playerId,
             tichuBonus: result.tichuBonus
           });
         }
@@ -524,7 +605,9 @@ function setupSocketHandlers(io, games, players) {
       const game = games.get(playerInfo.gameId);
       if (!game) return;
       
-      const result = selectDragonOpponent(game, socket.id, selectedOpponentId);
+      const playerId = getPlayerIdInGame(game, socket.id);
+      if (!playerId) return;
+      const result = selectDragonOpponent(game, playerId, selectedOpponentId);
       if (result.success) {
         broadcastGameUpdate(io, game);
         
@@ -606,10 +689,11 @@ function setupSocketHandlers(io, games, players) {
 }
 
 function broadcastGameUpdate(io, game) {
-  // Send personalized view to each player (hides other players' hands)
-  game.players.forEach(player => {
-    const playerView = getPlayerView(game, player.id);
-    io.to(player.socketId).emit('game-update', { game: playerView });
+  game.players.forEach((player) => {
+    if (player.socketId) {
+      const playerView = getPlayerView(game, player.socketId);
+      io.to(player.socketId).emit('game-update', { game: playerView });
+    }
   });
 }
 

@@ -6,6 +6,25 @@ import './App.css'
 
 const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001')
 
+const REJOIN_GAME_KEY = 'tichu_rejoin_gameId'
+const REJOIN_TOKEN_KEY = 'tichu_rejoin_token'
+
+function saveRejoinCreds(gameId, playerToken) {
+  if (gameId && playerToken) {
+    try {
+      localStorage.setItem(REJOIN_GAME_KEY, gameId)
+      localStorage.setItem(REJOIN_TOKEN_KEY, playerToken)
+    } catch (_) {}
+  }
+}
+
+function clearRejoinCreds() {
+  try {
+    localStorage.removeItem(REJOIN_GAME_KEY)
+    localStorage.removeItem(REJOIN_TOKEN_KEY)
+  } catch (_) {}
+}
+
 // Mock game in finished state for testing the end game screen
 const MOCK_FINISHED_GAME = {
   id: 'ENDGAME-TEST',
@@ -58,6 +77,11 @@ function App() {
     const onConnect = () => {
       setIsConnected(true)
       setPlayerId(socket.id)
+      const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
+      const savedToken = localStorage.getItem(REJOIN_TOKEN_KEY)
+      if (savedGameId && savedToken) {
+        socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken })
+      }
       console.log('Connected to server')
     }
     if (socket.connected) onConnect()
@@ -70,12 +94,18 @@ function App() {
     socket.on('game-created', (data) => {
       setGameState(data.game)
       setGameId(data.gameId)
-      setPlayerId(socket.id)
+      const me = data.game?.players?.find((p) => p.token)
+      setPlayerId(me?.id ?? socket.id)
+      if (data.playerToken) saveRejoinCreds(data.gameId, data.playerToken)
     })
 
     socket.on('player-joined', (data) => {
       setGameState(data.game)
-      setPlayerId(socket.id)
+      const gid = data.gameId ?? data.game?.id
+      setGameId(gid)
+      const me = data.game?.players?.find((p) => p.token)
+      setPlayerId(me?.id ?? socket.id)
+      if (data.playerToken && gid) saveRejoinCreds(gid, data.playerToken)
     })
 
     socket.on('game-started', (data) => {
@@ -89,6 +119,11 @@ function App() {
     socket.on('game-state', (data) => {
       if (!data?.game || !Array.isArray(data.game?.players)) return
       const nextGame = JSON.parse(JSON.stringify(data.game))
+      const me = nextGame.players?.find((p) => p.token)
+      if (me && nextGame.id) {
+        saveRejoinCreds(nextGame.id, me.token)
+        setPlayerId(me.id)
+      }
       setGameStateRef.current(nextGame)
       setGameStateVersion(v => v + 1)
     })
@@ -101,6 +136,10 @@ function App() {
     })
 
     socket.on('error', (data) => {
+      const msg = data?.message ?? ''
+      if (msg.includes('rejoin') || msg === 'Game not found' || msg === 'Already in game' || msg === 'Invalid rejoin token') {
+        clearRejoinCreds()
+      }
       alert(data.message)
     })
 
@@ -137,6 +176,7 @@ function App() {
   }
 
   const handleLeaveParty = () => {
+    clearRejoinCreds()
     socket.emit('leave-game')
     setGameState(null)
     setGameId('')
@@ -382,6 +422,7 @@ function App() {
                       <>
                         <span className="lobby-player-left">
                           <span className="lobby-player-name">{player.name}</span>
+                          {player.disconnected && <span className="lobby-player-reconnecting">Reconnecting…</span>}
                           {isYou && (
                             <button
                               type="button"

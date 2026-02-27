@@ -380,6 +380,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
               const stackCount = stack?.cards?.length ?? 0;
               const handCount = game.handCounts?.[player.id] ?? 0;
               const isActing = currentPlayer?.id === player.id && game.state === 'playing';
+              const isDisconnected = !!player.disconnected;
               const initials = (player.name || '?').slice(0, 2).toUpperCase();
 
               const isExchanging = game.state === 'exchanging' && !game.exchangeCards?.[playerId];
@@ -399,7 +400,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
               return (
                 <Fragment key={player.id}>
                   <div
-                    className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''} ${isExchangeDropTarget ? 'seat--exchange-drop' : ''} ${isDragOverThisSeat ? 'seat--exchange-drag-over' : ''}`}
+                    className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''} ${isDisconnected ? 'seat--disconnected' : ''} ${isExchangeDropTarget ? 'seat--exchange-drop' : ''} ${isDragOverThisSeat ? 'seat--exchange-drag-over' : ''}`}
                     style={{
                       left: `${posObj.x}px`,
                       top: `${posObj.y}px`,
@@ -446,9 +447,14 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
                         <Card card={exchangeAssignedCard} width={exchangeCardSize.w} height={exchangeCardSize.h} compact />
                       </div>
                     )}
+                    {isDisconnected && (
+                      <div className="seat-disconnected-overlay" aria-live="polite">
+                        <span className="seat-disconnected-label">Disconnected</span>
+                      </div>
+                    )}
                   </div>
                   <div
-                    className={`won-cards-pile won-cards-pile--${pos} ${stackCount === 0 ? 'won-cards-pile--empty' : ''}`}
+                    className={`won-cards-pile won-cards-pile--${pos} ${stackCount === 0 ? 'won-cards-pile--empty' : ''} ${isDisconnected ? 'won-cards-pile--disconnected' : ''}`}
                     style={{
                       left: `${wonStackLeft}px`,
                       top: `${wonStackTop}px`,

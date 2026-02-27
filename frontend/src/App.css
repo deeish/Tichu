@@ -410,6 +410,13 @@ body {
   color: #fff;
 }
 
+.lobby-player-reconnecting {
+  margin-left: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.65);
+}
+
 .lobby-player-edit {
   display: inline-flex;
   align-items: center;
