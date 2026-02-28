@@ -334,7 +334,7 @@ function HowToPlay() {
                         <td>Only a higher pair beats a pair.</td>
                       </tr>
                       <tr>
-                        <td>Sequence of pairs</td>
+                        <td>Sequence of pairs(aka Quenchies)</td>
                         <td>2+ adjacent pairs</td>
                         <td>You must match the number of pairs to beat it.</td>
                       </tr>

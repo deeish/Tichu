@@ -1,16 +1,6 @@
-1. change name of all pieces to avoid trademark
-
-
-
 
 Chat requs:
-1. Table & environment
-Table surface
-Replace the plain gradient with a clear “table” (e.g. green felt, wood, or cloth texture) so it reads as a card table. The game area (opponents, center, your hand) can sit inside this surface.
-Seating / positions
-Show the four players in fixed positions (e.g. you bottom, opponents left/top/right) so it feels like a real 4‑player table. Opponents’ names and stacks can stay where they are, but the layout should reinforce “around the table.”
-Card backs for opponents
-For each opponent, show a small fan or row of card backs (not count-only) so it’s clear they’re holding hidden cards. Count can still be shown as secondary info.
+
 2. Cards
 Card visuals
 Right now cards are rank + suit only. Consider:
