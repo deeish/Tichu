@@ -131,7 +131,7 @@ function HowToPlay() {
                     <strong>Grand Tichu (optional):</strong> must be called early (before taking your 9th card at the start).
                   </li>
                   <li>
-                    <strong>Pass:</strong> everyone passes <strong>3</strong> cards—one to each other player.
+                    <strong>Pass:</strong> everyone passes <strong>3</strong> cards, one to each other player.
                   </li>
                   <li>
                     <strong>Opening:</strong> if you hold <strong>Mah Jong</strong>, you must play it first (single or in a
@@ -166,7 +166,7 @@ function HowToPlay() {
                   <li>
                     Each player gets <strong>14</strong> cards.
                   </li>
-                  <li>Play proceeds in a fixed turn order (any consistent direction works).</li>
+                  <li>Play proceeds in a fixed turn order.</li>
                 </ul>
               </section>
 
@@ -216,7 +216,7 @@ function HowToPlay() {
                 <details className="htp-details">
                   <summary className="htp-details-summary">Rules clarity</summary>
                   <ul className="htp-bullets">
-                    <li>Calling Tichu is individual—partners shouldn’t coordinate the call.</li>
+                    <li>Calling Tichu is individual, partners shouldn’t coordinate the call.</li>
                     <li>Calls are often made before passing so that passing can support the call.</li>
                   </ul>
                 </details>
@@ -235,7 +235,7 @@ function HowToPlay() {
                     <p className="htp-muted">
                       If you hold the Mah Jong, it must be the first play, either as a <strong>single</strong>{' '}
                       or inside a <strong>straight containing 1</strong> (example: 1‑2‑3‑4‑5). When it’s played, announce a <strong>wish</strong>{' '}
-                      for a rank (A–K, no special cards).
+                      for a rank (2–A, no special cards).
                     </p>
                   </div>
 
@@ -275,7 +275,7 @@ function HowToPlay() {
                     <div>
                       <div className="htp-flow-title">Three passes ends the trick</div>
                       <p className="htp-muted">
-                        As soon as 3 players pass in order, the last (highest) play wins the trick and that player leads next.
+                        As soon as 3 players pass in order, the last (highest) play wins the trick and that player leads next. The winner collects all cards from that trick into their trick pile (face down).
                       </p>
                     </div>
                   </div>
@@ -313,48 +313,50 @@ function HowToPlay() {
                   (Exception: bombs.)
                 </p>
 
-                <div className="htp-tablewrap" role="region" aria-label="Combination table">
-                  <table className="htp-table">
-                    <thead>
-                      <tr>
-                        <th>Type</th>
-                        <th>Minimum</th>
-                        <th>Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>Single</td>
-                        <td>1 card</td>
-                        <td>Higher rank beats lower (special card exceptions apply).</td>
-                      </tr>
-                      <tr>
-                        <td>Pair</td>
-                        <td>2 same rank</td>
-                        <td>Only a higher pair beats a pair.</td>
-                      </tr>
-                      <tr>
-                        <td>Sequence of pairs(aka Quenchies)</td>
-                        <td>2+ adjacent pairs</td>
-                        <td>You must match the number of pairs to beat it.</td>
-                      </tr>
-                      <tr>
-                        <td>Trio</td>
-                        <td>3 same rank</td>
-                        <td>Only a higher trio beats a trio.</td>
-                      </tr>
-                      <tr>
-                        <td>Full house</td>
-                        <td>Trio + pair</td>
-                        <td>The trio’s rank determines which full house is higher.</td>
-                      </tr>
-                      <tr>
-                        <td>Straight</td>
-                        <td>5+ consecutive ranks</td>
-                        <td>You must match the length to beat it.</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="htp-combolist" role="region" aria-label="Combination list">
+                  <div className="htp-combolist-header">
+                    <span className="htp-combolist-type">Type</span>
+                    <span className="htp-combolist-min">Minimum</span>
+                    <span className="htp-combolist-notes">Notes</span>
+                  </div>
+                  <div className="htp-combolist-row">
+                    <span className="htp-combolist-type">Single</span>
+                    <span className="htp-combolist-min">1 card</span>
+                    <span className="htp-combolist-notes">Higher rank beats lower (special card exceptions apply).</span>
+                  </div>
+                  <div className="htp-combolist-row">
+                    <span className="htp-combolist-type">Pair</span>
+                    <span className="htp-combolist-min">2 same rank</span>
+                    <span className="htp-combolist-notes">Only a higher pair beats a pair.</span>
+                  </div>
+                  <div className="htp-combolist-row">
+                    <span className="htp-combolist-type">Sequence of pairs (aka Quenchies)</span>
+                    <span className="htp-combolist-min">2+ adjacent pairs</span>
+                    <div className="htp-combolist-notes">
+                      You must match the number of pairs to beat it.
+                      <details className="htp-details htp-combo-details">
+                        <summary className="htp-details-summary">Example</summary>
+                        <p className="htp-muted">
+                          If a player plays 2-2-3-3-4-4, you can play 3-3-4-4-5-5 or 4-4-5-5-6-6 (same number of pairs, higher rank).
+                        </p>
+                      </details>
+                    </div>
+                  </div>
+                  <div className="htp-combolist-row">
+                    <span className="htp-combolist-type">Trio</span>
+                    <span className="htp-combolist-min">3 same rank</span>
+                    <span className="htp-combolist-notes">Only a higher trio beats a trio.</span>
+                  </div>
+                  <div className="htp-combolist-row">
+                    <span className="htp-combolist-type">Full house</span>
+                    <span className="htp-combolist-min">Trio + pair</span>
+                    <span className="htp-combolist-notes">The trio’s rank determines which full house is higher.</span>
+                  </div>
+                  <div className="htp-combolist-row">
+                    <span className="htp-combolist-type">Straight</span>
+                    <span className="htp-combolist-min">5+ consecutive ranks</span>
+                    <span className="htp-combolist-notes">You must match the length to beat it.</span>
+                  </div>
                 </div>
               </section>
 
@@ -390,10 +392,10 @@ function HowToPlay() {
 
                   <div className="htp-card">
                     <h3 className="htp-h3">Phoenix</h3>
-                    <p className="htp-muted">The wildcard. Worth −25 points when your team loses the trick it is in.</p>
+                    <p className="htp-muted">The wildcard. Worth −25 points if it ends up in your trick pile.</p>
                     <ul className="htp-bullets">
                       <li>Can replace a normal card in combinations, but not to create a bomb.</li>
-                      <li>As a single, it’s worth half a rank higher than the current card.</li>
+                      <li>As a single, it’s worth half a rank higher than the current card (e.g., 8 → 8.5). If led, it counts as 1.5.</li>
                     </ul>
                   </div>
 
@@ -417,7 +419,7 @@ function HowToPlay() {
                   <li>To compare bombs: first by number of cards (more cards beats fewer), then by rank. A higher bomb beats a lower one, so bombs can be played on bombs.</li>
                 </ul>
                 <p className="htp-muted">
-                  Examples: a straight flush of 6 beats a straight flush of 5; four Kings beats four 7s.
+                  Examples: a straight flush of 6 beats a straight flush of 5; four Kings beats four 7s. A straight flush of 5 beats a four of a kind of Aces.
                 </p>
               </section>
 
@@ -433,7 +435,10 @@ function HowToPlay() {
               <section id="scoring" className="htp-section">
                 <h2 className="htp-h2">Scoring</h2>
 
-                <div className="htp-tablewrap" role="region" aria-label="Scoring table">
+                <p>
+                At the end of the round, count the points in each team’s trick pile (the cards your team won). Then apply any Tichu bonuses (+100/−100 or +200/−200). See the table below for card values.                </p>
+
+                <div className="htp-tablewrap htp-tablewrap-scoring" role="region" aria-label="Scoring table">
                   <table className="htp-table">
                     <thead>
                       <tr>
@@ -504,6 +509,20 @@ function HowToPlay() {
                     <summary className="htp-details-summary">What if both teams reach 1000?</summary>
                     <p className="htp-muted">
                       The team with the higher score wins. If the scores are tied, play continues until one team leads after a round.
+                    </p>
+                  </details>
+
+                  <details className="htp-details">
+                    <summary className="htp-details-summary">In a double victory, do Tichu bonuses still count?</summary>
+                    <p className="htp-muted">
+                      Yes. Card points are not counted, but any Small Tichu or Grand Tichu declarations still apply (+100/−100 or +200/−200 depending on whether that player emptied their hand first).
+                    </p>
+                  </details>
+
+                  <details className="htp-details">
+                    <summary className="htp-details-summary">Sequence of pairs: same number of pairs, only pairs?</summary>
+                    <p className="htp-muted">
+                      A sequence of pairs is made only from <strong>pairs</strong> (two of the same rank), not trios or single cards. Consecutive ranks, e.g. 2-2, 3-3, 4-4. To beat a sequence of pairs, you must play a sequence with the <strong>same number of pairs</strong> and higher rank—so you cannot beat 2-2-3-3 (two pairs) with 4-4-5-5-6-6 (three pairs); you would need a higher two-pair sequence, e.g. 3-3-4-4 or 4-4-5-5.
                     </p>
                   </details>
                 </div>

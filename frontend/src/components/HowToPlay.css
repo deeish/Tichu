@@ -337,12 +337,70 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* Legal combinations: list layout (no table) so Notes wrap and no horizontal scroll */
+.htp-combolist {
+  margin-top: 0.6rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+.htp-combolist-header,
+.htp-combolist-row {
+  display: grid;
+  grid-template-columns: 18% 22% 1fr;
+  gap: 0.5rem;
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  align-items: start;
+}
+.htp-combolist-row:last-child {
+  border-bottom: none;
+}
+.htp-combolist-header {
+  font-size: 0.85rem;
+  letter-spacing: 0.25px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.05);
+}
+.htp-combolist-row {
+  color: rgba(255, 255, 255, 0.86);
+}
+.htp-combolist-notes {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
+}
+.htp-combo-details {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+}
+.htp-combo-details .htp-details-summary {
+  padding: 0.45rem 0.6rem;
+}
+.htp-combo-details > *:not(summary) {
+  padding: 0.5rem 0.6rem 0.6rem;
+}
+@media (max-width: 820px) {
+  .htp-combolist-header,
+  .htp-combolist-row {
+    grid-template-columns: minmax(0, 18%) minmax(0, 22%) minmax(0, 1fr);
+    padding: 0.6rem 0.5rem;
+  }
+}
+
 /* Tables */
 .htp-tablewrap {
   margin-top: 0.6rem;
   overflow: auto;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.htp-tablewrap-scoring {
+  overflow: visible;
+}
+.htp-tablewrap-scoring .htp-table {
+  min-width: 0;
 }
 
 .htp-table {
