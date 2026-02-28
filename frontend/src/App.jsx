@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import GameBoard from './components/GameBoard'
 import StatsPopup from './components/StatsPopup'
@@ -367,9 +368,9 @@ function App() {
 
           {landingMode == null && (
             <footer className="landing-footer">
-              <a href="https://en.wikipedia.org/wiki/Tichu" target="_blank" rel="noopener noreferrer" className="landing-footer-link">
+              <Link to="/how-to-play" className="landing-footer-link landing-footer-btn">
                 How to play
-              </a>
+              </Link>
               <button type="button" className="landing-footer-link landing-footer-btn" onClick={() => {}}>
                 Submit feedback
               </button>
