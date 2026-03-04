@@ -171,11 +171,13 @@ describe('Bomb Interrupts', () => {
   });
 
   test('when bomb wins (no one can respond), bomb player gets turn not original lead', () => {
-    // P1 plays (and goes out), P2 and P3 are out. P4 plays bomb but must have a card left
-    // so we don't trigger "all 4 out" round end (which re-initializes and would break these assertions).
+    // Avoid tailender: when only one player has cards the round ends immediately. So we need two
+    // players with cards. Setup: P1 has 1 card, P2 has 1 (will pass), P3 out, P4 has bomb+1.
+    // Bomb clears passedPlayers so everyone gets a chance. P1 plays K (goes out), P2 passes,
+    // P4 bombs; turn goes to P2 (they get a chance). P2 passes again → trick wins to P4, P4 gets turn.
     game.hands = {
       p1: [{ type: 'standard', rank: 'K', suit: 'hearts' }],
-      p2: [],
+      p2: [{ type: 'standard', rank: '9', suit: 'hearts' }],
       p3: [],
       p4: [
         { type: 'standard', rank: 'A', suit: 'hearts' },
@@ -185,24 +187,25 @@ describe('Bomb Interrupts', () => {
         { type: 'standard', rank: '2', suit: 'hearts' }
       ]
     };
-    game.playersOut = ['p2', 'p3'];
+    game.playersOut = ['p3'];
     game.leadPlayer = 'p1';
     game.currentPlayerIndex = 0;
     game.currentTrick = [];
     game.passedPlayers = [];
 
     makeMove(game, 'p1', [{ type: 'standard', rank: 'K', suit: 'hearts' }], 'play');
+    makeMove(game, 'p2', [], 'pass');
     const bombResult = makeMove(game, 'p4', [
       { type: 'standard', rank: 'A', suit: 'hearts' },
       { type: 'standard', rank: 'A', suit: 'diamonds' },
       { type: 'standard', rank: 'A', suit: 'clubs' },
       { type: 'standard', rank: 'A', suit: 'spades' }
     ], 'play');
-
     expect(bombResult.success).toBe(true);
     expect(bombResult.bombPlayed).toBe(true);
-    expect(bombResult.newTrick).toBe(true);
-    expect(bombResult.winner).toBe('p4');
+    // After bomb, turn goes to P2 (bomb clears passes; they get a chance). P2 passes → trick wins to P4.
+    makeMove(game, 'p2', [], 'pass');
+
     expect(game.leadPlayer).toBe('p4');
     expect(game.currentTrick.length).toBe(0);
     expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p4');

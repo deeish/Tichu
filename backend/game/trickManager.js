@@ -29,6 +29,7 @@ function getCurrentWinningPlay(currentTrick) {
   let winningPlay = null;
   for (let i = 0; i < currentTrick.length; i++) {
     const play = currentTrick[i];
+    if (!play || !play.combination) continue;
     if (isDogOnlyPlay(play)) continue;
     if (winningPlay === null) {
       winningPlay = play;
@@ -86,7 +87,17 @@ function startNewTrick(game) {
       }
     }
   }
-  
+
+  // Defensive: never leave current player as someone who is out or has no cards (can happen if winner went out after we set lead)
+  const currentId = game.turnOrder[game.currentPlayerIndex]?.id;
+  if (currentId && (game.playersOut?.includes(currentId) || !game.hands[currentId]?.length)) {
+    const next = getNextPlayerWithCards(game, currentId);
+    if (next) {
+      const idx = game.turnOrder.findIndex(p => p.id === next.id);
+      if (idx !== -1) game.currentPlayerIndex = idx;
+    }
+  }
+
   // Wish persists across tricks until the wished card is played
 }
 

@@ -6,8 +6,25 @@
 const { validateCombination, compareCombinations, getPhoenixValue } = require('./combinations');
 const { getCurrentWinningPlay, winTrick } = require('./trickManager');
 const { handleSpecialCards } = require('./specialCards');
-const { advanceTurn } = require('./turnManagement');
+const { advanceTurn, getNextPlayerWithCards } = require('./turnManagement');
 const { handlePlayerWin } = require('./scoring');
+
+/**
+ * Ensures currentPlayerIndex points to a player who can act (not out, has cards).
+ * Prevents soft lock where a player who already finished is given the turn.
+ */
+function ensureCurrentPlayerCanAct(game) {
+  if (game.state !== 'playing' || !game.turnOrder?.length) return;
+  const currentId = game.turnOrder[game.currentPlayerIndex]?.id;
+  if (!currentId) return;
+  const canAct = !game.playersOut?.includes(currentId) && game.hands[currentId]?.length > 0;
+  if (canAct) return;
+  const next = getNextPlayerWithCards(game, currentId);
+  if (next) {
+    const idx = game.turnOrder.findIndex(p => p.id === next.id);
+    if (idx !== -1) game.currentPlayerIndex = idx;
+  }
+}
 
 /**
  * Current holder of the trick = the player who last played (last entry in currentTrick).
@@ -189,13 +206,13 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       if (nextPlayerIndex === leadPlayerIndex && !fourPlaysFewPasses) {
         const winningPlay = getCurrentWinningPlay(game.currentTrick);
         const winnerId = winningPlay ? winningPlay.playerId : leadPlayerId;
-        // BUGS.md #3: When winner has empty hand (went out), add to playersOut before winTrick so startNewTrick skips them and round can end when all 4 out
-        if (!game.hands[winnerId] || game.hands[winnerId].length === 0) {
-          handlePlayerWin(game, winnerId);
-          if (game.roundEnded) return { success: true, game, newTrick: true, playerWon: true, roundEnded: true };
-        }
         const result = winTrick(game, winnerId);
-        return { ...result, newTrick: true, ...(game.hands[winnerId]?.length === 0 ? { playerWon: true } : {}) };
+        if (!game.hands[winnerId] || game.hands[winnerId].length === 0) {
+          const winResult = handlePlayerWin(game, winnerId);
+          if (game.roundEnded) return { ...result, ...winResult, newTrick: true };
+          return { ...result, ...winResult, newTrick: true, playerWon: true };
+        }
+        return { ...result, newTrick: true };
       }
       
       // Acted since current leader (after a bomb, only pass or play at/after bomb counts)
@@ -210,7 +227,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
     
     game.currentPlayerIndex = nextPlayerIndex;
-    
+    ensureCurrentPlayerCanAct(game);
     // Not all players have acted yet; it's the next player's turn
     return { success: true, game };
   }
@@ -377,6 +394,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       }
       
       game.currentPlayerIndex = nextPlayerIndex;
+      ensureCurrentPlayerCanAct(game);
       return { ...winResult, success: true, game, bombPlayed: true, playerWon: true };
     }
     return { ...winResult, bombPlayed: true, playerWon: true };
@@ -423,7 +441,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
     
     game.currentPlayerIndex = nextPlayerIndex;
-    
+    ensureCurrentPlayerCanAct(game);
     return { success: true, game, bombPlayed: true };
   }
   
@@ -564,26 +582,29 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   // Track if Dog was played (so we don't advance turn - partner already has priority)
   const dogWasPlayed = specialCardResult.dogPlayed || false;
   
-  // Remove cards from hand
+  // Remove cards from hand; collect server card refs so the trick has canonical shape (Phoenix/Dragon score correctly)
+  const removedCards = [];
   for (const card of cards) {
-    const cardIndex = hand.findIndex(c => 
-      c.type === card.type && 
-      (c.type === 'standard' ? c.suit === card.suit && c.rank === card.rank : c.name === card.name)
+    const cardIndex = hand.findIndex(c =>
+      c.type === card.type &&
+      (c.type === 'standard' ? c.suit === card.suit && c.rank === card.rank : String(c.name).toLowerCase() === String(card.name).toLowerCase())
     );
     if (cardIndex !== -1) {
-      hand.splice(cardIndex, 1);
+      const [removed] = hand.splice(cardIndex, 1);
+      removedCards.push(removed);
     }
   }
-  
+  const cardsForTrick = removedCards.length === cards.length ? removedCards : cards;
+
   // Mark that player has played their first card (can no longer declare Tichu)
   if (!game.firstCardPlayed[playerId]) {
     game.firstCardPlayed[playerId] = true;
   }
-  
-  // Add to current trick
+
+  // Add to current trick (use server card refs so getCardPoints sees correct name/type)
   game.currentTrick.push({
     playerId,
-    cards,
+    cards: cardsForTrick,
     combination: validation
   });
   
@@ -605,6 +626,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     const nextIdx = (game.currentPlayerIndex + 1) % game.turnOrder.length;
     game.passedPlayers = [];
     game.currentPlayerIndex = nextIdx;
+    ensureCurrentPlayerCanAct(game);
     if (game.dogPriorityPlayer === playerId) game.dogPriorityPlayer = null;
     return { success: true, game, ...(winResult || {}), ...(playerHandEmpty ? { playerWon: true } : {}) };
   }
@@ -636,6 +658,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       nextIdx = (nextIdx + 1) % game.turnOrder.length;
     }
     game.currentPlayerIndex = nextIdx;
+    ensureCurrentPlayerCanAct(game);
     const firstPlayHandEmpty = !game.hands[playerId] || game.hands[playerId].length === 0;
     if (firstPlayHandEmpty) {
       const winResult = handlePlayerWin(game, playerId);
@@ -697,6 +720,10 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
           const winningPlay = getCurrentWinningPlay(game.currentTrick);
           const winnerId = winningPlay ? winningPlay.playerId : playerId;
           const trickResult = winTrick(game, winnerId);
+          if (!game.hands[winnerId] || game.hands[winnerId].length === 0) {
+            const winnerWinResult = handlePlayerWin(game, winnerId);
+            return { ...trickResult, ...winnerWinResult, playerWon: true, newTrick: true };
+          }
           return { ...trickResult, ...winResult, playerWon: true, newTrick: true };
         }
         
@@ -705,6 +732,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       }
       
       game.currentPlayerIndex = nextPlayerIndex;
+      ensureCurrentPlayerCanAct(game);
       return { ...winResult, success: true, game, playerWon: true };
     }
     return winResult;
@@ -777,6 +805,11 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
         const winningPlay = getCurrentWinningPlay(game.currentTrick);
         const winnerId = winningPlay ? winningPlay.playerId : playerId;
         const result = winTrick(game, winnerId);
+        if (!game.hands[winnerId] || game.hands[winnerId].length === 0) {
+          const winResult = handlePlayerWin(game, winnerId);
+          if (game.roundEnded) return { ...result, ...winResult, newTrick: true };
+          return { ...result, ...winResult, newTrick: true, playerWon: true };
+        }
         if (!game.hands[playerId] || game.hands[playerId].length === 0) {
           const winResult = handlePlayerWin(game, playerId);
           if (game.roundEnded) return { ...result, ...winResult, newTrick: true };
@@ -791,6 +824,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
     // Set the next player as current
     game.currentPlayerIndex = nextPlayerIndex;
+    ensureCurrentPlayerCanAct(game);
     if (!game.hands[playerId] || game.hands[playerId].length === 0) {
       const winResult = handlePlayerWin(game, playerId);
       if (game.roundEnded) return { ...winResult, success: true, game, playerWon: true };
@@ -805,6 +839,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   // No need to check here - the wish will be enforced on the next player's turn
   // and cleared when the wished card is actually played
   
+  ensureCurrentPlayerCanAct(game);
   return { success: true, game };
 }
 
