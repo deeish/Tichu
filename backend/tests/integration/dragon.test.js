@@ -197,4 +197,89 @@ describe('Dragon Special Card', () => {
     // If bomb wins, Dragon selection shouldn't be required
     // (bomb player gets the trick normally)
   });
+
+  test('when bomb beats Dragon, bomb player gets the trick and all points (no dragon pass-out)', () => {
+    game.mahJongPlayed = true;
+    // P1 leads with Dragon
+    makeMove(game, 'p1', [{ type: 'special', name: 'dragon' }], 'play');
+    expect(game.dragonPlayed?.playerId).toBe('p1');
+
+    // Give P3 a bomb; P2 and P4 have cards to pass
+    game.hands.p3 = [
+      { type: 'standard', rank: 'A', suit: 'hearts' },
+      { type: 'standard', rank: 'A', suit: 'diamonds' },
+      { type: 'standard', rank: 'A', suit: 'clubs' },
+      { type: 'standard', rank: 'A', suit: 'spades' }
+    ];
+    game.hands.p2 = [{ type: 'standard', rank: '2', suit: 'hearts' }];
+    game.hands.p4 = [{ type: 'standard', rank: '2', suit: 'diamonds' }];
+
+    // P2 pass, P3 pass, P4 plays bomb
+    makeMove(game, 'p2', [], 'pass');
+    const bombResult = makeMove(game, 'p3', [
+      { type: 'standard', rank: 'A', suit: 'hearts' },
+      { type: 'standard', rank: 'A', suit: 'diamonds' },
+      { type: 'standard', rank: 'A', suit: 'clubs' },
+      { type: 'standard', rank: 'A', suit: 'spades' }
+    ], 'play');
+    expect(bombResult.success).toBe(true);
+    // After bomb, others get a chance: P4, P1, P2 must pass
+    makeMove(game, 'p4', [], 'pass');
+    makeMove(game, 'p1', [], 'pass');
+    const lastResult = makeMove(game, 'p2', [], 'pass');
+    expect(lastResult.trickWon).toBe(true);
+    expect(lastResult.winner).toBe('p3');
+
+    // Bomb player (p3) gets the trick and points; no dragon opponent selection
+    expect(game.dragonOpponentSelection).toBe(null);
+    expect(game.dragonPlayed).toBe(null);
+    expect(game.playerStacks.p3).toBeDefined();
+    expect(game.playerStacks.p3.points).toBe(25); // Dragon is 25 points
+  });
+
+  test('when dragon player bombs their own dragon they keep the trick and all points (no pass-out)', () => {
+    game.mahJongPlayed = true;
+    // P1 leads with Dragon
+    makeMove(game, 'p1', [{ type: 'special', name: 'dragon' }], 'play');
+    expect(game.dragonPlayed?.playerId).toBe('p1');
+
+    // Give P1 a bomb; P4 plays a card so P1 gets another turn to bomb
+    game.hands.p1 = [
+      { type: 'standard', rank: 'A', suit: 'hearts' },
+      { type: 'standard', rank: 'A', suit: 'diamonds' },
+      { type: 'standard', rank: 'A', suit: 'clubs' },
+      { type: 'standard', rank: 'A', suit: 'spades' }
+    ];
+    game.hands.p2 = [{ type: 'standard', rank: '2', suit: 'hearts' }];
+    game.hands.p3 = [{ type: 'standard', rank: '2', suit: 'diamonds' }];
+    game.hands.p4 = [
+      { type: 'standard', rank: '2', suit: 'clubs' },
+      { type: 'standard', rank: '3', suit: 'clubs' }
+    ];
+
+    // P2 pass, P3 pass, P4 plays a single (so P1 gets another turn)
+    makeMove(game, 'p2', [], 'pass');
+    makeMove(game, 'p3', [], 'pass');
+    makeMove(game, 'p4', [{ type: 'standard', rank: '2', suit: 'clubs' }], 'play');
+    // P1 bombs (beats P4's single and own dragon)
+    const bombResult = makeMove(game, 'p1', [
+      { type: 'standard', rank: 'A', suit: 'hearts' },
+      { type: 'standard', rank: 'A', suit: 'diamonds' },
+      { type: 'standard', rank: 'A', suit: 'clubs' },
+      { type: 'standard', rank: 'A', suit: 'spades' }
+    ], 'play');
+    expect(bombResult.success).toBe(true);
+    // After bomb, others get a chance; all pass
+    makeMove(game, 'p2', [], 'pass');
+    makeMove(game, 'p3', [], 'pass');
+    const lastResult = makeMove(game, 'p4', [], 'pass');
+    expect(lastResult.trickWon).toBe(true);
+    expect(lastResult.winner).toBe('p1');
+
+    // P1 (dragon player) keeps the trick and points; no dragon opponent selection
+    expect(game.dragonOpponentSelection).toBe(null);
+    expect(game.dragonPlayed).toBe(null);
+    expect(game.playerStacks.p1).toBeDefined();
+    expect(game.playerStacks.p1.points).toBe(25); // Dragon 25; 2 and Aces are 0 in Tichu
+  });
 });

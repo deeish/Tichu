@@ -118,24 +118,28 @@ function winTrick(game, winnerId) {
     }
   }
   
-  // Handle Dragon special rule: winner must give trick to opponent
-  // BUT: If someone else beats the Dragon (e.g., with a bomb), they get the stack normally
+  // Handle Dragon special rule: winner must give trick to opponent only when they won WITH the dragon (single).
+  // If the winning play is a bomb (or anything that beat the dragon), the winner keeps the trick — including
+  // when the dragon player bombs their own dragon (they keep the whole trick and points).
+  const winningPlay = getCurrentWinningPlay(game.currentTrick);
+  const wonWithDragonSingle = game.dragonPlayed &&
+    winningPlay &&
+    winningPlay.playerId === game.dragonPlayed.playerId &&
+    winningPlay.cards?.some(c => c.name === 'dragon') &&
+    winningPlay.combination?.type === 'single';
+
   let actualWinnerId = winnerId;
-  if (game.dragonPlayed && game.dragonPlayed.playerId === winnerId) {
-    // Dragon player won the trick - they must choose which opponent to give the trick to
-    // Store the trick data and wait for player selection
+  if (wonWithDragonSingle) {
+    // Dragon player won with the dragon single (no one beat it) — must choose which opponent gets the trick
     game.dragonOpponentSelection = {
       playerId: winnerId,
       trickCards: [...trickCards],
       trickPoints: trickPoints
     };
-    // Don't assign the stack yet - wait for player to select opponent
-    // Return early to prevent stack assignment
   } else {
-    // Normal case: assign stack immediately
-    // This includes the case where someone else beat the Dragon (e.g., with a bomb)
-    // In that case, winnerId !== game.dragonPlayed.playerId, so Dragon selection doesn't trigger
+    // Winner beat the dragon (with a bomb or otherwise), or dragon wasn't in play: winner keeps the trick
     actualWinnerId = winnerId;
+    game.dragonPlayed = null;
   }
   
   // Add cards to winner's stack (not immediately scored - scored at round end)
