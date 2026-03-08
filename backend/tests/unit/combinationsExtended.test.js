@@ -53,7 +53,7 @@ describe('Combinations - Extended Tests', () => {
       expect(result.type).toBe('fullhouse');
     });
 
-    test('should validate full house with Phoenix', () => {
+    test('should validate full house with Phoenix (2+2+P)', () => {
       const cards = [
         { type: 'standard', rank: 'K', suit: 'hearts' },
         { type: 'standard', rank: 'K', suit: 'diamonds' },
@@ -64,6 +64,20 @@ describe('Combinations - Extended Tests', () => {
       const result = validateCombination(cards);
       expect(result.valid).toBe(true);
       expect(result.type).toBe('fullhouse');
+    });
+
+    test('should validate full house with Phoenix (3+1+P: three Qs, one K, Phoenix as second K)', () => {
+      const cards = [
+        { type: 'special', name: 'phoenix' },
+        { type: 'standard', rank: 'K', suit: 'spades' },
+        { type: 'standard', rank: 'Q', suit: 'spades' },
+        { type: 'standard', rank: 'Q', suit: 'diamonds' },
+        { type: 'standard', rank: 'Q', suit: 'clubs' }
+      ];
+      const result = validateCombination(cards);
+      expect(result.valid).toBe(true);
+      expect(result.type).toBe('fullhouse');
+      expect(result.tripleRank).toBe('Q');
     });
   });
 

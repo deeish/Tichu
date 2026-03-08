@@ -155,6 +155,10 @@ describe('Deck Management', () => {
       expect(getCardPoints(phoenix)).toBe(-25);
     });
 
+    test('should return -25 for Phoenix when name is capitalized (client-sent shape)', () => {
+      expect(getCardPoints({ type: 'special', name: 'Phoenix' })).toBe(-25);
+    });
+
     test('should return 0 for Mah Jong and Dog', () => {
       const mahJong = { type: 'special', name: 'mahjong' };
       const dog = { type: 'special', name: 'dog' };

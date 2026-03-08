@@ -70,12 +70,15 @@ function getCardValue(rank) {
 }
 
 /**
- * Gets the point value of a card for scoring
+ * Gets the point value of a card for scoring.
+ * Special names are compared case-insensitively so client-sent cards (e.g. name: 'Phoenix') still score.
  */
 function getCardPoints(card) {
+  if (!card) return 0;
   if (card.type === 'special') {
-    if (card.name === 'dragon') return 25;
-    if (card.name === 'phoenix') return -25;
+    const name = card.name && String(card.name).toLowerCase();
+    if (name === 'dragon') return 25;
+    if (name === 'phoenix') return -25;
     return 0;
   }
   

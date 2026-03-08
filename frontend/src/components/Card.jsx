@@ -46,10 +46,12 @@ function Card({ card, onClick, selected = false, playable = false, width, height
       clubs: 'black',
       spades: 'black'
     };
+    const suit = card.suit && suitSymbols[card.suit] != null ? suitSymbols[card.suit] : '?';
+    const color = card.suit && colors[card.suit] != null ? colors[card.suit] : 'black';
     return {
-      rank: card.rank,
-      suit: suitSymbols[card.suit],
-      color: colors[card.suit]
+      rank: card.rank ?? '?',
+      suit,
+      color
     };
   };
 

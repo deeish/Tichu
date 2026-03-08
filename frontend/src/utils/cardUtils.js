@@ -59,6 +59,23 @@ export function cardKey(card) {
 }
 
 /**
+ * True if the card has the shape we need for display and logic.
+ * Standard: type, suit, rank. Special: type, name.
+ * Use to filter out malformed or partial cards so they never reach the hand UI.
+ */
+export function isValidCard(card) {
+  if (!card || typeof card !== 'object') return false;
+  if (card.type === 'standard') {
+    return typeof card.suit === 'string' && card.suit.length > 0 &&
+           typeof card.rank === 'string' && card.rank.length > 0;
+  }
+  if (card.type === 'special') {
+    return typeof card.name === 'string' && card.name.length > 0;
+  }
+  return false;
+}
+
+/**
  * Groups cards by rank
  */
 function groupByRank(cards) {

@@ -3,11 +3,17 @@ import { createPortal } from 'react-dom';
 import Card from './Card';
 import { getHandRailStep, getDockCardSize, getVisibleHandCap } from '../styles/layoutTokens';
 import { cardKey } from '../utils/cardUtils';
+import { DEBUG_HAND_DRAG } from '../debug';
+import { reportClientError } from '../clientErrorReport';
 import '../styles/handDock.css';
 
+/** Max cards shown in hand; Tichu max hand size is 14. */
+const MAX_HAND_DISPLAY = 14;
+
 function HandDock({
-  cards = [],
+  cards: cardsProp = [],
   selectedCards = [],
+  selectionDisabled = false,
   onCardClick,
   playable,
   sortMode,
@@ -28,12 +34,25 @@ function HandDock({
   exchangeDraggingIndex = null,
   onReorder,
 }) {
+  const cards = Array.isArray(cardsProp) ? cardsProp.slice(0, MAX_HAND_DISPLAY) : [];
   const railRef = useRef(null);
+  const lastRailWRef = useRef(0);
   const [railW, setRailW] = useState(0);
   const [reorderDrag, setReorderDrag] = useState(null);
+  /** Defer hint + actions to next frame to avoid blocking the same commit as the card list (freeze mitigation). */
+  const [showDockActions, setShowDockActions] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShowDockActions(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
   const dragPreviewRef = useRef(null);
   const dragPosRef = useRef({ x: 0, y: 0 });
   const dragJustEndedRef = useRef(false);
+  /** Ref to remove pointermove listener so we can clean up on unmount if drag is in progress */
+  const removePointerMoveRef = useRef(null);
+  /** Always current cards so reorder commit uses latest hand (avoids stale closure if game updates during drag) */
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
 
   const isExchangeDrag = draggable && onCardDragStart;
   const isReorderDrag = onReorder && !draggable;
@@ -41,17 +60,28 @@ function HandDock({
   useEffect(() => {
     const el = railRef.current;
     if (!el) return;
+    let rafId = null;
     const ro = new ResizeObserver((entries) => {
       const { width } = entries[0]?.contentRect ?? {};
-      if (width != null) setRailW(width);
+      if (width == null || typeof width !== 'number') return;
+      if (Math.abs(width - lastRailWRef.current) <= 1) return;
+      lastRailWRef.current = width;
+      if (rafId != null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        setRailW(width);
+      });
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      if (rafId != null) cancelAnimationFrame(rafId);
+      ro.disconnect();
+    };
   }, []);
 
   const cardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
-  const visibleCap = getVisibleHandCap(containerWidth);
-  const visibleCount = Math.min(cards.length, visibleCap);
+  const visibleCap = Math.min(getVisibleHandCap(containerWidth), MAX_HAND_DISPLAY);
+  const visibleCount = Math.min(Math.max(0, cards.length), visibleCap);
   const step = getHandRailStep(railW, cardSize.w, visibleCount);
   const totalCardRowWidth = visibleCount > 0 ? (visibleCount - 1) * step + cardSize.w : 0;
   /* Card has border + margin + box-shadow; reserve space so the last card isn't clipped by overflow */
@@ -64,20 +94,32 @@ function HandDock({
   const displayCards = useMemo(() => {
     if (!reorderDrag) return cards;
     const { startIndex, currentDropIndex } = reorderDrag;
+    const n = cards.length;
+    if (n === 0) return cards;
+    const si = Math.max(0, Math.min(startIndex, n - 1));
+    const di = Math.max(0, Math.min(currentDropIndex, n - 1));
     const list = [...cards];
-    const [removed] = list.splice(startIndex, 1);
-    list.splice(currentDropIndex, 0, removed);
+    const [removed] = list.splice(si, 1);
+    if (removed == null) return cards;
+    list.splice(di, 0, removed);
     return list;
   }, [cards, reorderDrag]);
 
   const visibleCards = useMemo(() => displayCards.slice(0, visibleCount), [displayCards, visibleCount]);
 
-  const isCardSelected = (card) =>
-    selectedCards.some(
-      (s) =>
-        s.type === card.type &&
-        (s.type === 'standard' ? s.suit === card.suit && s.rank === card.rank : s.name === card.name)
-    );
+  const isCardSelected = (card) => {
+    if (selectionDisabled) return false;
+    if (!card || typeof card !== 'object' || !Array.isArray(selectedCards)) return false;
+    try {
+      return selectedCards.some(
+        (s) =>
+          s && s.type === card.type &&
+          (s.type === 'standard' ? s.suit === card.suit && s.rank === card.rank : s.name === card.name)
+      );
+    } catch {
+      return false;
+    }
+  };
 
   useEffect(() => {
     if (reorderDrag && dragPreviewRef.current) {
@@ -86,11 +128,44 @@ function HandDock({
     }
   }, [reorderDrag]);
 
+  // Clear reorder drag when tab/window hidden or window loses focus (avoids stuck state when switching screen/tab)
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (removePointerMoveRef.current) {
+          removePointerMoveRef.current();
+          removePointerMoveRef.current = null;
+        }
+        setReorderDrag((prev) => {
+          if (prev && DEBUG_HAND_DRAG) console.log('[HandDock] visibility hidden – clearing reorder drag');
+          return prev ? null : prev;
+        });
+      }
+    };
+    const onWindowBlur = () => {
+      if (removePointerMoveRef.current) {
+        removePointerMoveRef.current();
+        removePointerMoveRef.current = null;
+      }
+      setReorderDrag((prev) => {
+        if (prev && DEBUG_HAND_DRAG) console.log('[HandDock] window blur – clearing reorder drag');
+        return prev ? null : prev;
+      });
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('blur', onWindowBlur);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('blur', onWindowBlur);
+    };
+  }, []);
+
   const DRAG_THRESHOLD_PX = 8;
 
   const handleReorderPointerDown = useCallback(
     (e, card, i) => {
       if (e.button !== 0) return;
+      if (visibleCount <= 1) return; // No reorder with 0–1 cards; avoids division by zero (step === 0)
       const rail = railRef.current;
       if (!rail) return;
       const wrapEl = e.currentTarget;
@@ -100,6 +175,7 @@ function HandDock({
       const startX = e.clientX;
       const startY = e.clientY;
       let dragStarted = false;
+      let lastMoveLogTime = 0;
 
       const onMove = (e) => {
         if (!dragStarted) {
@@ -110,6 +186,7 @@ function HandDock({
           if (wrapEl.setPointerCapture) wrapEl.setPointerCapture(e.pointerId);
           dragPosRef.current = { x: e.clientX - offsetX, y: e.clientY - offsetY };
           setReorderDrag({ card, startIndex: i, currentDropIndex: i, offsetX, offsetY });
+          if (DEBUG_HAND_DRAG) console.log('[HandDock] reorder drag START', { startIndex: i, card: cardKey(card) });
         }
         if (!dragStarted) return;
         const railRect = rail.getBoundingClientRect();
@@ -123,16 +200,20 @@ function HandDock({
         }
         const rowLeft = railRect.left + cardRowLeftOffset;
         const cardLeftInRow = x - rowLeft;
-        const dropIndex = Math.max(
-          0,
-          Math.min(visibleCount - 1, Math.round(cardLeftInRow / step))
-        );
+        const dropIndex = step > 0
+          ? Math.max(0, Math.min(visibleCount - 1, Math.round(cardLeftInRow / step)))
+          : 0;
+        if (DEBUG_HAND_DRAG && Date.now() - lastMoveLogTime > 200) {
+          console.log('[HandDock] reorder onMove', { dropIndex });
+          lastMoveLogTime = Date.now();
+        }
         setReorderDrag((prev) =>
           prev && prev.currentDropIndex !== dropIndex ? { ...prev, currentDropIndex: dropIndex } : prev
         );
       };
 
       const onUp = (e) => {
+        if (DEBUG_HAND_DRAG) console.log('[HandDock] reorder onUp', { eventType: e?.type, dragStarted });
         if (!dragStarted) {
           document.removeEventListener('pointermove', onMove);
           return;
@@ -142,28 +223,56 @@ function HandDock({
         const rowLeft = railRect.left + cardRowLeftOffset;
         const xUp = Math.max(railRect.left, Math.min(railRect.right - cardSize.w, e.clientX - offsetX));
         const cardLeftInRowUp = xUp - rowLeft;
-        const dropIndex = Math.max(
-          0,
-          Math.min(visibleCount - 1, Math.round(cardLeftInRowUp / step))
-        );
+        const dropIndex = step > 0
+          ? Math.max(0, Math.min(visibleCount - 1, Math.round(cardLeftInRowUp / step)))
+          : 0;
         if (dropIndex !== i) {
-          const newCards = [...cards];
-          const [removed] = newCards.splice(i, 1);
-          newCards.splice(dropIndex, 0, removed);
+          const currentCards = cardsRef.current;
+          if (!Array.isArray(currentCards) || currentCards.length === 0) {
+            setReorderDrag(null);
+            return;
+          }
+          const n = currentCards.length;
+          const fromIdx = Math.max(0, Math.min(i, n - 1));
+          const toIdx = Math.max(0, Math.min(dropIndex, n - 1));
+          const newCards = [...currentCards];
+          const [removed] = newCards.splice(fromIdx, 1);
+          if (removed == null) {
+            setReorderDrag(null);
+            return;
+          }
+          newCards.splice(toIdx, 0, removed);
+          if (DEBUG_HAND_DRAG) console.log('[HandDock] reorder COMMIT', { from: fromIdx, to: toIdx, card: cardKey(card) });
           onReorder(newCards);
           dragJustEndedRef.current = true;
           setTimeout(() => { dragJustEndedRef.current = false; }, 100);
         }
         document.removeEventListener('pointermove', onMove);
+        removePointerMoveRef.current = null;
         setReorderDrag(null);
       };
 
+      const removeMove = () => {
+        document.removeEventListener('pointermove', onMove);
+        removePointerMoveRef.current = null;
+      };
+      removePointerMoveRef.current = removeMove;
       document.addEventListener('pointermove', onMove);
       document.addEventListener('pointerup', onUp, { once: true });
       document.addEventListener('pointercancel', onUp, { once: true });
     },
-    [onReorder, cardRowLeftOffset, step, cardSize.w, cardSize.h, visibleCount, cards]
+    [onReorder, cardRowLeftOffset, step, cardSize.w, cardSize.h, visibleCount]
   );
+
+  // If component unmounts during reorder drag, remove document listener to avoid leak and setState on unmounted component
+  useEffect(() => {
+    return () => {
+      if (removePointerMoveRef.current) {
+        removePointerMoveRef.current();
+        removePointerMoveRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div className="hand-dock">
@@ -191,6 +300,7 @@ function HandDock({
           <div className="dock-rail" ref={railRef}>
             <div className="dock-rail-inner">
               {visibleCards.map((card, i) => {
+                if (card == null) return <div key={`card-placeholder-${i}`} className="dock-card-wrap" style={{ left: `${cardRowLeftOffset}px`, transform: `translateX(${i * step}px)`, width: cardSize.w, height: cardSize.h }} aria-hidden="true" />;
                 const isSelected = isCardSelected(card);
                 // Use index in key so duplicate cards (e.g. two 7♥) get unique keys; otherwise
                 // React reuses one DOM node and the other can render invisible but keep layout.
@@ -211,12 +321,36 @@ function HandDock({
                     <Card
                       card={card}
                       onClick={
-                        isReorderDrag
-                          ? (c) => {
-                              if (dragJustEndedRef.current) return;
-                              onCardClick(c);
-                            }
-                          : onCardClick
+                        typeof onCardClick !== 'function'
+                          ? undefined
+                          : isReorderDrag
+                            ? (c) => {
+                                if (dragJustEndedRef.current) return;
+                                try {
+                                  onCardClick(c);
+                                } catch (err) {
+                                  console.error('[HandDock] onCardClick', err);
+                                  reportClientError({
+                                    source: 'HandDock',
+                                    message: err?.message ?? String(err),
+                                    stack: err?.stack,
+                                    context: 'onCardClick (reorder mode)',
+                                  });
+                                }
+                              }
+                            : (c) => {
+                                try {
+                                  onCardClick(c);
+                                } catch (err) {
+                                  console.error('[HandDock] onCardClick', err);
+                                  reportClientError({
+                                    source: 'HandDock',
+                                    message: err?.message ?? String(err),
+                                    stack: err?.stack,
+                                    context: 'onCardClick',
+                                  });
+                                }
+                              }
                       }
                       selected={isSelected}
                       playable={playable}
@@ -231,38 +365,41 @@ function HandDock({
               })}
             </div>
           </div>
-          <div className={`dock-hint ${hintError ? 'error' : ''}`}>
-            {hintText || '\u00A0'}
-          </div>
+          {showDockActions && (
+            <div className={`dock-hint ${hintError ? 'error' : ''}`}>
+              {hintText || '\u00A0'}
+            </div>
+          )}
         </div>
-        <div className="dock-actions-box">
-          <div className="dock-actions">
-            {children}
-            {showDefaultActions && (
-              <>
-                <button
-                  type="button"
-                  className="dock-btn dock-btn-primary"
-                  disabled={!canPlay}
-                  onClick={onPlay}
-                >
-                  {primaryLabel}
-                </button>
-                <button
-                  type="button"
-                  className="dock-btn dock-btn-secondary"
-                  disabled={!canPass}
-                  onClick={onPass}
-                >
-                  Pass
-                </button>
-              </>
-            )}
+        {showDockActions && (
+          <div className="dock-actions-box">
+            <div className="dock-actions">
+              {children}
+              {showDefaultActions && (
+                <>
+                  <button
+                    type="button"
+                    className="dock-btn dock-btn-primary"
+                    disabled={!canPlay}
+                    onClick={onPlay}
+                  >
+                    {primaryLabel}
+                  </button>
+                  <button
+                    type="button"
+                    className="dock-btn dock-btn-secondary"
+                    disabled={!canPass}
+                    onClick={onPass}
+                  >
+                    Pass
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
-      {reorderDrag &&
-        createPortal(
+      {reorderDrag && createPortal(
           <div
             ref={dragPreviewRef}
             className="dock-drag-preview dock-drag-preview--reorder"

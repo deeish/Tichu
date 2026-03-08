@@ -485,24 +485,34 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   const canPlayAnyAfterDog = dogInTrick && (currentPlayerId === playerId);
   
   if (game.currentTrick.length > 0 && !canPlayAnyAfterDog) {
-    // BUGS.md: When following, if you have the wished card you must play it (cannot play a different card e.g. 2 when wish is 7).
-    if (game.mahJongWish && game.mahJongWish.mustPlay) {
-      const hand = game.hands[playerId];
-      const hasWishedCard = hand && hand.some(card =>
-        card.type === 'standard' && card.rank === game.mahJongWish.wishedRank
-      );
-      const playingWishedRank = cards.some(c =>
-        c.type === 'standard' && c.rank === game.mahJongWish.wishedRank
-      );
-      if (hasWishedCard && !playingWishedRank) {
-        return { success: false, error: `You must play the wished card (${game.mahJongWish.wishedRank}) when you have it` };
-      }
-    }
     const winningPlay = getCurrentWinningPlay(game.currentTrick);
     const currentWinningCombo = winningPlay ? winningPlay.combination : null;
-    
+
     if (!currentWinningCombo) {
       return { success: false, error: 'Invalid trick state' };
+    }
+
+    // BUGS.md: When following, if you have the wished card you must play it (as single or in a bomb) when you can; if you only have it in a bomb, you must play that bomb or pass.
+    if (game.mahJongWish && game.mahJongWish.mustPlay) {
+      const hand = game.hands[playerId];
+      const wishedRank = game.mahJongWish.wishedRank;
+      const countWished = hand ? hand.filter(c => c.type === 'standard' && c.rank === wishedRank).length : 0;
+      const hasWishedCard = countWished >= 1;
+      const playingWishedRank = cards.some(c =>
+        c.type === 'standard' && c.rank === wishedRank
+      );
+      if (hasWishedCard && !playingWishedRank) {
+        if (countWished >= 4) {
+          // Have the wish only in a bomb (four-of-a-kind): must play that bomb or pass; cannot play a different combination (e.g. single 9)
+          return { success: false, error: `You must play the wished card (${wishedRank}) in a bomb or pass` };
+        }
+        const wishedAsSingle = { type: 'single', cards: [{ type: 'standard', rank: wishedRank, suit: 'hearts' }] };
+        const wishBeatsCurrent = currentWinningCombo.type === 'single' && compareCombinations(wishedAsSingle, currentWinningCombo) === 1;
+        if (wishBeatsCurrent) {
+          return { success: false, error: `You must play the wished card (${wishedRank}) when you have it` };
+        }
+        // 1–3 of the rank: wished single can't beat current — allow playing a higher card or pass
+      }
     }
     
     // Only bombs can beat bombs

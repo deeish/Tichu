@@ -177,7 +177,7 @@
   font-weight: 600;
 }
 
-/* Reorder only: smooth-following card (pointer drag), Balatro-style */
+/* Reorder only: smooth-following card (pointer drag), Balatro-style. Constrain size so it never fills the screen if state gets stuck. */
 .dock-drag-preview.dock-drag-preview--reorder {
   position: fixed;
   left: 0;
@@ -188,6 +188,8 @@
   transform-origin: center center;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
   border-radius: 8px;
+  max-width: 120px;
+  max-height: 180px;
 }
 
 /* Actions: vertical stack inside right-side box */

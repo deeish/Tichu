@@ -322,6 +322,33 @@ describe('Mah Jong Wish - Playing in the middle of a trick', () => {
     expect(game.mahJongWish).toBe(null);
   });
 
+  test('BUGS.md: player with bomb of 7s (wish 7) cannot play single 9 when following; must play bomb or pass', () => {
+    // 7 wished, P1 played 6, P2 played 8; P3 has four 7s + 9, tries to play 9 → rejected
+    const game = baseGame();
+    game.mahJongWish = { wishedRank: '7', mustPlay: true };
+    game.mahJongPlayed = true;
+    game.leadPlayer = 'p1';
+    game.currentTrick = [
+      { playerId: 'p1', cards: [createCard('6', 'hearts')], combination: { type: 'single', cards: [createCard('6', 'hearts')] } },
+      { playerId: 'p2', cards: [createCard('8', 'hearts')], combination: { type: 'single', cards: [createCard('8', 'hearts')] } }
+    ];
+    game.currentPlayerIndex = 2;
+    game.hands.p3 = [
+      createCard('7', 'hearts'), createCard('7', 'spades'),
+      createCard('7', 'diamonds'), createCard('7', 'clubs'),
+      createCard('9', 'hearts')
+    ];
+    const playNine = makeMove(game, 'p3', [createCard('9', 'hearts')], 'play');
+    expect(playNine.success).toBe(false);
+    expect(playNine.error).toMatch(/wished card|7|bomb|pass/);
+    const playBomb = makeMove(game, 'p3', [
+      createCard('7', 'hearts'), createCard('7', 'spades'),
+      createCard('7', 'diamonds'), createCard('7', 'clubs')
+    ], 'play');
+    expect(playBomb.success).toBe(true);
+    expect(game.mahJongWish).toBe(null);
+  });
+
   test('player WITHOUT wish can play a pair when current play is single (lead set type)', () => {
     const game = baseGame();
     game.mahJongWish = { wishedRank: 'K', mustPlay: true };

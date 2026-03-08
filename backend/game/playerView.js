@@ -30,23 +30,27 @@ function getPlayerView(game, socketIdOrPlayerId) {
   view.hands = {};
   view.hands[playerId] = game.hands[playerId];
 
-  // Hide other players' hands but show count
+  // Hide other players' hands but show count (include every other player so rejoin doesn't lose counts)
   view.handCounts = {};
+  const hands = game.hands || {};
   game.players.forEach((player) => {
-    if (player.id !== playerId) {
-      view.handCounts[player.id] = game.hands[player.id]?.length || 0;
+    if (player.id && player.id !== playerId) {
+      view.handCounts[player.id] = hands[player.id]?.length ?? 0;
     }
   });
 
-  // Only include token for this player (so only reconnecting client can store it)
+  // Only include token for this player (so only reconnecting client can store it).
+  // Ensure every player has a display name so rejoin never shows blank/unknown.
   view.players = (game.players || []).map((p) => ({
     ...p,
+    name: p.name || p.id || 'Player',
     token: p.id === playerId ? p.token : undefined
   }));
 
   // During exchange, include who you pass each card to (order: 1st, 2nd, 3rd recipient)
   if (game.state === 'exchanging') {
     view.exchangeRecipients = getExchangeRecipients(game, playerId);
+    view.exchangeSubmitted = !!(game.exchangeComplete && game.exchangeComplete[playerId]);
   }
 
   return view;

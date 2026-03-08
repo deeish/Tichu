@@ -50,6 +50,20 @@
   font-family: ui-monospace, monospace;
 }
 
+.sidebar-resync {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.sidebar-resync:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
 .sidebar-scores {
   display: flex;
   gap: var(--s16);

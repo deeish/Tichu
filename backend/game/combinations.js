@@ -230,11 +230,12 @@ function validateFullHouse(cards) {
   const counts = Object.values(rankCounts).sort((a, b) => b - a);
   
   // Standard full house: 3 of one rank, 2 of another
-  // With Phoenix: can help form either the triple or pair
-  if (counts.length === 2 && ((counts[0] === 3 && counts[1] === 2) || 
-      (counts[0] === 2 && counts[1] === 2 && phoenixCount === 1))) {
+  // With Phoenix: (1) 2+2+P, or (2) 3+1+P (Phoenix as second of the pair rank)
+  const standardFullHouse = counts.length === 2 && counts[0] === 3 && counts[1] === 2;
+  const twoTwoPhoenix = counts.length === 2 && counts[0] === 2 && counts[1] === 2 && phoenixCount === 1;
+  const threeOnePhoenix = counts.length === 2 && counts[0] === 3 && counts[1] === 1 && phoenixCount === 1;
+  if (standardFullHouse || twoTwoPhoenix || threeOnePhoenix) {
     // Rulebook: "in full houses the value of the trio is what counts"
-    // Find the triple rank (the one that appears 3 times, or with Phoenix: the higher of the two when 2+2+P)
     let tripleRank = null;
     for (const [rank, count] of Object.entries(rankCounts)) {
       if (count === 3) {
@@ -242,12 +243,16 @@ function validateFullHouse(cards) {
         break;
       }
     }
-    // 2+2+Phoenix: Phoenix completes one to 3; use the higher rank as the triple for comparison
+    // 2+2+Phoenix: Phoenix completes one pair to a triple; use higher rank as triple for comparison
     if (!tripleRank && phoenixCount === 1) {
       const pairRanks = Object.entries(rankCounts).filter(([, c]) => c === 2).map(([r]) => r);
       tripleRank = pairRanks.sort((a, b) => getCardValue(b) - getCardValue(a))[0];
     }
-    return { valid: true, type: 'fullhouse', cards, tripleRank };
+    // 3+1+Phoenix: triple is the rank with 3; Phoenix is the second of the pair
+    if (!tripleRank && threeOnePhoenix) {
+      tripleRank = Object.entries(rankCounts).find(([, c]) => c === 3)?.[0] ?? null;
+    }
+    if (tripleRank) return { valid: true, type: 'fullhouse', cards, tripleRank };
   }
   
   return { valid: false };

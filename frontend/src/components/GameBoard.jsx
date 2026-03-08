@@ -4,7 +4,10 @@ import Card from './Card';
 import CardBack from './CardBack';
 import Drawer from './Drawer';
 import HandDock from './HandDock';
-import { sortCardsByRank, cardKey } from '../utils/cardUtils';
+import HandErrorBoundary from './HandErrorBoundary';
+import { sortCardsByRank, cardKey, isValidCard } from '../utils/cardUtils';
+import { DEBUG_HAND_DRAG } from '../debug';
+import { reportClientError } from '../clientErrorReport';
 import {
   getDockHeight,
   getCenterRect,
@@ -30,7 +33,7 @@ import './GameBoard.css';
 const THEME_STORAGE_KEY = 'tichu-table-theme';
 const THEMES = ['classic', 'velvet', 'midnight', 'ember', 'forest', 'ocean', 'sunset', 'royal', 'slate', 'autumn', 'jade', 'noir'];
 
-function GameBoard({ game, socket, playerId, isConnected = true }) {
+function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame }) {
   // ----- UI state (do not reset on game update unless invalidated) -----
   const [tableTheme, setTableTheme] = useState(() => {
     try {
@@ -53,6 +56,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   const [exchangeAssignments, setExchangeAssignments] = useState([null, null, null]);
   const [exchangeDragOverSlot, setExchangeDragOverSlot] = useState(null);
   const [exchangeDraggingIndex, setExchangeDraggingIndex] = useState(null);
+  const [exchangeSubmitted, setExchangeSubmitted] = useState(false);
   const [handOrderOverride, setHandOrderOverride] = useState(null);
   // Optimistic glow for Tichu buttons so click/unclick feels instant; cleared when game state updates
   const [optimisticTichu, setOptimisticTichu] = useState(null);
@@ -60,6 +64,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
 
   const layoutRef = useRef(null);
   const tableRef = useRef(null);
+  const lastTableSizeRef = useRef({ w: 0, h: 0 });
   const [tableSize, setTableSize] = useState({ w: 0, h: 0 });
 
   const isMyTurn = useMemo(() => {
@@ -97,16 +102,30 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0]?.contentRect ?? {};
-      if (width != null && height != null) setTableSize({ w: width, h: height });
+      if (width == null || height == null) return;
+      const prev = lastTableSizeRef.current;
+      if (prev.w === width && prev.h === height) return;
+      lastTableSizeRef.current = { w: width, h: height };
+      setTableSize({ w: width, h: height });
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  // Clear selection only when phase changes or selected cards no longer in hand
+  // Clear selection only when phase changes or selected cards no longer in hand.
+  // Use stable hand signature so this effect doesn't run on every game-update (avoids flicker).
   const myHand = game?.hands?.[playerId] || [];
+  const handSignature = useMemo(
+    () => (game?.state === 'playing' || game?.state === 'exchanging' ? `${myHand.length}:${myHand.map(cardKey).join(',')}` : ''),
+    [game?.state, myHand]
+  );
   useEffect(() => {
     if (game?.state !== 'playing' && game?.state !== 'exchanging') {
+      setSelectedCards([]);
+      return;
+    }
+    // Clear selection when entering exchange so no card shows as "selected" during exchange.
+    if (game?.state === 'exchanging') {
       setSelectedCards([]);
       return;
     }
@@ -117,14 +136,47 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
           (h.type === 'standard' ? h.suit === c.suit && h.rank === c.rank : h.name === c.name)
       );
     setSelectedCards((prev) => prev.filter(stillInHand));
-  }, [game?.state, myHand]);
+  }, [game?.state, handSignature]);
 
   useEffect(() => {
     if (game?.state !== 'exchanging') {
       setExchangeAssignments([null, null, null]);
       setExchangeDraggingIndex(null);
+      setExchangeSubmitted(false);
     }
   }, [game?.state]);
+
+  // Clear hand order override when the hand content changes (play, exchange, new round)
+  // so old keys aren't applied to a new hand (avoids cards appearing/disappearing or jumping).
+  useEffect(() => {
+    setHandOrderOverride(null);
+  }, [handSignature]);
+
+  // Clear exchange drag when tab/window hidden or window loses focus (avoids stuck state when switching screen/tab)
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        setExchangeDraggingIndex((prev) => {
+          if (prev != null && DEBUG_HAND_DRAG) console.log('[GameBoard] visibility hidden – clearing exchange drag');
+          return null;
+        });
+        setExchangeDragOverSlot(null);
+      }
+    };
+    const onWindowBlur = () => {
+      setExchangeDraggingIndex((prev) => {
+        if (prev != null && DEBUG_HAND_DRAG) console.log('[GameBoard] window blur – clearing exchange drag');
+        return null;
+      });
+      setExchangeDragOverSlot(null);
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('blur', onWindowBlur);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('blur', onWindowBlur);
+    };
+  }, []);
 
   const dockH = getDockHeight();
   const sidebarW = 320;
@@ -146,29 +198,67 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   );
 
   const opponentsByPosition = useMemo(() => {
-    const order = game?.turnOrder?.length === 4 ? game.turnOrder : game?.players ?? [];
-    const myIndex = order.findIndex((p) => p.id === playerId);
-    if (myIndex === -1) {
-      const others = (game?.players ?? []).filter((p) => p.id !== playerId);
+    const order = game?.turnOrder?.length >= 4 ? game.turnOrder : game?.players ?? [];
+    const seenIds = new Set();
+    const uniqueOrder = order.filter((p) => {
+      if (!p?.id || seenIds.has(p.id)) return false;
+      seenIds.add(p.id);
+      return true;
+    });
+    const n = uniqueOrder.length;
+    const myIndex = uniqueOrder.findIndex((p) => p.id === playerId);
+    if (myIndex === -1 || n < 3) {
+      const others = (game?.players ?? []).filter((p) => p?.id && p.id !== playerId);
       return { left: others[0] ?? null, top: others[1] ?? null, right: others[2] ?? null };
     }
     return {
-      left: order[(myIndex + 1) % 4],
-      top: order[(myIndex + 2) % 4],
-      right: order[(myIndex + 3) % 4],
+      left: uniqueOrder[(myIndex + 1) % n] ?? null,
+      top: uniqueOrder[(myIndex + 2) % n] ?? null,
+      right: uniqueOrder[(myIndex + 3) % n] ?? null,
     };
   }, [game?.turnOrder, game?.players, playerId]);
 
   const exchangeRecipients = game?.exchangeRecipients ?? [];
   const cardMatches = (a, b) =>
     a && b && a.type === b.type && (a.type === 'standard' ? a.suit === b.suit && a.rank === b.rank : a.name === b.name);
+  const lastReportedInvalidRef = useRef(null);
   const displayHand = useMemo(() => {
-    const safeHand = (myHand || []).filter(Boolean);
+    const raw = (myHand || []).filter(Boolean);
+    const invalid = raw.filter((c) => !isValidCard(c));
+    const safeHand = raw.filter(isValidCard);
+    if (invalid.length > 0) {
+      const key = JSON.stringify(invalid.map((c) => ({ type: c?.type, suit: c?.suit, rank: c?.rank, name: c?.name })));
+      if (lastReportedInvalidRef.current !== key) {
+        lastReportedInvalidRef.current = key;
+        const payload = {
+          source: 'handValidation',
+          message: 'Invalid cards filtered from hand (check server terminal or localStorage tichu_debug_invalid_hand)',
+          invalidCards: invalid.slice(0, 20),
+          filteredCount: invalid.length,
+          handLengthBefore: raw.length,
+          gameState: game?.state,
+        };
+        reportClientError(payload);
+        try {
+          localStorage.setItem('tichu_debug_invalid_hand', JSON.stringify({ t: Date.now(), ...payload }));
+        } catch (_) {}
+      }
+    } else {
+      lastReportedInvalidRef.current = null;
+    }
     if (!safeHand.length) return safeHand;
     let base = safeHand;
-    if (game?.state === 'exchanging' && exchangeAssignments.some(Boolean)) {
-      const assigned = exchangeAssignments.filter(Boolean);
-      base = safeHand.filter((c) => !assigned.some((a) => cardMatches(a, c)));
+    // During exchange, never show in hand the cards we've assigned to slots or that the server has recorded as our exchange
+    if (game?.state === 'exchanging') {
+      const fromSlots = exchangeAssignments.filter(Boolean);
+      const fromServer = game?.exchangeCards?.[playerId] && Array.isArray(game.exchangeCards[playerId]) ? game.exchangeCards[playerId] : [];
+      const toHide = [...fromSlots];
+      for (const c of fromServer) {
+        if (c && !toHide.some((a) => cardMatches(a, c))) toHide.push(c);
+      }
+      if (toHide.length > 0) {
+        base = safeHand.filter((c) => !toHide.some((a) => cardMatches(a, c)));
+      }
     }
     try {
       if (sortMode === 'asc') return sortCardsByRank(base, true);
@@ -177,21 +267,18 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
     } catch {
       return base;
     }
-  }, [myHand, sortMode, game?.state, exchangeAssignments]);
+  }, [myHand, sortMode, game?.state, exchangeAssignments, game?.exchangeCards, playerId]);
 
   const orderedHand = useMemo(() => {
     if (!displayHand?.length) return displayHand;
     if (!handOrderOverride?.length) return displayHand;
-    const keyToCard = new Map(displayHand.map((c) => [cardKey(c), c]));
-    const ordered = [];
-    for (const k of handOrderOverride) {
-      const c = keyToCard.get(k);
-      if (c) {
-        ordered.push(c);
-        keyToCard.delete(k);
-      }
-    }
-    keyToCard.forEach((c) => ordered.push(c));
+    // handOrderOverride is an array of indices into displayHand (preserves duplicate cards)
+    const n = displayHand.length;
+    if (handOrderOverride.length !== n) return displayHand;
+    const inBounds = handOrderOverride.every((i) => typeof i === 'number' && i >= 0 && i < n);
+    if (!inBounds) return displayHand;
+    const ordered = handOrderOverride.map((i) => displayHand[i]);
+    if (ordered.some((c) => c == null)) return displayHand;
     return ordered;
   }, [displayHand, handOrderOverride]);
 
@@ -201,8 +288,25 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   }, []);
 
   const handleHandReorder = useCallback((newOrderedCards) => {
-    setHandOrderOverride(newOrderedCards.map(cardKey));
-  }, []);
+    const n = displayHand?.length;
+    if (!n || newOrderedCards.length !== n) return;
+    // Map each card in newOrderedCards back to its index in displayHand; use per-key queues so duplicates get distinct indices
+    const indicesByKey = {};
+    displayHand.forEach((c, i) => {
+      const k = cardKey(c);
+      if (!indicesByKey[k]) indicesByKey[k] = [];
+      indicesByKey[k].push(i);
+    });
+    const indices = newOrderedCards.map((card) => {
+      const k = cardKey(card);
+      const arr = indicesByKey[k];
+      return arr && arr.length > 0 ? arr.shift() : -1;
+    });
+    if (indices.some((i) => i < 0)) return;
+    // Only set if indices form a valid permutation (each 0..n-1 exactly once)
+    if (new Set(indices).size !== n || indices.some((i) => i < 0 || i >= n)) return;
+    setHandOrderOverride(indices);
+  }, [displayHand]);
 
   const currentPlayer = game?.turnOrder?.[game?.currentPlayerIndex];
 
@@ -221,72 +325,125 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   }, [selectedCards]);
 
   const handleCardClick = (card) => {
-    if (game?.state === 'exchanging') {
-      setExchangeAssignments((prev) => {
-        const i = prev.findIndex((x) => !x);
-        if (i === -1) return prev;
-        const n = [...prev];
-        n[i] = card;
-        return n;
-      });
-      return;
-    }
-    if (game?.state !== 'playing') return;
+    try {
+      if (!card || typeof card !== 'object') return;
+      const validCard =
+        (card.type === 'standard' && card.suit && card.rank) ||
+        (card.type === 'special' && card.name);
+      if (!validCard) return;
 
-    const isSelected = selectedCards.some(
-      (s) =>
-        s.type === card.type &&
-        (s.type === 'standard' ? s.suit === card.suit && s.rank === card.rank : s.name === card.name)
-    );
-    if (isSelected) {
-      setSelectedCards((prev) =>
-        prev.filter(
-          (s) =>
-            !(s.type === card.type && (s.type === 'standard' ? s.suit === card.suit && s.rank === card.rank : s.name === card.name))
-        )
+      if (game?.state === 'exchanging') {
+        setExchangeAssignments((prev) => {
+          const i = prev.findIndex((x) => !x);
+          if (i === -1) return prev;
+          const n = [...prev];
+          n[i] = card;
+          return n;
+        });
+        return;
+      }
+      if (game?.state !== 'playing') return;
+
+      const isSelected = selectedCards.some(
+        (s) =>
+          s.type === card.type &&
+          (s.type === 'standard' ? s.suit === card.suit && s.rank === card.rank : s.name === card.name)
       );
-    } else {
-      setSelectedCards((prev) => [...prev, card]);
+      if (isSelected) {
+        setSelectedCards((prev) =>
+          prev.filter(
+            (s) =>
+              !(s.type === card.type && (s.type === 'standard' ? s.suit === card.suit && s.rank === card.rank : s.name === card.name))
+          )
+        );
+      } else {
+        setSelectedCards((prev) => [...prev, card]);
+      }
+    } catch (err) {
+      console.error('[GameBoard] handleCardClick', err);
+      reportClientError({
+        source: 'GameBoard',
+        message: err?.message ?? String(err),
+        stack: err?.stack,
+        context: 'handleCardClick',
+      });
     }
   };
 
   const handleRemoveFromSlot = (i) => {
-    setExchangeAssignments((prev) => {
-      const n = [...prev];
-      n[i] = null;
-      return n;
-    });
+    try {
+      const idx = Math.max(0, Math.min(Number(i), 2));
+      setExchangeAssignments((prev) => {
+        const n = Array.isArray(prev) ? [...prev] : [null, null, null];
+        n[idx] = null;
+        return n.slice(0, 3);
+      });
+    } catch (err) {
+      console.error('[GameBoard] handleRemoveFromSlot', err);
+      reportClientError({
+        source: 'GameBoard',
+        message: err?.message ?? String(err),
+        stack: err?.stack,
+        context: 'handleRemoveFromSlot',
+      });
+    }
   };
 
   const handleDropOnSlot = (slotIndex, card) => {
-    setExchangeAssignments((prev) => {
-      const n = [...prev];
-      n[slotIndex] = card;
-      return n;
-    });
+    try {
+      if (DEBUG_HAND_DRAG) console.log('[GameBoard] exchange DROP', { slotIndex, card: cardKey(card) });
+      const idx = Math.max(0, Math.min(Number(slotIndex), 2));
+      const validCard = card && typeof card === 'object' && ((card.type === 'standard' && card.suit && card.rank) || (card.type === 'special' && card.name));
+      setExchangeAssignments((prev) => {
+        const n = Array.isArray(prev) ? [...prev] : [null, null, null];
+        n[idx] = validCard ? card : null;
+        return n.slice(0, 3);
+      });
+    } catch (err) {
+      console.error('[GameBoard] handleDropOnSlot', err);
+      reportClientError({
+        source: 'GameBoard',
+        message: err?.message ?? String(err),
+        stack: err?.stack,
+        context: 'handleDropOnSlot',
+      });
+    }
     setExchangeDragOverSlot(null);
     setExchangeDraggingIndex(null);
   };
 
   const handleExchangeDragStart = (e, card, index) => {
     try {
-      const data = JSON.stringify(card);
-      e.dataTransfer.setData('tichu/card', data);
-      e.dataTransfer.setData('text/plain', data);
-    } catch (_) {
-      e.dataTransfer.setData('text/plain', String(card?.name ?? card?.rank ?? ''));
+      if (DEBUG_HAND_DRAG) console.log('[GameBoard] exchange drag START', { index, card: cardKey(card) });
+      try {
+        const data = JSON.stringify(card);
+        e.dataTransfer?.setData('tichu/card', data);
+        e.dataTransfer?.setData('text/plain', data);
+      } catch (_) {
+        e.dataTransfer?.setData('text/plain', String(card?.name ?? card?.rank ?? ''));
+      }
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      const cardEl = (e.target?.closest?.('.card')) || e.target;
+      if (cardEl?.getBoundingClientRect) {
+        const rect = cardEl.getBoundingClientRect();
+        e.dataTransfer?.setDragImage?.(cardEl, e.clientX - rect.left, e.clientY - rect.top);
+      }
+      const safeIndex = typeof index === 'number' && index >= 0 ? index : null;
+      requestAnimationFrame(() => setExchangeDraggingIndex(safeIndex));
+    } catch (err) {
+      console.error('[GameBoard] handleExchangeDragStart', err);
+      setExchangeDraggingIndex(null);
+      reportClientError({
+        source: 'GameBoard',
+        message: err?.message ?? String(err),
+        stack: err?.stack,
+        context: 'handleExchangeDragStart',
+      });
     }
-    e.dataTransfer.effectAllowed = 'move';
-    const cardEl = (e.target && e.target.closest && e.target.closest('.card')) || e.target;
-    if (cardEl && typeof cardEl.getBoundingClientRect === 'function') {
-      const rect = cardEl.getBoundingClientRect();
-      e.dataTransfer.setDragImage(cardEl, e.clientX - rect.left, e.clientY - rect.top);
-    }
-    // Defer so the native drag isn't interrupted by a re-render (fixes drop-on-seat in some browsers)
-    requestAnimationFrame(() => setExchangeDraggingIndex(index));
   };
 
   const handleExchangeDragEnd = () => {
+    if (DEBUG_HAND_DRAG) console.log('[GameBoard] exchange drag END');
     setExchangeDraggingIndex(null);
   };
 
@@ -339,6 +496,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
   const containerWidth = typeof window !== 'undefined' ? window.innerWidth : 1440;
   const exchangeCardSize = getExchangeCardSize(containerWidth);
   const wonCardSize = getWonPileCardSize(containerWidth);
+  const tableHasSize = tableSize.w >= 10 && tableSize.h >= 10;
 
   const getStateMessage = () => {
     if (!game) return '';
@@ -352,6 +510,73 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
       default: return game.state || '';
     }
   };
+
+  // Memoize dock action buttons so HandDock doesn't reconcile this tree on every game-update (freeze mitigation).
+  const handDockChildren = useMemo(() => (
+    <>
+      {game.state === 'exchanging' && !game.exchangeCards?.[playerId] && !exchangeSubmitted && !game.exchangeSubmitted && (
+        <button
+          type="button"
+          className="dock-btn dock-btn-primary"
+          disabled={exchangeAssignments.some((x) => !x)}
+          onClick={() => {
+            if (exchangeAssignments.some((x) => !x)) return;
+            socket.emit('exchange-cards', exchangeAssignments);
+            setExchangeSubmitted(true);
+          }}
+        >
+          Exchange ({exchangeAssignments.filter(Boolean).length}/3)
+        </button>
+      )}
+      {game.state === 'grand-tichu' && (!game.cardsRevealed?.[playerId] || game.grandTichuDeclarations?.[playerId]) && (
+        <>
+          {!game.cardsRevealed?.[playerId] && (
+            <button type="button" className="dock-btn dock-btn-secondary dock-btn-rail" onClick={() => socket.emit('reveal-remaining-cards')}>
+              Reveal cards
+            </button>
+          )}
+          <button
+            type="button"
+            className={`dock-btn dock-btn-primary ${(optimisticGrandTichu === true || (optimisticGrandTichu !== false && game.grandTichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
+            onClick={() => {
+              const declared = optimisticGrandTichu === true || (optimisticGrandTichu !== false && game.grandTichuDeclarations?.[playerId]);
+              setOptimisticGrandTichu(!declared);
+              declared ? socket.emit('undeclare-grand-tichu') : socket.emit('declare-grand-tichu');
+            }}
+          >
+            Grand Tichu (+200)
+          </button>
+        </>
+      )}
+      {game.state === 'playing' && isMyTurn && !game.firstCardPlayed?.[playerId] && (
+        <button
+          type="button"
+          className={`dock-btn dock-btn-secondary ${(optimisticTichu === true || (optimisticTichu !== false && game.tichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
+          onClick={() => {
+            const declared = optimisticTichu === true || (optimisticTichu !== false && game.tichuDeclarations?.[playerId]);
+            setOptimisticTichu(!declared);
+            declared ? socket.emit('undeclare-tichu') : socket.emit('declare-tichu');
+          }}
+        >
+          Tichu (+100)
+        </button>
+      )}
+    </>
+  ), [
+    game?.state,
+    game?.exchangeCards?.[playerId],
+    game?.exchangeSubmitted,
+    game?.cardsRevealed?.[playerId],
+    game?.grandTichuDeclarations?.[playerId],
+    game?.firstCardPlayed?.[playerId],
+    game?.tichuDeclarations?.[playerId],
+    exchangeSubmitted,
+    exchangeAssignments,
+    optimisticGrandTichu,
+    optimisticTichu,
+    isMyTurn,
+    playerId,
+  ]);
 
   return (
     <div className="game-layout" ref={layoutRef} data-theme={tableTheme === 'classic' ? undefined : tableTheme}>
@@ -371,6 +596,8 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
                 )}
               </div>
             </div>
+            {tableHasSize && (
+            <>
             {/* Seat panels (absolute) + won-cards pile (below left/right, right of top) */}
             {['top', 'left', 'right'].map((pos) => {
               const player = opponentsByPosition[pos];
@@ -386,7 +613,8 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
               const isExchanging = game.state === 'exchanging' && !game.exchangeCards?.[playerId];
               const exchangeSlotIndex = isExchanging ? exchangeRecipients.findIndex((r) => r.id === player.id) : -1;
               const exchangeAssignedCard = exchangeSlotIndex >= 0 ? exchangeAssignments[exchangeSlotIndex] : null;
-              const isExchangeDropTarget = exchangeSlotIndex >= 0 && !exchangeAssignedCard;
+              const exchangeLocked = exchangeSubmitted || game.exchangeSubmitted;
+              const isExchangeDropTarget = exchangeSlotIndex >= 0 && !exchangeAssignedCard && !exchangeLocked;
               const isDragOverThisSeat = exchangeDragOverSlot === exchangeSlotIndex;
 
               const isTop = pos === 'top';
@@ -398,7 +626,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
                 : posObj.y + SEAT_HEIGHT + WON_STACK_GAP;
 
               return (
-                <Fragment key={player.id}>
+                <Fragment key={`seat-${pos}-${player.id}`}>
                   <div
                     className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''} ${isDisconnected ? 'seat--disconnected' : ''} ${isExchangeDropTarget ? 'seat--exchange-drop' : ''} ${isDragOverThisSeat ? 'seat--exchange-drag-over' : ''}`}
                     style={{
@@ -443,7 +671,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
                       </span>
                     </div>
                     {isExchanging && exchangeAssignedCard && (
-                      <div className="seat-exchange-card" onClick={() => handleRemoveFromSlot(exchangeSlotIndex)} title="Click to remove">
+                      <div className="seat-exchange-card" onClick={!exchangeLocked ? () => handleRemoveFromSlot(exchangeSlotIndex) : undefined} title={!exchangeLocked ? 'Click to remove' : undefined}>
                         <Card card={exchangeAssignedCard} width={exchangeCardSize.w} height={exchangeCardSize.h} compact />
                       </div>
                     )}
@@ -543,6 +771,8 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
                 </div>
               );
             })()}
+            </>
+            )}
           </div>
         </div>
       </div>
@@ -596,9 +826,11 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
       )}
 
       <div className="hand-dock-wrapper">
+        <HandErrorBoundary onError={(err, info) => reportClientError({ source: 'HandErrorBoundary', message: err?.message ?? String(err), stack: err?.stack, componentStack: info?.componentStack })}>
         <HandDock
           cards={orderedHand}
           selectedCards={game.state === 'exchanging' ? [] : selectedCards}
+          selectionDisabled={game?.state === 'exchanging'}
           onCardClick={handleCardClick}
           playable={game.state === 'exchanging' || game.state === 'playing'}
           sortMode={sortMode}
@@ -610,61 +842,16 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
           hintText={hintText}
           containerWidth={containerWidth}
           primaryLabel={selectedIsBomb ? 'Play bomb' : `Play (${selectedCards.length})`}
-          showDefaultActions={game.state !== 'grand-tichu'}
-          draggable={game.state === 'exchanging'}
-          onCardDragStart={game.state === 'exchanging' ? handleExchangeDragStart : undefined}
+          showDefaultActions={game.state !== 'grand-tichu' && game.state !== 'exchanging'}
+          draggable={game.state === 'exchanging' && !exchangeSubmitted && !game.exchangeSubmitted}
+          onCardDragStart={game.state === 'exchanging' && !exchangeSubmitted && !game.exchangeSubmitted ? handleExchangeDragStart : undefined}
           onCardDragEnd={game.state === 'exchanging' ? handleExchangeDragEnd : undefined}
           exchangeDraggingIndex={game.state === 'exchanging' ? exchangeDraggingIndex : null}
           onReorder={game.state === 'playing' ? handleHandReorder : undefined}
         >
-          {game.state === 'exchanging' && !game.exchangeCards?.[playerId] && (
-            <button
-              type="button"
-              className="dock-btn dock-btn-primary"
-              disabled={exchangeAssignments.some((x) => !x)}
-              onClick={() => {
-                if (exchangeAssignments.some((x) => !x)) return;
-                socket.emit('exchange-cards', exchangeAssignments);
-                setExchangeAssignments([null, null, null]);
-              }}
-            >
-              Exchange ({exchangeAssignments.filter(Boolean).length}/3)
-            </button>
-          )}
-          {game.state === 'grand-tichu' && (!game.cardsRevealed?.[playerId] || game.grandTichuDeclarations?.[playerId]) && (
-            <>
-              {!game.cardsRevealed?.[playerId] && (
-                <button type="button" className="dock-btn dock-btn-secondary dock-btn-rail" onClick={() => socket.emit('reveal-remaining-cards')}>
-                  Reveal cards
-                </button>
-              )}
-              <button
-                type="button"
-                className={`dock-btn dock-btn-primary ${(optimisticGrandTichu === true || (optimisticGrandTichu !== false && game.grandTichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
-                onClick={() => {
-                  const declared = optimisticGrandTichu === true || (optimisticGrandTichu !== false && game.grandTichuDeclarations?.[playerId]);
-                  setOptimisticGrandTichu(!declared);
-                  declared ? socket.emit('undeclare-grand-tichu') : socket.emit('declare-grand-tichu');
-                }}
-              >
-                Grand Tichu (+200)
-              </button>
-            </>
-          )}
-          {game.state === 'playing' && isMyTurn && !game.firstCardPlayed?.[playerId] && (
-            <button
-              type="button"
-              className={`dock-btn dock-btn-secondary ${(optimisticTichu === true || (optimisticTichu !== false && game.tichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
-              onClick={() => {
-                const declared = optimisticTichu === true || (optimisticTichu !== false && game.tichuDeclarations?.[playerId]);
-                setOptimisticTichu(!declared);
-                declared ? socket.emit('undeclare-tichu') : socket.emit('declare-tichu');
-              }}
-            >
-              Tichu (+100)
-            </button>
-          )}
+          {handDockChildren}
         </HandDock>
+        </HandErrorBoundary>
       </div>
       </div>
 
@@ -675,6 +862,7 @@ function GameBoard({ game, socket, playerId, isConnected = true }) {
           socket={socket}
           tableTheme={tableTheme}
           onTableThemeChange={handleTableThemeChange}
+          onResync={onResyncGame}
         />
     </div>
   );

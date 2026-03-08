@@ -1,14 +1,44 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, startTransition } from 'react'
 import { Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import GameBoard from './components/GameBoard'
+import GameErrorBoundary from './components/GameErrorBoundary'
 import StatsPopup from './components/StatsPopup'
+import { initClientErrorReport, reportClientError } from './clientErrorReport'
 import './App.css'
 
 const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001')
+initClientErrorReport(socket)
 
 const REJOIN_GAME_KEY = 'tichu_rejoin_gameId'
 const REJOIN_TOKEN_KEY = 'tichu_rejoin_token'
+
+/** Throttle game-update apply so we clone + setState at most this often (reduces re-renders and churn). */
+const GAME_UPDATE_THROTTLE_MS = 90
+
+/** Max trick plays and cards per play we pass to React (avoids DOM/layout explosion or hang from bad payload). */
+const MAX_TRICK_PLAYS = 20;
+const MAX_CARDS_PER_PLAY = 20;
+
+/**
+ * Normalize critical game state so UI never sees undefined/invalid shapes (defensive, see docs/DEFENSIVE_GAME_STATE.md).
+ * Also caps currentTrick and play.cards so setState never receives huge arrays that could freeze render.
+ */
+function normalizeGameState(game) {
+  if (!game || typeof game !== 'object') return game
+  const next = { ...game }
+  if (!Array.isArray(next.currentTrick)) next.currentTrick = []
+  if (!Array.isArray(next.passedPlayers)) next.passedPlayers = []
+  next.currentTrick = next.currentTrick
+    .filter((p) => p && p.playerId != null && Array.isArray(p?.cards))
+    .slice(0, MAX_TRICK_PLAYS)
+    .map((p) => ({ ...p, cards: (p.cards || []).slice(0, MAX_CARDS_PER_PLAY) }))
+  const turnLen = next.turnOrder?.length ?? 0
+  if (turnLen > 0 && (typeof next.currentPlayerIndex !== 'number' || next.currentPlayerIndex < 0 || next.currentPlayerIndex >= turnLen)) {
+    next.currentPlayerIndex = 0
+  }
+  return next
+}
 
 function saveRejoinCreds(gameId, playerToken) {
   if (gameId && playerToken) {
@@ -59,8 +89,11 @@ const MOCK_FINISHED_GAME = {
 function App() {
   const [gameState, setGameState] = useState(null)
   const [gameStateVersion, setGameStateVersion] = useState(0)
+  const [resyncVersion, setResyncVersion] = useState(0)
   const setGameStateRef = useRef(setGameState)
   setGameStateRef.current = setGameState
+  const pendingGameRef = useRef(null)
+  const flushTimerRef = useRef(null)
 
   const [playerName, setPlayerName] = useState('')
   const [gameId, setGameId] = useState('')
@@ -93,47 +126,108 @@ function App() {
     })
 
     socket.on('game-created', (data) => {
-      setGameState(data.game)
+      const game = data?.game ? normalizeGameState(data.game) : data.game
+      setGameState(game)
       setGameId(data.gameId)
       const me = data.game?.players?.find((p) => p.token)
-      setPlayerId(me?.id ?? socket.id)
+      const myId = me?.id ?? socket.id
+      setPlayerId(myId)
       if (data.playerToken) saveRejoinCreds(data.gameId, data.playerToken)
     })
 
     socket.on('player-joined', (data) => {
-      setGameState(data.game)
+      const game = data?.game ? normalizeGameState(data.game) : data.game
+      setGameState(game)
       const gid = data.gameId ?? data.game?.id
       setGameId(gid)
       const me = data.game?.players?.find((p) => p.token)
-      setPlayerId(me?.id ?? socket.id)
+      const myId = me?.id ?? socket.id
+      setPlayerId(myId)
       if (data.playerToken && gid) saveRejoinCreds(gid, data.playerToken)
     })
 
     socket.on('game-started', (data) => {
-      setGameState(data.game)
+      const game = data?.game ? normalizeGameState(data.game) : data.game
+      setGameState(game)
     })
 
     socket.on('game-update', (data) => {
-      setGameState(data.game)
+      const game = data?.game
+      if (game && typeof game === 'object') {
+        pendingGameRef.current = game
+        const hasPlays = Array.isArray(game.currentTrick) && game.currentTrick.length > 0
+        const me = game.players?.find((p) => p.token)
+        const myId = me?.id
+        const playerWentOut = myId && Array.isArray(game.hands?.[myId]) && game.hands[myId].length === 0
+        if (hasPlays || playerWentOut) {
+          if (flushTimerRef.current != null) {
+            clearTimeout(flushTimerRef.current)
+            flushTimerRef.current = null
+          }
+          pendingGameRef.current = null
+          const gameToApply = game
+          startTransition(() => {
+            try {
+              const cloned = normalizeGameState(JSON.parse(JSON.stringify(gameToApply)))
+              setGameStateRef.current(cloned)
+              const foundMe = cloned.players?.find((p) => p.token)
+              if (foundMe?.id) setPlayerId(foundMe.id)
+            } catch (_) {
+              setGameStateRef.current(normalizeGameState(gameToApply))
+            }
+          })
+          return
+        }
+        if (flushTimerRef.current == null) {
+          flushTimerRef.current = setTimeout(() => {
+            const pending = pendingGameRef.current
+            pendingGameRef.current = null
+            flushTimerRef.current = null
+            if (pending && typeof pending === 'object') {
+              startTransition(() => {
+                try {
+                  const cloned = normalizeGameState(JSON.parse(JSON.stringify(pending)))
+                  setGameStateRef.current(cloned)
+                  const me = cloned.players?.find((p) => p.token)
+                  if (me?.id) setPlayerId(me.id)
+                } catch (_) {
+                  setGameStateRef.current(normalizeGameState(pending))
+                }
+              })
+            }
+          }, GAME_UPDATE_THROTTLE_MS)
+        }
+      } else {
+        startTransition(() => {
+          setGameStateRef.current(normalizeGameState(game))
+        })
+      }
     })
 
     socket.on('game-state', (data) => {
       if (!data?.game || !Array.isArray(data.game?.players)) return
-      const nextGame = JSON.parse(JSON.stringify(data.game))
+      const nextGame = normalizeGameState(JSON.parse(JSON.stringify(data.game)))
       const me = nextGame.players?.find((p) => p.token)
       if (me && nextGame.id) {
         saveRejoinCreds(nextGame.id, me.token)
         setPlayerId(me.id)
+        setGameId(nextGame.id)
       }
       setGameStateRef.current(nextGame)
       setGameStateVersion(v => v + 1)
+      setResyncVersion(v => v + 1)
     })
 
     socket.on('player-won-round', () => {})
-    socket.on('trick-won', () => {})
+    socket.on('trick-won', () => {
+      // Do NOT request get-game-state here: the winner often leads immediately; a delayed
+      // game-state response (empty trick) would overwrite their lead play and show "No cards played yet".
+      // Use the sidebar "Resync" button or error fallback "Sync game" if something looks wrong.
+    })
 
     socket.on('player-left', (data) => {
-      setGameState(data.game)
+      const game = data?.game ? normalizeGameState(data.game) : data.game
+      setGameState(game)
     })
 
     socket.on('error', (data) => {
@@ -145,6 +239,11 @@ function App() {
     })
 
     return () => {
+      if (flushTimerRef.current != null) {
+        clearTimeout(flushTimerRef.current)
+        flushTimerRef.current = null
+      }
+      pendingGameRef.current = null
       socket.off('connect', onConnect)
       socket.off('disconnect')
       socket.off('game-created')
@@ -251,7 +350,8 @@ function App() {
   if (showEndGameTest) {
     return (
       <div className="end-game-test-wrap">
-        <GameBoard
+        <GameErrorBoundary onError={(payload) => reportClientError(payload)}>
+          <GameBoard
           game={MOCK_FINISHED_GAME}
           socket={socket}
           playerId={playerId || 'p1'}
@@ -277,19 +377,31 @@ function App() {
           players={MOCK_FINISHED_GAME.players}
           game={MOCK_FINISHED_GAME}
         />
+        </GameErrorBoundary>
       </div>
     )
+  }
+
+  const handleResyncGame = () => {
+    socket.emit('get-game-state')
   }
 
   if (inActiveGame) {
     return (
       <div className="game-fade-in">
-        <GameBoard
-          game={gameState}
-          socket={socket}
-          playerId={playerId || socket.id}
-          isConnected={isConnected}
-        />
+        <GameErrorBoundary
+          onError={(payload) => reportClientError(payload)}
+          onResync={handleResyncGame}
+          resyncVersion={resyncVersion}
+        >
+          <GameBoard
+            game={gameState}
+            socket={socket}
+            playerId={playerId || socket.id}
+            isConnected={isConnected}
+            onResyncGame={handleResyncGame}
+          />
+        </GameErrorBoundary>
       </div>
     );
   }
