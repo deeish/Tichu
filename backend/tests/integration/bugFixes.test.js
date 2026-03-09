@@ -112,6 +112,42 @@ describe('Bug fixes (BUGS.md)', () => {
       expect(game.roundScores.team2).toBe(0);
       expect(game.playersOut).toHaveLength(4); // p3, p4 added as last
     });
+
+    test('double victory still ends round when player id types differ (playersOut vs players[].id)', () => {
+      // Simulate bug: first out stored as number (e.g. socket id), players[].id are strings; second player goes out as string
+      const game = createTestGame({
+        state: 'playing',
+        playersOut: [123], // first out id as number
+        players: [
+          { id: '123', team: 1, name: 'P1' },
+          { id: '456', team: 1, name: 'P2' },
+          { id: '789', team: 2, name: 'P3' },
+          { id: '999', team: 2, name: 'P4' }
+        ],
+        turnOrder: [
+          { id: '123', team: 1, name: 'P1' },
+          { id: '456', team: 1, name: 'P2' },
+          { id: '789', team: 2, name: 'P3' },
+          { id: '999', team: 2, name: 'P4' }
+        ],
+        currentTrick: [],
+        passedPlayers: [],
+        hands: { '123': [], '456': [], '789': [], '999': [] },
+        playerStacks: { '123': { cards: [], points: 0 }, '456': { cards: [], points: 0 }, '789': { cards: [], points: 0 }, '999': { cards: [], points: 0 } },
+        scores: { team1: 0, team2: 0 },
+        roundScores: { team1: 0, team2: 0 },
+        roundEnded: false,
+        tichuDeclarations: {},
+        grandTichuDeclarations: {}
+      });
+
+      handlePlayerWin(game, '456'); // second out (string id) -> playersOut becomes [123, '456'], length 2; lookup must match by string
+
+      expect(game.state).toBe('round-ended');
+      expect(game.roundEnded).toBe(true);
+      expect(game.roundScores.team1).toBe(200);
+      expect(game.roundScores.team2).toBe(0);
+    });
   });
 
   describe('3. Round end when 3 of 4 players have finished', () => {

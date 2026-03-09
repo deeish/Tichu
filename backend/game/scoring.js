@@ -102,20 +102,25 @@ function handlePlayerWin(game, playerId) {
   
   // Double victory: team finishes 1st and 2nd -> +200, no card points, only Tichu applied
   // Trigger as soon as 2nd player goes out (even if their play is still in currentTrick)
+  // Use string comparison so id type mismatch (e.g. socket id vs player.id) never skips round end (BUGS.md: round sometimes doesn't end)
   if (game.playersOut.length === 2) {
-    const firstPlayer = game.players.find(p => p.id === game.playersOut[0]);
-    const secondPlayer = game.players.find(p => p.id === game.playersOut[1]);
-    
+    const firstId = game.playersOut[0] != null ? String(game.playersOut[0]) : null;
+    const secondId = game.playersOut[1] != null ? String(game.playersOut[1]) : null;
+    const firstPlayer = firstId ? game.players.find(p => p.id != null && String(p.id) === firstId) : null;
+    const secondPlayer = secondId ? game.players.find(p => p.id != null && String(p.id) === secondId) : null;
+
     if (firstPlayer && secondPlayer && firstPlayer.team === secondPlayer.team) {
       // Clear current trick without assigning points (no card points in double victory)
       game.currentTrick = [];
       game.passedPlayers = [];
       
-      // Add remaining players to playersOut (they're last)
-      const remainingPlayers = game.players.filter(p => !game.playersOut.includes(p.id));
+      // Add remaining players to playersOut (they're last); use string id compare so we never skip (id type consistency)
+      const outSet = new Set(game.playersOut.map(id => String(id)));
+      const remainingPlayers = game.players.filter(p => !outSet.has(String(p.id)));
       remainingPlayers.forEach(p => {
-        if (!game.playersOut.includes(p.id)) {
+        if (!outSet.has(String(p.id))) {
           game.playersOut.push(p.id);
+          outSet.add(String(p.id));
         }
         const remainingCards = game.hands[p.id] || [];
         if (!game.playerStacks[p.id]) {

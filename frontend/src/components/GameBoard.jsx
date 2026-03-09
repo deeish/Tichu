@@ -548,7 +548,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
           </button>
         </>
       )}
-      {game.state === 'playing' && isMyTurn && !game.firstCardPlayed?.[playerId] && (
+      {game.state === 'playing' && isMyTurn && !game.firstCardPlayed?.[playerId] && !game.grandTichuDeclarations?.[playerId] && (
         <button
           type="button"
           className={`dock-btn dock-btn-secondary ${(optimisticTichu === true || (optimisticTichu !== false && game.tichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}

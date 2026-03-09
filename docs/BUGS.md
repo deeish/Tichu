@@ -1,10 +1,9 @@
 Current Bug List
 ****
 new bugs
-**When players disconnect make sure they get their team status still(users left, 1 & 3 finished first and round didnt end even though they were on a team)**
+**When players disconnect make sure they get their team status still(users left, 1 & 3 finished first and round didnt end even though they were on a team)** 
 **when players leave make sure their names stays the same**
-**when call grand, dont let user click on tichu(it currently still glows even though it throws an error)**
-**Sometimes when a team finishes(team gets first/second) the round doesnt end**
+**Sometimes when a team finishes(team gets first/second) the round doesnt end** *attempted to fix, check if this works*
 
 
 
