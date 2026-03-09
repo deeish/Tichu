@@ -107,6 +107,16 @@ function App() {
   const [editingMyName, setEditingMyName] = useState(false)
   const [lobbyNameDraft, setLobbyNameDraft] = useState('')
 
+  // Pre-fill name on Join Party so new joiners (e.g. filling a disconnected slot) send their name
+  useEffect(() => {
+    if (landingMode === 'join') {
+      try {
+        const saved = localStorage.getItem('tichu-player-name')
+        if (saved != null && saved !== '' && !playerName.trim()) setPlayerName(saved)
+      } catch (_) {}
+    }
+  }, [landingMode])
+
   useEffect(() => {
     const onConnect = () => {
       setIsConnected(true)
@@ -263,6 +273,9 @@ function App() {
       alert('Please enter your name')
       return
     }
+    try {
+      localStorage.setItem('tichu-player-name', playerName.trim())
+    } catch (_) {}
     socket.emit('create-game', playerName)
   }
 
@@ -272,6 +285,9 @@ function App() {
       return
     }
     const name = playerName.trim() || 'Player'
+    try {
+      localStorage.setItem('tichu-player-name', name)
+    } catch (_) {}
     socket.emit('join-game', { gameId, playerName: name })
   }
 
@@ -452,7 +468,14 @@ function App() {
               <input
                 type="text"
                 className="landing-input landing-join-input"
-                placeholder="abcd"
+                placeholder="Your name"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+              />
+              <input
+                type="text"
+                className="landing-input landing-join-input"
+                placeholder="Party code"
                 value={gameId}
                 onChange={(e) => setGameId(e.target.value.toUpperCase())}
               />
