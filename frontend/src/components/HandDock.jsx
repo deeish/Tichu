@@ -285,8 +285,9 @@ function HandDock({
               type="button"
               className={sortMode === mode ? 'active' : ''}
               onClick={() => onSortModeChange(mode)}
+              title={mode === 'none' ? 'Original order' : mode === 'asc' ? 'Sort by rank (low to high)' : 'Sort by rank (high to low)'}
             >
-              {mode === 'none' ? 'None' : mode === 'asc' ? '↑' : '↓'}
+              {mode === 'none' ? 'None' : mode === 'asc' ? 'Low→High' : 'High→Low'}
             </button>
           ))}
         </div>

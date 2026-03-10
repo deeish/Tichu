@@ -80,6 +80,7 @@
 .dock-sort button {
   padding: 4px 10px;
   font-size: 12px;
+  white-space: nowrap;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid transparent;
   border-radius: 6px;
