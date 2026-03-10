@@ -25,30 +25,42 @@ function getCardPointLabel(card) {
 
 /**
  * Build one round-log entry from current game state (after round end, before next round).
- * Matches frontend shape: { round, players: [ { playerId, playerName, team, breakdown, tichu, grandTichu, total } ] }
+ * Matches frontend shape: { round, doubleVictory?, players: [ { playerId, playerName, team, placement, breakdown, tichu, grandTichu, total } ] }
+ * When opts.doubleVictory is true: 1st and 2nd get empty breakdown and show as "1st"/"2nd" in UI; 3rd and 4th also get no card breakdown (card points are not summed in double victory), only Tichu/Grand if called.
  */
-function buildRoundLogEntry(game) {
+function buildRoundLogEntry(game, opts = {}) {
   if (!game.players || game.players.length === 0 || !game.playersOut || game.playersOut.length !== 4) {
     return null;
   }
+  const doubleVictory = !!opts.doubleVictory;
   const firstPlaceId = game.playersOut[0] != null ? String(game.playersOut[0]) : null;
   const tichuDec = game.tichuDeclarations || {};
   const grandTichuDec = game.grandTichuDeclarations || {};
 
+  // placement 1..4 by order in playersOut
+  const placementByPlayerId = {};
+  game.playersOut.forEach((id, index) => {
+    placementByPlayerId[String(id)] = index + 1;
+  });
+
   const players = game.players.map((player) => {
     const pid = player.id != null ? String(player.id) : null;
     const gotFirst = firstPlaceId !== null && pid !== null && firstPlaceId === pid;
+    const placement = placementByPlayerId[pid] ?? 0;
     const stack = game.playerStacks && game.playerStacks[player.id] ? game.playerStacks[player.id] : { cards: [], points: 0 };
 
+    // In double victory, no one gets card breakdown in the log (only 1st/2nd points and Tichu/Grand count)
     const breakdownMap = {};
-    for (const card of stack.cards || []) {
-      const label = getCardPointLabel(card);
-      if (label == null) continue;
-      const pts = getCardPoints(card);
-      const key = label;
-      if (!breakdownMap[key]) breakdownMap[key] = { count: 0, points: 0 };
-      breakdownMap[key].count += 1;
-      breakdownMap[key].points += pts;
+    if (!doubleVictory) {
+      for (const card of stack.cards || []) {
+        const label = getCardPointLabel(card);
+        if (label == null) continue;
+        const pts = getCardPoints(card);
+        const key = label;
+        if (!breakdownMap[key]) breakdownMap[key] = { count: 0, points: 0 };
+        breakdownMap[key].count += 1;
+        breakdownMap[key].points += pts;
+      }
     }
     const breakdown = Object.entries(breakdownMap).map(([label, { count, points }]) => ({
       label: count > 1 ? `${count}×${label}` : `1×${label}`,
@@ -60,13 +72,21 @@ function buildRoundLogEntry(game) {
     let grandTichu = null;
     if (grandTichuDec[player.id]) grandTichu = gotFirst ? 200 : -200;
 
-    const cardTotal = stack.points || 0;
-    const total = cardTotal + (tichu ?? 0) + (grandTichu ?? 0);
+    let total;
+    if (doubleVictory && placement <= 2) {
+      total = 100 + (tichu ?? 0) + (grandTichu ?? 0);
+    } else if (doubleVictory && placement >= 3) {
+      total = (tichu ?? 0) + (grandTichu ?? 0);
+    } else {
+      const cardTotal = stack.points || 0;
+      total = cardTotal + (tichu ?? 0) + (grandTichu ?? 0);
+    }
 
     return {
       playerId: player.id,
       playerName: player.name || `Player ${player.id}`,
       team: player.team ?? 1,
+      placement,
       breakdown,
       tichu,
       grandTichu,
@@ -75,15 +95,18 @@ function buildRoundLogEntry(game) {
   });
 
   const roundNumber = Array.isArray(game.roundLog) ? game.roundLog.length + 1 : 1;
-  return { round: roundNumber, players };
+  const entry = { round: roundNumber, players };
+  if (doubleVictory) entry.doubleVictory = true;
+  return entry;
 }
 
 /**
  * Append current round to game.roundLog (creates roundLog if missing).
  * Call once when round has ended, after last-place transfer and Tichu/Grand applied.
+ * opts.doubleVictory: set when same team got 1st and 2nd (no card points for them in log).
  */
-function appendRoundToLog(game) {
-  const entry = buildRoundLogEntry(game);
+function appendRoundToLog(game, opts = {}) {
+  const entry = buildRoundLogEntry(game, opts);
   if (!entry) return;
   if (!game.roundLog) game.roundLog = [];
   game.roundLog.push(entry);
@@ -154,7 +177,7 @@ function handlePlayerWin(game, playerId) {
         game.scores.team1 = (game.scores.team1 || 0) + game.roundScores.team1;
         game.scores.team2 = (game.scores.team2 || 0) + game.roundScores.team2;
       }
-      appendRoundToLog(game);
+      appendRoundToLog(game, { doubleVictory: true });
       if (game.scores && (game.scores.team1 >= WINNING_SCORE || game.scores.team2 >= WINNING_SCORE)) {
         game.state = 'finished';
         // If both hit 1000 in same round, team with more points wins; else first to 1000 wins

@@ -108,38 +108,50 @@ function formatRoundScore(r) {
   return n > 0 ? `+${n}` : n;
 }
 
-/** Mock round log for visuals; backend will supply game.roundLog later. */
+/** Mock round log for visuals; backend will supply game.roundLog when rounds complete. Includes a double-victory round so quick test game Log tab can be verified. */
 function getMockRoundLog(players) {
   const names = (players || []).map((p) => p.name);
   if (names.length < 4) names.push('Player 2', 'Player 3', 'Player 4');
   return [
     {
       round: 1,
+      doubleVictory: true,
       players: [
-        { playerId: '1', playerName: names[0] || 'Player 1', team: 1, breakdown: [{ label: "2×5", points: 10 }, { label: "1×10", points: 10 }, { label: "3×K", points: 30 }], tichu: 100, grandTichu: null, total: 150 },
-        { playerId: '2', playerName: names[1] || 'Player 2', team: 2, breakdown: [{ label: "1×10", points: 10 }, { label: "2×K", points: 20 }], tichu: -100, grandTichu: null, total: -70 },
-        { playerId: '3', playerName: names[2] || 'Player 3', team: 1, breakdown: [{ label: "1×5", points: 5 }, { label: "1×Dragon", points: 25 }], tichu: null, grandTichu: null, total: 30 },
-        { playerId: '4', playerName: names[3] || 'Player 4', team: 2, breakdown: [{ label: "2×10", points: 20 }, { label: "1×Phoenix", points: -25 }], tichu: null, grandTichu: -200, total: -205 },
+        { playerId: '1', playerName: names[0] || 'Player 1', team: 1, placement: 1, breakdown: [], tichu: 100, grandTichu: null, total: 200 },
+        { playerId: '2', playerName: names[1] || 'Player 2', team: 1, placement: 2, breakdown: [], tichu: null, grandTichu: 200, total: 200 },
+        { playerId: '3', playerName: names[2] || 'Player 3', team: 2, placement: 3, breakdown: [], tichu: null, grandTichu: null, total: 0 },
+        { playerId: '4', playerName: names[3] || 'Player 4', team: 2, placement: 4, breakdown: [], tichu: -100, grandTichu: null, total: -100 },
       ],
     },
     {
       round: 2,
       players: [
-        { playerId: '1', playerName: names[0] || 'Player 1', team: 1, breakdown: [{ label: "1×10", points: 10 }, { label: "2×K", points: 20 }], tichu: null, grandTichu: null, total: 30 },
-        { playerId: '2', playerName: names[1] || 'Player 2', team: 2, breakdown: [{ label: "3×5", points: 15 }, { label: "1×10", points: 10 }], tichu: 100, grandTichu: null, total: 125 },
-        { playerId: '3', playerName: names[2] || 'Player 3', team: 1, breakdown: [{ label: "1×Dragon", points: 25 }], tichu: null, grandTichu: 200, total: 225 },
-        { playerId: '4', playerName: names[3] || 'Player 4', team: 2, breakdown: [], tichu: -100, grandTichu: null, total: -100 },
+        { playerId: '1', playerName: names[0] || 'Player 1', team: 1, placement: 1, breakdown: [{ label: "2×5", points: 10 }, { label: "1×10", points: 10 }, { label: "3×K", points: 30 }], tichu: 100, grandTichu: null, total: 150 },
+        { playerId: '2', playerName: names[1] || 'Player 2', team: 2, placement: 2, breakdown: [{ label: "1×10", points: 10 }, { label: "2×K", points: 20 }], tichu: -100, grandTichu: null, total: -70 },
+        { playerId: '3', playerName: names[2] || 'Player 3', team: 1, placement: 3, breakdown: [{ label: "1×5", points: 5 }, { label: "1×Dragon", points: 25 }], tichu: null, grandTichu: null, total: 30 },
+        { playerId: '4', playerName: names[3] || 'Player 4', team: 2, placement: 4, breakdown: [{ label: "2×10", points: 20 }, { label: "1×Phoenix", points: -25 }], tichu: null, grandTichu: -200, total: -205 },
+      ],
+    },
+    {
+      round: 3,
+      doubleVictory: true,
+      players: [
+        { playerId: '1', playerName: names[0] || 'Player 1', team: 1, placement: 1, breakdown: [], tichu: 100, grandTichu: null, total: 200 },
+        { playerId: '2', playerName: names[1] || 'Player 2', team: 1, placement: 2, breakdown: [], tichu: null, grandTichu: 200, total: 200 },
+        { playerId: '3', playerName: names[2] || 'Player 3', team: 2, placement: 3, breakdown: [], tichu: null, grandTichu: null, total: 0 },
+        { playerId: '4', playerName: names[3] || 'Player 4', team: 2, placement: 4, breakdown: [], tichu: -100, grandTichu: null, total: -100 },
       ],
     },
   ];
 }
 
 function GameLogPanel({ game, playerId }) {
-  // Use server roundLog when it's an array. Missing/empty in real games → empty state; test game with no log → mock for testing.
+  // Use server roundLog when it's an array with entries. Empty in real games → empty state. Test game with no rounds yet → mock so Log tab shows sample (including double-victory row) for verification.
   const isTestGame = game?.players?.some((p) => p.isTestPlayer);
   const serverLog = game?.roundLog != null && Array.isArray(game.roundLog) ? game.roundLog : null;
+  const hasServerRounds = serverLog !== null && serverLog.length > 0;
   const roundLog =
-    serverLog !== null ? serverLog : isTestGame ? getMockRoundLog(game?.players) : [];
+    hasServerRounds ? serverLog : isTestGame ? getMockRoundLog(game?.players) : [];
   const isYou = (id) => id === playerId;
 
   return (
@@ -157,7 +169,15 @@ function GameLogPanel({ game, playerId }) {
                     <span className="drawer-log-player-team">Team {p.team}</span>
                   </div>
                   <div className="drawer-log-player-breakdown">
-                    {p.breakdown && p.breakdown.length > 0 ? (
+                    {entry.doubleVictory && (p.placement === 1 || p.placement === 2) ? (
+                      <span className="drawer-log-breakdown-item drawer-log-breakdown-item--placement">
+                        {p.placement === 1 ? '1st' : '2nd'}
+                      </span>
+                    ) : entry.doubleVictory && (p.placement === 3 || p.placement === 4) ? (
+                      <span className="drawer-log-breakdown-item drawer-log-breakdown-item--placement">
+                        {p.placement === 3 ? '3rd' : '4th'}
+                      </span>
+                    ) : p.breakdown && p.breakdown.length > 0 ? (
                       p.breakdown.map((item, i) => (
                         <span key={i} className="drawer-log-breakdown-item">
                           {item.label} ({item.points}){i < p.breakdown.length - 1 ? ',' : ''}
@@ -168,12 +188,12 @@ function GameLogPanel({ game, playerId }) {
                     )}
                     {p.tichu != null && (
                       <span className="drawer-log-breakdown-item drawer-log-breakdown-item--tichu">
-                        {p.breakdown?.length ? ', ' : ''}Tichu {p.tichu >= 0 ? `+${p.tichu}` : p.tichu}
+                        {(entry.doubleVictory && (p.placement === 1 || p.placement === 2)) || (entry.doubleVictory && (p.placement === 3 || p.placement === 4)) || (p.breakdown?.length) ? ', ' : ''}Tichu {p.tichu >= 0 ? `+${p.tichu}` : p.tichu}
                       </span>
                     )}
                     {p.grandTichu != null && (
                       <span className="drawer-log-breakdown-item drawer-log-breakdown-item--grand">
-                        {p.breakdown?.length || p.tichu != null ? ', ' : ''}Grand {p.grandTichu >= 0 ? `+${p.grandTichu}` : p.grandTichu}
+                        {(entry.doubleVictory && (p.placement === 1 || p.placement === 2)) || (entry.doubleVictory && (p.placement === 3 || p.placement === 4)) || p.breakdown?.length || p.tichu != null ? ', ' : ''}Grand {p.grandTichu >= 0 ? `+${p.grandTichu}` : p.grandTichu}
                       </span>
                     )}
                   </div>

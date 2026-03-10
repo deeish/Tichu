@@ -111,6 +111,19 @@ describe('Bug fixes (BUGS.md)', () => {
       expect(game.roundScores.team1).toBe(200);
       expect(game.roundScores.team2).toBe(0);
       expect(game.playersOut).toHaveLength(4); // p3, p4 added as last
+      // Log tab: double-victory round shows 1st/2nd and 3rd/4th with no card breakdown; only Tichu/Grand
+      expect(game.roundLog).toHaveLength(1);
+      expect(game.roundLog[0].doubleVictory).toBe(true);
+      const place1 = game.roundLog[0].players.find((p) => String(p.playerId) === 'p1');
+      const place2 = game.roundLog[0].players.find((p) => String(p.playerId) === 'p2');
+      const place3 = game.roundLog[0].players.find((p) => String(p.playerId) === 'p3');
+      const place4 = game.roundLog[0].players.find((p) => String(p.playerId) === 'p4');
+      expect(place1?.placement).toBe(1);
+      expect(place2?.placement).toBe(2);
+      expect(place1?.breakdown).toEqual([]);
+      expect(place2?.breakdown).toEqual([]);
+      expect(place3?.breakdown).toEqual([]);
+      expect(place4?.breakdown).toEqual([]);
     });
 
     test('double victory still ends round when player id types differ (playersOut vs players[].id)', () => {
