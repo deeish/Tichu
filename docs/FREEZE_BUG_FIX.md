@@ -73,9 +73,22 @@ So we didn’t change *what* we render; we changed *how urgent* that work is. Th
 | **Cause** | Too much urgent, synchronous work triggered by game-update (React render/layout/paint), plus a high rate of game-update events from the server. |
 | **Client fix** | Wrap **all** game-update apply paths in **`startTransition`** in `App.jsx` so React treats these updates as non-urgent and can keep the UI responsive. |
 | **Server fix** | **Throttle** `broadcastGameUpdate` per game (80 ms): emit immediately on first call, coalesce further calls into one emit when the timer fires; only delete the throttle entry when it’s still the same reference (race fix). |
+| **Permanent safeguard** | All full-game apply handlers (game-state, game-created, player-joined, game-started, player-left) use startTransition; normalizeGameState caps roundLog and playerStacks (see FINALLY_KILLING_THE_FREEZE_BUG.md). |
 
 The fix is in place in **App.jsx** (startTransition) and **socketHandlers.js** (throttle + `emitGameUpdateToAll`). Keeping this document and the comments in those files should prevent accidental reversion and make it clear why the code is structured this way.
 
+---
+
+## Permanent fix (see FINALLY_KILLING_THE_FREEZE_BUG.md)
+
+To ensure the freeze never comes back, we also:
+
+1. **All socket handlers that apply a full game** (game-state, game-created, player-joined, game-started, player-left) apply state inside **`startTransition`**, so Resync and lobby updates never block the main thread.
+2. **`normalizeGameState`** caps **roundLog** (e.g. last 80 entries) and **playerStacks[].cards** (e.g. 56 per stack) so clone and render never see unbounded arrays.
+
+The full plan, double-check table, and implementation order are in **docs/FINALLY_KILLING_THE_FREEZE_BUG.md**.
+
+---
 
 Simply what happen:
 The main issue was too much urgent work on the main thread: every game-update from the server caused an immediate setState and a full re-render of the game UI. When updates came in quickly, React kept doing heavy render/layout/paint work back-to-back, the main thread got blocked, and the tab froze. Fix: treat those updates as non-urgent with startTransition and send fewer of them by throttling on the server, so the main thread isn’t overloaded.

@@ -118,19 +118,23 @@ function appendRoundToLog(game, opts = {}) {
 function handlePlayerWin(game, playerId) {
   const player = game.players.find(p => p.id === playerId);
   
-  // Track that this player has gone out
-  if (!game.playersOut.includes(playerId)) {
+  // Track that this player has gone out. Use string comparison so we never push the same player twice
+  // when id type differs (e.g. socket id vs player.id), which would make playersOut.length === 3 and skip double-victory.
+  const playerIdStr = playerId != null ? String(playerId) : null;
+  const alreadyOut = playerIdStr != null && game.playersOut.some(id => id != null && String(id) === playerIdStr);
+  if (!alreadyOut) {
     game.playersOut.push(playerId);
   }
   
   // Double victory: team finishes 1st and 2nd -> +200, no card points, only Tichu applied
   // Trigger as soon as 2nd player goes out (even if their play is still in currentTrick)
   // Use string comparison so id type mismatch (e.g. socket id vs player.id) never skips round end (BUGS.md: round sometimes doesn't end)
+  // Match by p.id or p.socketId so we find the player even if playersOut holds the other identifier (e.g. after rejoin).
   if (game.playersOut.length === 2) {
     const firstId = game.playersOut[0] != null ? String(game.playersOut[0]) : null;
     const secondId = game.playersOut[1] != null ? String(game.playersOut[1]) : null;
-    const firstPlayer = firstId ? game.players.find(p => p.id != null && String(p.id) === firstId) : null;
-    const secondPlayer = secondId ? game.players.find(p => p.id != null && String(p.id) === secondId) : null;
+    const firstPlayer = firstId ? game.players.find(p => (p.id != null && String(p.id) === firstId) || (p.socketId != null && String(p.socketId) === firstId)) : null;
+    const secondPlayer = secondId ? game.players.find(p => (p.id != null && String(p.id) === secondId) || (p.socketId != null && String(p.socketId) === secondId)) : null;
 
     if (firstPlayer && secondPlayer && firstPlayer.team === secondPlayer.team) {
       // Clear current trick without assigning points (no card points in double victory)
@@ -191,7 +195,14 @@ function handlePlayerWin(game, playerId) {
   
   // Round ends when 3 of 4 have finished (tailender) OR when all 4 are out
   // BUGS.md: When P1,P2,P3 are out, round ends immediately; P4 cannot play more or claim points for cards in hand (discarded)
-  const playersWithCards = game.players.filter(p => !game.playersOut.includes(p.id));
+  // Use string comparison so id type mismatch never counts an out player as "with cards".
+  const outIds = (game.playersOut || []).map(id => (id != null ? String(id) : null)).filter(Boolean);
+  const outSetStr = new Set(outIds);
+  const playersWithCards = game.players.filter(p => {
+    const pid = p.id != null ? String(p.id) : null;
+    const sid = p.socketId != null ? String(p.socketId) : null;
+    return !(pid && outSetStr.has(pid)) && !(sid && outSetStr.has(sid));
+  });
   
   // Tailender: as soon as only one player has cards left, round ends. Resolve current trick (if any) to whoever is winning; P4's hand is discarded (not counted).
   if (playersWithCards.length === 1) {

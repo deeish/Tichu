@@ -20,9 +20,13 @@ const GAME_UPDATE_THROTTLE_MS = 90
 const MAX_TRICK_PLAYS = 20;
 const MAX_CARDS_PER_PLAY = 20;
 
+/** Freeze mitigation: cap roundLog and playerStacks so clone/render never see unbounded arrays (see docs/FINALLY_KILLING_THE_FREEZE_BUG.md). */
+const MAX_ROUND_LOG_ENTRIES = 80
+const MAX_STACK_CARDS = 56
+
 /**
  * Normalize critical game state so UI never sees undefined/invalid shapes (defensive, see docs/DEFENSIVE_GAME_STATE.md).
- * Also caps currentTrick and play.cards so setState never receives huge arrays that could freeze render.
+ * Also caps currentTrick, roundLog, and playerStacks so setState never receives huge arrays that could freeze render (see docs/FINALLY_KILLING_THE_FREEZE_BUG.md).
  */
 function normalizeGameState(game) {
   if (!game || typeof game !== 'object') return game
@@ -36,6 +40,19 @@ function normalizeGameState(game) {
   const turnLen = next.turnOrder?.length ?? 0
   if (turnLen > 0 && (typeof next.currentPlayerIndex !== 'number' || next.currentPlayerIndex < 0 || next.currentPlayerIndex >= turnLen)) {
     next.currentPlayerIndex = 0
+  }
+  if (Array.isArray(next.roundLog) && next.roundLog.length > MAX_ROUND_LOG_ENTRIES) {
+    next.roundLog = next.roundLog.slice(-MAX_ROUND_LOG_ENTRIES)
+  }
+  if (next.playerStacks && typeof next.playerStacks === 'object') {
+    const stacks = { ...next.playerStacks }
+    for (const key of Object.keys(stacks)) {
+      const stack = stacks[key]
+      if (stack && Array.isArray(stack.cards) && stack.cards.length > MAX_STACK_CARDS) {
+        stacks[key] = { ...stack, cards: stack.cards.slice(0, MAX_STACK_CARDS) }
+      }
+    }
+    next.playerStacks = stacks
   }
   return next
 }
@@ -137,29 +154,35 @@ function App() {
     })
 
     socket.on('game-created', (data) => {
-      const game = data?.game ? normalizeGameState(data.game) : data.game
-      setGameState(game)
-      setGameId(data.gameId)
-      const me = data.game?.players?.find((p) => p.token)
-      const myId = me?.id ?? socket.id
-      setPlayerId(myId)
-      if (data.playerToken) saveRejoinCreds(data.gameId, data.playerToken)
+      startTransition(() => {
+        const game = data?.game ? normalizeGameState(data.game) : data.game
+        setGameState(game)
+        setGameId(data.gameId)
+        const me = data.game?.players?.find((p) => p.token)
+        const myId = me?.id ?? socket.id
+        setPlayerId(myId)
+        if (data.playerToken) saveRejoinCreds(data.gameId, data.playerToken)
+      })
     })
 
     socket.on('player-joined', (data) => {
-      const game = data?.game ? normalizeGameState(data.game) : data.game
-      setGameState(game)
-      const gid = data.gameId ?? data.game?.id
-      setGameId(gid)
-      const me = data.game?.players?.find((p) => p.token)
-      const myId = me?.id ?? socket.id
-      setPlayerId(myId)
-      if (data.playerToken && gid) saveRejoinCreds(gid, data.playerToken)
+      startTransition(() => {
+        const game = data?.game ? normalizeGameState(data.game) : data.game
+        setGameState(game)
+        const gid = data.gameId ?? data.game?.id
+        setGameId(gid)
+        const me = data.game?.players?.find((p) => p.token)
+        const myId = me?.id ?? socket.id
+        setPlayerId(myId)
+        if (data.playerToken && gid) saveRejoinCreds(gid, data.playerToken)
+      })
     })
 
     socket.on('game-started', (data) => {
-      const game = data?.game ? normalizeGameState(data.game) : data.game
-      setGameState(game)
+      startTransition(() => {
+        const game = data?.game ? normalizeGameState(data.game) : data.game
+        setGameState(game)
+      })
     })
 
     socket.on('game-update', (data) => {
@@ -215,18 +238,24 @@ function App() {
       }
     })
 
+    // Apply in startTransition so Resync never blocks main thread (freeze fix; see docs/FINALLY_KILLING_THE_FREEZE_BUG.md).
+    // Phase 6 (Option A): skip applying game-state when a game-update is pending so we never overwrite newer state with stale game-state (desync fix).
     socket.on('game-state', (data) => {
       if (!data?.game || !Array.isArray(data.game?.players)) return
-      const nextGame = normalizeGameState(JSON.parse(JSON.stringify(data.game)))
-      const me = nextGame.players?.find((p) => p.token)
-      if (me && nextGame.id) {
-        saveRejoinCreds(nextGame.id, me.token)
-        setPlayerId(me.id)
-        setGameId(nextGame.id)
-      }
-      setGameStateRef.current(nextGame)
-      setGameStateVersion(v => v + 1)
-      setResyncVersion(v => v + 1)
+      if (pendingGameRef.current != null) return
+      const payload = data.game
+      startTransition(() => {
+        const nextGame = normalizeGameState(JSON.parse(JSON.stringify(payload)))
+        const me = nextGame.players?.find((p) => p.token)
+        if (me && nextGame.id) {
+          saveRejoinCreds(nextGame.id, me.token)
+          setPlayerId(me.id)
+          setGameId(nextGame.id)
+        }
+        setGameStateRef.current(nextGame)
+        setGameStateVersion(v => v + 1)
+        setResyncVersion(v => v + 1)
+      })
     })
 
     socket.on('player-won-round', () => {})
@@ -237,8 +266,10 @@ function App() {
     })
 
     socket.on('player-left', (data) => {
-      const game = data?.game ? normalizeGameState(data.game) : data.game
-      setGameState(game)
+      startTransition(() => {
+        const game = data?.game ? normalizeGameState(data.game) : data.game
+        setGameState(game)
+      })
     })
 
     socket.on('error', (data) => {
