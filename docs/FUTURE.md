@@ -1,7 +1,5 @@
-******* double check the dragon frontend and how it looks*******
+** double check the dragon frontend and how it looks**
 
-
--Add fly.io so the backend can run in multiple regions(mostly for soom)
 
 Might need to add:
 -if multiple people leave have them pick which seat to sit at instead of auto join

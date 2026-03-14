@@ -107,12 +107,13 @@ function App() {
   const [editingMyName, setEditingMyName] = useState(false)
   const [lobbyNameDraft, setLobbyNameDraft] = useState('')
 
-  // Pre-fill name on Join Party so new joiners (e.g. filling a disconnected slot) send their name
+  // Pre-fill name on Join Party from last saved name (only if it looks like a real name: 2+ chars)
   useEffect(() => {
     if (landingMode === 'join') {
       try {
         const saved = localStorage.getItem('tichu-player-name')
-        if (saved != null && saved !== '' && !playerName.trim()) setPlayerName(saved)
+        const trimmed = saved != null ? String(saved).trim() : ''
+        if (trimmed.length >= 2 && !playerName.trim()) setPlayerName(trimmed)
       } catch (_) {}
     }
   }, [landingMode])
