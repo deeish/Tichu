@@ -308,7 +308,11 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
     setHandOrderOverride(indices);
   }, [displayHand]);
 
-  const currentPlayer = game?.turnOrder?.[game?.currentPlayerIndex];
+  // When Dragon selection is pending, the dragon player is still "acting" until they choose; show their turn.
+  const turnOrderCurrent = game?.turnOrder?.[game?.currentPlayerIndex];
+  const currentPlayer = game?.dragonOpponentSelection
+    ? (game?.turnOrder ?? []).find((p) => p.id === game.dragonOpponentSelection?.playerId) ?? turnOrderCurrent
+    : turnOrderCurrent;
 
   const isBomb = useCallback(() => {
     if (selectedCards.length < 4) return false;
