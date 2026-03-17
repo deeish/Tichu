@@ -162,7 +162,7 @@ function GameLogPanel({ game, playerId }) {
           <section key={entry.round} className="drawer-log-round" aria-label={`Round ${entry.round}`}>
             <h4 className="drawer-log-round-title">Round {entry.round}</h4>
             <ul className="drawer-log-player-list">
-              {entry.players.map((p) => (
+              {(Array.isArray(entry.players) ? entry.players : []).map((p) => (
                 <li key={`${entry.round}-${p.playerId}`} className={isYou(p.playerId) ? 'drawer-log-player--you' : ''}>
                   <div className="drawer-log-player-header">
                     <span className="drawer-log-player-name">{p.playerName}</span>
@@ -260,10 +260,10 @@ function Drawer({ game, playerId, isConnected, socket, tableTheme = 'velvet', on
         </div>
         <div className="drawer-panel">
           {activeTab === 'Chat' && <ChatPanel playerId={playerId} players={game?.players} socket={socket} />}
-          {activeTab === 'Players' && game?.players && (
+          {activeTab === 'Players' && (game?.players ?? []).length > 0 && (
             <div className="drawer-panel-inner">
               <ul className="drawer-players">
-                {game.players.map((p) => (
+                {(game?.players ?? []).map((p) => (
                   <li key={p.id} className={p.id === playerId ? 'you' : ''}>
                     <span className="drawer-player-name">{p.name}</span>
                     <span className="drawer-player-team">Team {p.team}</span>

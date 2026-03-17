@@ -200,4 +200,25 @@ describe('Complete Round Completion', () => {
     expect(game.roundScores.team1).toBeGreaterThanOrEqual(200); // 200 base + any Tichu bonuses
     expect(game.roundScores.team2).toBeLessThanOrEqual(0); // 0 or negative (if Tichu penalties)
   });
+
+  test('double victory: round ends when second player goes out in sequence (real flow)', () => {
+    // Real flow: first player goes out, then second (same team) — round must end
+    game.playersOut = [];
+    game.hands.p1 = [];
+    game.hands.p2 = [];
+    game.hands.p3 = [createCard('K', 'hearts')];
+    game.hands.p4 = [createCard('Q', 'hearts')];
+
+    const r1 = handlePlayerWin(game, 'p1');
+    expect(game.playersOut).toEqual(['p1']);
+    expect(game.roundEnded).toBe(false);
+    expect(r1.doubleVictory).toBeUndefined();
+
+    const r2 = handlePlayerWin(game, 'p2');
+    expect(game.playersOut).toHaveLength(4); // p1, p2, then p3, p4 added in double-victory block
+    expect(r2.doubleVictory).toBe(true);
+    expect(game.roundEnded).toBe(true);
+    expect(game.state).toBe('round-ended');
+    expect(game.roundScores.team1).toBe(200);
+  });
 });

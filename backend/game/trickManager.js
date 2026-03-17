@@ -143,13 +143,16 @@ function winTrick(game, winnerId) {
   }
   
   // Add cards to winner's stack (not immediately scored - scored at round end)
-  // Skip if Dragon selection is pending
+  // Use canonical string key so scoring sums find the same stack (avoids points keyed under different id type)
   if (!game.dragonOpponentSelection) {
-    if (!game.playerStacks[actualWinnerId]) {
-      game.playerStacks[actualWinnerId] = { cards: [], points: 0 };
+    const stackKey = actualWinnerId != null ? String(actualWinnerId) : null;
+    if (stackKey) {
+      if (!game.playerStacks[stackKey]) {
+        game.playerStacks[stackKey] = { cards: [], points: 0 };
+      }
+      game.playerStacks[stackKey].cards.push(...trickCards);
+      game.playerStacks[stackKey].points += trickPoints;
     }
-    game.playerStacks[actualWinnerId].cards.push(...trickCards);
-    game.playerStacks[actualWinnerId].points += trickPoints;
   }
   
   // Store trick (actualWinner will be set when Dragon opponent is selected)
@@ -213,14 +216,16 @@ function selectDragonOpponent(game, dragonPlayerId, selectedOpponentId) {
     return { success: false, error: 'Must select an opponent, not a teammate' };
   }
   
-  // Assign the trick to the selected opponent
+  // Assign the trick to the selected opponent (use canonical string key so scoring finds the stack)
   const { trickCards, trickPoints } = game.dragonOpponentSelection;
-  
-  if (!game.playerStacks[selectedOpponentId]) {
-    game.playerStacks[selectedOpponentId] = { cards: [], points: 0 };
+  const stackKey = selectedOpponentId != null ? String(selectedOpponentId) : null;
+  if (stackKey) {
+    if (!game.playerStacks[stackKey]) {
+      game.playerStacks[stackKey] = { cards: [], points: 0 };
+    }
+    game.playerStacks[stackKey].cards.push(...trickCards);
+    game.playerStacks[stackKey].points += trickPoints;
   }
-  game.playerStacks[selectedOpponentId].cards.push(...trickCards);
-  game.playerStacks[selectedOpponentId].points += trickPoints;
   
   // Update the most recent trick history with the actual winner
   if (game.trickHistory.length > 0) {

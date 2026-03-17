@@ -68,9 +68,11 @@ function initializeGame(game) {
   game.dragonOpponentSelection = null; // Track when Dragon player needs to choose opponent: { playerId, trickCards, trickPoints }
   game.dogPriorityPlayer = null; // Track player who has priority from Dog (cannot pass, must play)
   // Track per-player stacks (cards won in tricks) - only awarded at round end unless last place
+  // Use String(player.id) so scoring always finds the same stack (avoids id type mismatch when summing points)
   game.playerStacks = {}; // { playerId: { cards: [...], points: number } }
   game.players.forEach(player => {
-    game.playerStacks[player.id] = { cards: [], points: 0 };
+    const key = player.id != null ? String(player.id) : null;
+    if (key) game.playerStacks[key] = { cards: [], points: 0 };
   });
 
   // Cumulative stats across rounds (do not reset) - special cards at round start, bombs played, placement, points

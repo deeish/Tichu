@@ -9,7 +9,8 @@ function GameInfo({ game, currentPlayer, playerId, variant }) {
   if (!game) return null;
 
   const getPlayerName = (pid) => {
-    const player = game.players.find(p => p.id === pid);
+    const list = Array.isArray(game.players) ? game.players : [];
+    const player = list.find(p => p.id === pid);
     return player ? player.name : 'Unknown';
   };
 

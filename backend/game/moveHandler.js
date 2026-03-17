@@ -747,7 +747,14 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
     return winResult;
   }
-  
+
+  // When player went out by playing the Dog (last card): we skipped the block above so partner gets
+  // priority, but we must still record the win and end the round if team gets first/second (double victory).
+  if (hand.length === 0 && dogWasPlayed) {
+    const winResult = handlePlayerWin(game, playerId);
+    if (game.roundEnded) return { ...winResult, success: true, game, playerWon: true };
+  }
+
   // CRITICAL FIX: When a player plays (beats previous play), we need to advance to the NEXT player
   // who hasn't acted yet in this trick. We should NOT skip players who have passed (they already acted),
   // but we should find the next player who hasn't acted (not in passedPlayers and not in currentTrick).

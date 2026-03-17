@@ -548,14 +548,19 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
           </button>
         </>
       )}
-      {game.state === 'playing' && isMyTurn && !game.firstCardPlayed?.[playerId] && !game.grandTichuDeclarations?.[playerId] && (
+      {game?.state === 'playing' && isMyTurn && !game.firstCardPlayed?.[playerId] && !game.grandTichuDeclarations?.[playerId] && (
         <button
           type="button"
           className={`dock-btn dock-btn-secondary ${(optimisticTichu === true || (optimisticTichu !== false && game.tichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
           onClick={() => {
-            const declared = optimisticTichu === true || (optimisticTichu !== false && game.tichuDeclarations?.[playerId]);
-            setOptimisticTichu(!declared);
-            declared ? socket.emit('undeclare-tichu') : socket.emit('declare-tichu');
+            try {
+              const declared = optimisticTichu === true || (optimisticTichu !== false && game?.tichuDeclarations?.[playerId]);
+              setOptimisticTichu(!declared);
+              declared ? socket.emit('undeclare-tichu') : socket.emit('declare-tichu');
+            } catch (err) {
+              console.error('[GameBoard] Tichu button click', err);
+              reportClientError({ source: 'GameBoard', message: err?.message ?? String(err), stack: err?.stack, context: 'Tichu button' });
+            }
           }}
         >
           Tichu (+100)
@@ -809,8 +814,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
         <div className="prompt-strip">
           <p>Dragon — choose who receives the trick</p>
           <div className="prompt-actions">
-            {game.players
-              .filter((p) => p.id !== playerId && game.players.find((pl) => pl.id === playerId)?.team !== p.team)
+            {(game?.players ?? [])
+              .filter((p) => p.id !== playerId && (game?.players ?? []).find((pl) => pl.id === playerId)?.team !== p.team)
               .map((opp) => (
                 <button
                   key={opp.id}

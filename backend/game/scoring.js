@@ -8,6 +8,28 @@ const { getCurrentWinningPlay } = require('./trickManager');
 const { getCardPoints } = require('./deck');
 const { WINNING_SCORE } = require('../config/gameRules');
 
+/** Canonical key for playerStacks so points are never stored under one key and read under another (id type mismatch). */
+function stackKey(id) {
+  return id == null ? null : String(id);
+}
+
+/** Get a player's stack by id (tries both raw id and string key so we find the stack regardless of how it was keyed). */
+function getStack(game, id) {
+  if (id == null || !game.playerStacks) return null;
+  return game.playerStacks[id] || game.playerStacks[String(id)] || null;
+}
+
+/** Ensure a stack exists for id; return it. Uses canonical key so summing finds it. */
+function ensureStack(game, id) {
+  if (id == null) return null;
+  if (!game.playerStacks) game.playerStacks = {};
+  const key = stackKey(id);
+  if (!game.playerStacks[key]) {
+    game.playerStacks[key] = { cards: [], points: 0 };
+  }
+  return game.playerStacks[key];
+}
+
 /**
  * Build a human-readable point label for a card (for round log breakdown)
  */
@@ -47,7 +69,7 @@ function buildRoundLogEntry(game, opts = {}) {
     const pid = player.id != null ? String(player.id) : null;
     const gotFirst = firstPlaceId !== null && pid !== null && firstPlaceId === pid;
     const placement = placementByPlayerId[pid] ?? 0;
-    const stack = game.playerStacks && game.playerStacks[player.id] ? game.playerStacks[player.id] : { cards: [], points: 0 };
+    const stack = getStack(game, player.id) || { cards: [], points: 0 };
 
     // In double victory, no one gets card breakdown in the log (only 1st/2nd points and Tichu/Grand count)
     const breakdownMap = {};
@@ -113,19 +135,30 @@ function appendRoundToLog(game, opts = {}) {
 }
 
 /**
+ * Resolve to the canonical player object and stable id (so playersOut and lookups never miss due to id/socketId mismatch).
+ */
+function resolvePlayerAndId(game, playerId) {
+  if (playerId == null || !game.players) return { player: null, stableId: null };
+  const idStr = String(playerId);
+  const player = game.players.find(p =>
+    (p.id != null && String(p.id) === idStr) || (p.socketId != null && String(p.socketId) === idStr)
+  );
+  return { player, stableId: player ? (player.id != null ? player.id : playerId) : null };
+}
+
+/**
  * Handles when a player empties their hand
  */
 function handlePlayerWin(game, playerId) {
-  const player = game.players.find(p => p.id === playerId);
-  
-  // Track that this player has gone out. Use string comparison so we never push the same player twice
-  // when id type differs (e.g. socket id vs player.id), which would make playersOut.length === 3 and skip double-victory.
-  const playerIdStr = playerId != null ? String(playerId) : null;
+  const { player, stableId } = resolvePlayerAndId(game, playerId);
+
+  // Track that this player has gone out. Push stable id so double-victory lookup always finds first/second player.
+  const playerIdStr = stableId != null ? String(stableId) : (playerId != null ? String(playerId) : null);
   const alreadyOut = playerIdStr != null && game.playersOut.some(id => id != null && String(id) === playerIdStr);
-  if (!alreadyOut) {
-    game.playersOut.push(playerId);
+  if (!alreadyOut && (stableId != null || playerId != null)) {
+    game.playersOut.push(stableId != null ? stableId : playerId);
   }
-  
+
   // Double victory: team finishes 1st and 2nd -> +200, no card points, only Tichu applied
   // Trigger as soon as 2nd player goes out (even if their play is still in currentTrick)
   // Use string comparison so id type mismatch (e.g. socket id vs player.id) never skips round end (BUGS.md: round sometimes doesn't end)
@@ -136,7 +169,23 @@ function handlePlayerWin(game, playerId) {
     const firstPlayer = firstId ? game.players.find(p => (p.id != null && String(p.id) === firstId) || (p.socketId != null && String(p.socketId) === firstId)) : null;
     const secondPlayer = secondId ? game.players.find(p => (p.id != null && String(p.id) === secondId) || (p.socketId != null && String(p.socketId) === secondId)) : null;
 
-    if (firstPlayer && secondPlayer && firstPlayer.team === secondPlayer.team) {
+    if (process.env.DEBUG_TICHU_SCORING && (!firstPlayer || !secondPlayer || firstPlayer.team !== secondPlayer.team)) {
+      console.warn('[scoring] double-victory skipped: playersOut.length=2', {
+        firstId,
+        secondId,
+        firstFound: !!firstPlayer,
+        secondFound: !!secondPlayer,
+        team1: firstPlayer?.team,
+        team2: secondPlayer?.team
+      });
+    }
+
+    // Treat undefined team as same (default); only skip if explicitly different teams
+    const sameTeam = firstPlayer && secondPlayer && (
+      firstPlayer.team === secondPlayer.team ||
+      (firstPlayer.team == null && secondPlayer.team == null)
+    );
+    if (firstPlayer && secondPlayer && sameTeam) {
       // Clear current trick without assigning points (no card points in double victory)
       game.currentTrick = [];
       game.passedPlayers = [];
@@ -150,14 +199,13 @@ function handlePlayerWin(game, playerId) {
           outSet.add(String(p.id));
         }
         const remainingCards = game.hands[p.id] || [];
-        if (!game.playerStacks[p.id]) {
-          game.playerStacks[p.id] = { cards: [], points: 0 };
-        }
-        game.playerStacks[p.id].cards.push(...remainingCards);
+        const st = ensureStack(game, p.id);
+        if (st) st.cards.push(...remainingCards);
       });
       
       game.roundScores = { team1: 0, team2: 0 };
-      game.roundScores[`team${firstPlayer.team}`] = 200;
+      const winningTeam = firstPlayer.team != null ? firstPlayer.team : 1;
+      game.roundScores[`team${winningTeam}`] = 200;
       
       // Tichu/Grand Tichu: +100/+200 only if player got FIRST; otherwise -100/-200 (BUGS.md: can get negative points)
       const firstPlaceIdDouble = game.playersOut && game.playersOut[0] != null ? String(game.playersOut[0]) : null;
@@ -218,13 +266,13 @@ function handlePlayerWin(game, playerId) {
             trickPoints += getCardPoints(card);
           }
         }
-        if (!game.playerStacks[winnerId]) {
-          game.playerStacks[winnerId] = { cards: [], points: 0 };
+        const st = ensureStack(game, winnerId);
+        if (st) {
+          for (const play of game.currentTrick) {
+            st.cards.push(...play.cards);
+          }
+          st.points += trickPoints;
         }
-        for (const play of game.currentTrick) {
-          game.playerStacks[winnerId].cards.push(...play.cards);
-        }
-        game.playerStacks[winnerId].points += trickPoints;
       }
       game.currentTrick = [];
       game.passedPlayers = [];
@@ -249,13 +297,13 @@ function handlePlayerWin(game, playerId) {
             trickPoints += getCardPoints(card);
           }
         }
-        if (!game.playerStacks[winnerId]) {
-          game.playerStacks[winnerId] = { cards: [], points: 0 };
+        const st = ensureStack(game, winnerId);
+        if (st) {
+          for (const play of game.currentTrick) {
+            st.cards.push(...play.cards);
+          }
+          st.points += trickPoints;
         }
-        for (const play of game.currentTrick) {
-          game.playerStacks[winnerId].cards.push(...play.cards);
-        }
-        game.playerStacks[winnerId].points += trickPoints;
       }
       game.currentTrick = [];
       game.passedPlayers = [];
@@ -274,7 +322,7 @@ function handlePlayerWin(game, playerId) {
   function updatePlayerStatsForRoundEnd(game) {
     if (!game.playerStats || !game.playersOut || game.playersOut.length !== 4) return;
     for (const player of game.players) {
-      const stack = game.playerStacks[player.id];
+      const stack = getStack(game, player.id);
       if (stack && game.playerStats[player.id]) {
         game.playerStats[player.id].points = (game.playerStats[player.id].points || 0) + (stack.points || 0);
       }
@@ -304,26 +352,25 @@ function handlePlayerWin(game, playerId) {
   if (game.playersOut.length === 4) {
     const firstPlaceId = game.playersOut[0];
     const lastPlaceId = game.playersOut[3];
-    
-    if (game.playerStacks[lastPlaceId]) {
-      const lastPlacePoints = game.playerStacks[lastPlaceId].points || 0;
-      // Transfer ALL points from last to first (including negative points from Phoenix)
-      if (!game.playerStacks[firstPlaceId]) {
-        game.playerStacks[firstPlaceId] = { cards: [], points: 0 };
+    const lastStack = getStack(game, lastPlaceId);
+    if (lastStack) {
+      const lastPlacePoints = lastStack.points || 0;
+      const firstStack = ensureStack(game, firstPlaceId);
+      if (firstStack) {
+        firstStack.points += lastPlacePoints;
       }
-      game.playerStacks[firstPlaceId].points += lastPlacePoints;
-      game.playerStacks[lastPlaceId].points = 0; // Last place gets 0 points
+      lastStack.points = 0; // Last place gets 0 points
     }
   }
 
   updatePlayerStatsForRoundEnd(game);
   
-  // Calculate team scores from player stacks
+  // Calculate team scores from player stacks (use getStack so we find stacks regardless of key type)
   game.roundScores = { team1: 0, team2: 0 };
   for (const player of game.players) {
-    const stack = game.playerStacks[player.id];
-    if (stack) {
-      game.roundScores[`team${player.team}`] += stack.points;
+    const stack = getStack(game, player.id);
+    if (stack && (stack.points != null)) {
+      game.roundScores[`team${player.team}`] += (stack.points || 0);
     }
   }
   

@@ -67,4 +67,62 @@ class GameErrorBoundary extends Component {
   }
 }
 
+/**
+ * Root-level error boundary. Catches any render error in the app (including outside the game).
+ * Shows a full-page fallback with "Refresh page" so the user never needs to kill the tab or restart the machine.
+ */
+class RootErrorBoundary extends Component {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    const payload = {
+      source: 'RootErrorBoundary',
+      message: error?.message ?? String(error),
+      stack: error?.stack,
+      componentStack: errorInfo?.componentStack,
+    };
+    console.error('[RootErrorBoundary]', payload);
+    this.props.onError?.(payload);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '1rem',
+          padding: '2rem',
+          textAlign: 'center',
+          color: '#fff',
+          background: 'rgba(0,0,0,0.92)',
+          fontFamily: 'system-ui, sans-serif',
+          boxSizing: 'border-box',
+        }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Something went wrong</h2>
+          <p style={{ margin: 0, maxWidth: 360, opacity: 0.9 }}>
+            Refresh the page to recover — you don&apos;t need to close the tab or restart.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{ padding: '0.6rem 1.2rem', cursor: 'pointer', fontSize: '1rem', borderRadius: 6, border: 'none', background: '#4a9', color: '#fff' }}
+          >
+            Refresh page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default GameErrorBoundary;
+export { RootErrorBoundary };

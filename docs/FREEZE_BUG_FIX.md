@@ -84,7 +84,8 @@ The fix is in place in **App.jsx** (startTransition) and **socketHandlers.js** (
 To ensure the freeze never comes back, we also:
 
 1. **All socket handlers that apply a full game** (game-state, game-created, player-joined, game-started, player-left) apply state inside **`startTransition`**, so Resync and lobby updates never block the main thread.
-2. **`normalizeGameState`** caps **roundLog** (e.g. last 80 entries) and **playerStacks[].cards** (e.g. 56 per stack) so clone and render never see unbounded arrays.
+2. **`normalizeGameState`** caps **roundLog** (last 80), **playerStacks[].cards** (56), **hands** (56 per player), and **trickHistory** (last 100) so clone and render never see unbounded arrays.
+3. **Normalize before clone:** For **game-state** and **game-update**, we call **`normalizeGameState(payload)` first**, then inside `startTransition` we **deep-clone the normalized result** only. That way the main thread never runs `JSON.parse(JSON.stringify(...))` on an unbounded payload (which was still causing freezes when roundLog/hands/trickHistory were large).
 
 The full plan, double-check table, and implementation order are in **docs/FINALLY_KILLING_THE_FREEZE_BUG.md**.
 

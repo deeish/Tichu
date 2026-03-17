@@ -280,10 +280,41 @@ describe('Bug fixes (BUGS.md)', () => {
       expect(dogResult.success).toBe(true);
       expect(game.dogPriorityPlayer).toBe('p2'); // P1's partner
       expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p2');
+      // P1 played Dog as last card so they went out (recorded); trick still has the Dog for partner to play
+      expect(game.playersOut).toContain('p1');
+      expect(game.currentTrick.length).toBe(1);
 
       const pairResult = makeMove(game, 'p2', [createCard('5', 'hearts'), createCard('5', 'spades')], 'play');
       expect(pairResult.success).toBe(true);
-      expect(game.currentTrick.length).toBe(2); // Dog + pair
+      // P2 went out too: same team 1st+2nd → double victory, round ends, trick is cleared
+      expect(game.roundEnded).toBe(true);
+      expect(game.state).toBe('round-ended');
+      expect(game.roundScores.team1).toBe(200);
+    });
+
+    test('Going out with Dog as last card when teammate already out ends round (double victory)', () => {
+      // User scenario: teammate already finished (first out), player plays Dog as last card → round must end
+      const game = createTestGame({
+        state: 'playing',
+        currentTrick: [],
+        passedPlayers: [],
+        leadPlayer: 'p1',
+        currentPlayerIndex: 0,
+        playersOut: ['p2'], // teammate already first out
+        hands: {
+          p1: [createSpecialCard('dog')],
+          p2: [],
+          p3: [createCard('K', 'hearts')],
+          p4: [createCard('A', 'hearts')]
+        }
+      });
+      const result = makeMove(game, 'p1', [createSpecialCard('dog')], 'play');
+      expect(result.success).toBe(true);
+      expect(game.playersOut).toContain('p1');
+      expect(game.playersOut).toContain('p2');
+      expect(game.roundEnded).toBe(true);
+      expect(game.state).toBe('round-ended');
+      expect(game.roundScores.team1).toBe(200);
     });
 
     test('Dog priority player cannot pass', () => {

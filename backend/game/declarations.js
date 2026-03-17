@@ -74,12 +74,18 @@ function declareTichu(game, playerId) {
     return { success: false, error: 'Tichu can only be declared when playing your first card' };
   }
 
-  // Check if it's player's turn
-  const currentPlayer = game.turnOrder[game.currentPlayerIndex];
-  if (currentPlayer.id !== playerId) {
+  // Check if it's player's turn (defensive: turnOrder/currentPlayerIndex may be missing in edge cases)
+  const turnOrder = game.turnOrder;
+  const idx = game.currentPlayerIndex;
+  if (!Array.isArray(turnOrder) || turnOrder.length === 0 || typeof idx !== 'number' || idx < 0 || idx >= turnOrder.length) {
+    return { success: false, error: 'Invalid turn state' };
+  }
+  const currentPlayer = turnOrder[idx];
+  if (!currentPlayer || currentPlayer.id !== playerId) {
     return { success: false, error: 'Can only declare Tichu on your turn' };
   }
 
+  game.tichuDeclarations = game.tichuDeclarations || {};
   game.tichuDeclarations[playerId] = true;
   return { success: true, game };
 }
@@ -97,8 +103,13 @@ function undeclareTichu(game, playerId) {
   if (game.firstCardPlayed[playerId]) {
     return { success: false, error: 'Cannot undeclare Tichu after playing a card' };
   }
-  const currentPlayer = game.turnOrder[game.currentPlayerIndex];
-  if (currentPlayer.id !== playerId) {
+  const turnOrder = game.turnOrder;
+  const idx = game.currentPlayerIndex;
+  if (!Array.isArray(turnOrder) || turnOrder.length === 0 || typeof idx !== 'number' || idx < 0 || idx >= turnOrder.length) {
+    return { success: false, error: 'Invalid turn state' };
+  }
+  const currentPlayer = turnOrder[idx];
+  if (!currentPlayer || currentPlayer.id !== playerId) {
     return { success: false, error: 'Can only undeclare Tichu on your turn' };
   }
   delete game.tichuDeclarations[playerId];

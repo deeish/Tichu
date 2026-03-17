@@ -16,6 +16,7 @@ const {
   selectDragonOpponent,
   getPlayerView
 } = require('../game/gameState');
+const { capGameForWire } = require('../game/capGameForWire');
 const { getBotMove, getDragonOpponentChoice } = require('../game/simpleBot');
 const { assignRandomTeamsToGame, startGame, generateGameId } = require('./gameManager');
 
@@ -218,6 +219,7 @@ function setupSocketHandlers(io, games, players) {
       const gameAfter = games.get(playerInfo.gameId);
       if (gameAfter) {
         const hostView = getPlayerView(gameAfter, socket.id);
+        capGameForWire(hostView);
         socket.emit('game-update', { game: hostView });
       }
     });
@@ -242,7 +244,11 @@ function setupSocketHandlers(io, games, players) {
       player.name = name;
       players.set(socket.id, { gameId: playerInfo.gameId, playerName: name });
       game.players.forEach((p) => {
-        if (p.socketId) io.to(p.socketId).emit('game-state', { game: getPlayerView(game, p.socketId) });
+        if (p.socketId) {
+          const view = getPlayerView(game, p.socketId);
+          capGameForWire(view);
+          io.to(p.socketId).emit('game-state', { game: view });
+        }
       });
     });
 
@@ -271,7 +277,9 @@ function setupSocketHandlers(io, games, players) {
       console.log('[set-player-team] updated', player.name, 'to team', t);
       game.players.forEach((p) => {
         if (p.socketId) {
-          io.to(p.socketId).emit('game-state', { game: getPlayerView(game, p.socketId) });
+          const view = getPlayerView(game, p.socketId);
+          capGameForWire(view);
+          io.to(p.socketId).emit('game-state', { game: view });
         }
       });
     });
@@ -286,7 +294,11 @@ function setupSocketHandlers(io, games, players) {
       if (game.players.length !== 4) return;
       assignRandomTeamsToGame(game);
       game.players.forEach((p) => {
-        if (p.socketId) io.to(p.socketId).emit('game-state', { game: getPlayerView(game, p.socketId) });
+        if (p.socketId) {
+          const view = getPlayerView(game, p.socketId);
+          capGameForWire(view);
+          io.to(p.socketId).emit('game-state', { game: view });
+        }
       });
     });
 
@@ -345,6 +357,7 @@ function setupSocketHandlers(io, games, players) {
       players.set(socket.id, { gameId, playerName: player.name });
       socket.join(gameId);
       const view = getPlayerView(game, socket.id);
+      capGameForWire(view);
       socket.emit('game-state', { game: view });
       broadcastGameUpdate(io, game);
       console.log('Player rejoined:', player.name, socket.id, 'game', gameId);
@@ -689,6 +702,7 @@ function setupSocketHandlers(io, games, players) {
       if (!game) return;
       
       const playerView = getPlayerView(game, socket.id);
+      capGameForWire(playerView);
       socket.emit('game-state', { game: playerView });
     });
 
@@ -715,6 +729,7 @@ function emitGameUpdateToAll(io, game) {
   game.players.forEach((player) => {
     if (player.socketId) {
       const playerView = getPlayerView(game, player.socketId);
+      capGameForWire(playerView);
       io.to(player.socketId).emit('game-update', { game: playerView });
     }
   });
