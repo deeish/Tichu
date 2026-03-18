@@ -643,6 +643,7 @@ function App() {
   }
 
   if (inActiveGame) {
+    const gameEnded = gameState?.state === 'finished';
     return (
       <div className="game-fade-in">
         {protocolMismatch && (
@@ -660,6 +661,15 @@ function App() {
             Protocol mismatch detected. Syncing latest game state…
           </div>
         )}
+        {gameEnded && (
+          <button
+            type="button"
+            className="game-stats-btn"
+            onClick={() => setShowStatsPopup(true)}
+          >
+            View stats
+          </button>
+        )}
         <GameErrorBoundary
           onError={(payload) => reportClientError(payload)}
           onResync={handleResyncGame}
@@ -673,6 +683,14 @@ function App() {
             onResyncGame={handleResyncGame}
           />
         </GameErrorBoundary>
+        {gameEnded && (
+          <StatsPopup
+            open={showStatsPopup}
+            onClose={() => setShowStatsPopup(false)}
+            players={gameState.players}
+            game={gameState}
+          />
+        )}
       </div>
     );
   }

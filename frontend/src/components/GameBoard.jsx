@@ -964,7 +964,6 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
           socket={socket}
           tableTheme={tableTheme}
           onTableThemeChange={handleTableThemeChange}
-          onResync={onResyncGame}
         />
     </div>
   );
