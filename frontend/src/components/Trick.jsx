@@ -1,8 +1,12 @@
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import Card from './Card';
 import { getWonPileCardSize } from '../styles/layoutTokens';
 import './Trick.css';
 
 function Trick({ trick, players, containerWidth = 1440 }) {
+  const playsScrollRef = useRef(null);
+  const userNearBottomRef = useRef(true);
+
   if (!trick || !Array.isArray(trick) || trick.length === 0) {
     return (
       <div className="trick empty">
@@ -22,7 +26,8 @@ function Trick({ trick, players, containerWidth = 1440 }) {
   const MAX_CARDS_PER_PLAY = 14;
   const safePlays = trick
     .filter((play) => play && play.playerId != null && Array.isArray(play.cards) && play.cards.length > 0)
-    .slice(0, MAX_PLAYS)
+    // Keep the *latest* plays so the bottom of the trick matches the newest input.
+    .slice(-MAX_PLAYS)
     .map((play) => ({
       ...play,
       cards: play.cards.slice(0, MAX_CARDS_PER_PLAY),
@@ -38,10 +43,46 @@ function Trick({ trick, players, containerWidth = 1440 }) {
     );
   }
 
+  // Auto-scroll so the latest played cards stay visible.
+  // Only force-scroll if the user is already near the bottom (prevents hijacking manual scroll).
+  const lastPlay = safePlays[safePlays.length - 1];
+  const lastCard = lastPlay?.cards?.[0] || null;
+  const lastCardKey = lastCard ? `${lastCard.type || ''}-${lastCard.name || ''}-${lastCard.rank || ''}` : 'none';
+  const lastPlaySignature = lastPlay
+    ? `${trick.length}-${lastPlay.playerId}-${lastPlay.cards.length}-${lastPlay._omitted || 0}-${lastCardKey}`
+    : `${trick.length}-none`;
+
+  // Track whether the user is at/near the bottom via scroll events.
+  // This avoids the common "scrollHeight increased after new render" problem where we can't tell
+  // whether they were at the bottom before the new cards arrived.
+  useEffect(() => {
+    const el = playsScrollRef.current;
+    if (!el) return;
+
+    const updateNearBottom = () => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      userNearBottomRef.current = distanceFromBottom < 16;
+    };
+
+    updateNearBottom();
+    el.addEventListener('scroll', updateNearBottom, { passive: true });
+    return () => el.removeEventListener('scroll', updateNearBottom);
+  }, []);
+
+  // On trick update, auto-scroll if the user was previously near the bottom.
+  useLayoutEffect(() => {
+    const el = playsScrollRef.current;
+    if (!el) return;
+
+    if (userNearBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [lastPlaySignature]);
+
   return (
     <div className="trick">
       <h3>Current Trick</h3>
-      <div className="trick-plays">
+      <div className="trick-plays" ref={playsScrollRef}>
         {safePlays.map((play, index) => (
           <div key={`${play.playerId}-${index}`} className="trick-play">
             <div className="play-player">{getPlayerName(play.playerId)}</div>
