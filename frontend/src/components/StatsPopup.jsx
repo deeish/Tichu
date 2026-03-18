@@ -45,7 +45,10 @@ function StatsPopup({ open, onClose, players = [], game = null }) {
   if (!open) return null
 
   const playerStats = game?.playerStats || null
-  const list = players.length ? players : [{ id: '1', name: 'Player 1' }, { id: '2', name: 'Player 2' }, { id: '3', name: 'Player 3' }, { id: '4', name: 'Player 4' }]
+  const safePlayers = Array.isArray(players) ? players : []
+  const list = safePlayers.length
+    ? safePlayers
+    : [{ id: '1', name: 'Player 1' }, { id: '2', name: 'Player 2' }, { id: '3', name: 'Player 3' }, { id: '4', name: 'Player 4' }]
   const rows = list.map((p) => buildRow(p, playerStats))
 
   return (

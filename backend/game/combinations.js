@@ -11,8 +11,31 @@ const { getCardValue } = require('./deck');
  * @returns {Object} { valid: boolean, type: string, error: string }
  */
 function validateCombination(cards) {
-  if (!cards || cards.length === 0) {
+  if (!Array.isArray(cards) || cards.length === 0) {
     return { valid: false, error: 'No cards provided' };
+  }
+
+  const isValidStandardCard = (c) =>
+    c != null &&
+    typeof c === 'object' &&
+    c.type === 'standard' &&
+    typeof c.rank === 'string' &&
+    typeof c.suit === 'string';
+
+  const isValidSpecialCard = (c) =>
+    c != null &&
+    typeof c === 'object' &&
+    c.type === 'special' &&
+    typeof c.name === 'string' &&
+    // Special cards supported by the ruleset/validator
+    ['phoenix', 'mahjong', 'dog', 'dragon'].includes(c.name);
+
+  // Card-element-shape safety: never allow malformed elements into the validator.
+  // This prevents runtime throws from downstream logic (e.g. c.rank/c.name reads).
+  for (const c of cards) {
+    if (isValidStandardCard(c)) continue;
+    if (isValidSpecialCard(c)) continue;
+    return { valid: false, error: 'Invalid card element' };
   }
 
   // Single card
@@ -394,6 +417,11 @@ function validateStraightFlush(cards) {
  * @returns {number} -1 if combo1 < combo2, 0 if equal, 1 if combo1 > combo2
  */
 function compareCombinations(combo1, combo2) {
+  // Defensive: comparison should never throw on missing/invalid combo shapes.
+  if (!combo1 || !combo2 || typeof combo1 !== 'object' || typeof combo2 !== 'object') return null;
+  if (!Array.isArray(combo1.cards) && combo1.type === 'single') return null;
+  if (!Array.isArray(combo2.cards) && combo2.type === 'single') return null;
+
   // Bombs beat everything except higher bombs
   if (combo1.type === 'bomb' && combo2.type !== 'bomb') return 1;
   if (combo2.type === 'bomb' && combo1.type !== 'bomb') return -1;

@@ -384,9 +384,9 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
         }
         
         if (leadPlayerIndex !== -1 && nextPlayerIndex === leadPlayerIndex) {
-          const bombWinnerId = game.leadPlayer;
-          const trickResult = winTrick(game, bombWinnerId);
-          return { ...trickResult, ...winResult, bombPlayed: true, playerWon: true, newTrick: true };
+          // Do not force-end the trick here during bomb continuation.
+          // Other players must still be able to pass/respond; the normal trick
+          // resolution path will handle it.
         }
         
         nextPlayerIndex = (nextPlayerIndex + 1) % game.turnOrder.length;
@@ -468,10 +468,12 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   }
 
   // Phoenix as single: value = last card played + 0.5 (or 1.5 if led). Must be set before "must beat" comparison.
+  let computedPhoenixValue = null
   if (validation.type === 'single' && cards[0].name === 'phoenix') {
     const phoenixValue = getPhoenixValue(cards[0], game.currentTrick);
     cards[0].phoenixValue = phoenixValue;
     validation.phoenixValue = phoenixValue;
+    computedPhoenixValue = phoenixValue;
   }
 
   // If there's a current trick, validate the move beats the CURRENT HIGHEST play
@@ -605,6 +607,13 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
   }
   const cardsForTrick = removedCards.length === cards.length ? removedCards : cards;
+
+  // Ensure the canonical card objects stored in the trick carry phoenixValue.
+  if (computedPhoenixValue != null) {
+    for (const c of cardsForTrick) {
+      if (c && c.name === 'phoenix') c.phoenixValue = computedPhoenixValue;
+    }
+  }
 
   // Mark that player has played their first card (can no longer declare Tichu)
   if (!game.firstCardPlayed[playerId]) {

@@ -29,9 +29,25 @@ function exchangeCards(game, playerId, cardsToExchange) {
   if (game.state !== 'exchanging') {
     return { success: false, error: 'Not the exchange phase' };
   }
+
+  // Card input shape safety: reject malformed payloads without throwing.
+  const isValidStandardCard = (c) =>
+    c != null && typeof c === 'object' && c.type === 'standard' && typeof c.rank === 'string' && typeof c.suit === 'string';
+
+  const isValidSpecialCard = (c) =>
+    c != null && typeof c === 'object' && c.type === 'special' && typeof c.name === 'string' && ['phoenix', 'mahjong', 'dog', 'dragon'].includes(c.name);
+
+  if (!Array.isArray(cardsToExchange)) {
+    return { success: false, error: 'Invalid cards payload' };
+  }
   
   if (cardsToExchange.length !== 3) {
     return { success: false, error: 'Must exchange exactly 3 cards' };
+  }
+
+  for (const c of cardsToExchange) {
+    if (isValidStandardCard(c) || isValidSpecialCard(c)) continue;
+    return { success: false, error: 'Invalid card element' };
   }
   
   const player = game.players.find(p => p.id === playerId);

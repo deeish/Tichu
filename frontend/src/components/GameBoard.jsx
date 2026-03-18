@@ -7,7 +7,7 @@ import HandDock from './HandDock';
 import HandErrorBoundary from './HandErrorBoundary';
 import { sortCardsByRank, cardKey, isValidCard } from '../utils/cardUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
-import { reportClientError } from '../clientErrorReport';
+import { reportClientError, setClientCorrelation } from '../clientErrorReport';
 import {
   getDockHeight,
   getCenterRect,
@@ -114,11 +114,20 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
 
   // Clear selection only when phase changes or selected cards no longer in hand.
   // Use stable hand signature so this effect doesn't run on every game-update (avoids flicker).
-  const myHand = game?.hands?.[playerId] || [];
+  const myHand = Array.isArray(game?.hands?.[playerId]) ? game?.hands?.[playerId] : [];
   const handSignature = useMemo(
     () => (game?.state === 'playing' || game?.state === 'exchanging' ? `${myHand.length}:${myHand.map(cardKey).join(',')}` : ''),
     [game?.state, myHand]
   );
+  const onResyncGameRef = useRef(onResyncGame)
+  const actionSeqRef = useRef(0)
+  const nextActionId = () => {
+    actionSeqRef.current += 1
+    return `${Date.now()}-${actionSeqRef.current}`
+  }
+  useEffect(() => {
+    onResyncGameRef.current = onResyncGame
+  }, [onResyncGame])
   useEffect(() => {
     if (game?.state !== 'playing' && game?.state !== 'exchanging') {
       setSelectedCards([]);
@@ -135,7 +144,15 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
           h.type === c.type &&
           (h.type === 'standard' ? h.suit === c.suit && h.rank === c.rank : h.name === c.name)
       );
-    setSelectedCards((prev) => prev.filter(stillInHand));
+    setSelectedCards((prev) => {
+      const next = prev.filter(stillInHand);
+      // Likely desync: we still had a selection but it no longer exists in our current hand.
+      // Trigger a full state refresh (with backoff implemented in App.jsx).
+      if (game?.state === 'playing' && prev.length > 0 && next.length !== prev.length) {
+        onResyncGameRef.current?.('desync-selected-not-in-hand');
+      }
+      return next;
+    });
   }, [game?.state, handSignature]);
 
   useEffect(() => {
@@ -271,7 +288,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
 
   const orderedHand = useMemo(() => {
     if (!displayHand?.length) return displayHand;
-    if (!handOrderOverride?.length) return displayHand;
+    if (!Array.isArray(handOrderOverride) || handOrderOverride.length === 0) return displayHand;
     // handOrderOverride is an array of indices into displayHand (preserves duplicate cards)
     const n = displayHand.length;
     if (handOrderOverride.length !== n) return displayHand;
@@ -453,6 +470,13 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
 
   const handlePlayCards = () => {
     if (selectedCards.length === 0) return;
+    const myHandArr = Array.isArray(myHand) ? myHand : [];
+    const allInHand = selectedCards.every((sc) => myHandArr.some((h) => cardMatches(h, sc)));
+    if (!allInHand) {
+      setSelectedCards([]);
+      onResyncGame?.();
+      return;
+    }
     const hasMahJong = selectedCards.some((c) => c.name === 'mahjong');
     const isSingle = selectedCards.length === 1;
     const isFirstTrick = !game?.currentTrick?.length;
@@ -460,7 +484,11 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
       setShowWishInput(true);
       return;
     }
+    const actionId = nextActionId();
+    setClientCorrelation({ requestId: actionId, actionId });
     socket.emit('make-move', {
+      requestId: actionId,
+      actionId,
       cards: selectedCards,
       action: 'play',
       mahJongWish: hasMahJong && isSingle && isFirstTrick ? mahJongWish : null,
@@ -471,12 +499,20 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
   };
 
   const handlePass = () => {
-    socket.emit('make-move', { cards: [], action: 'pass' });
+    const actionId = nextActionId()
+    setClientCorrelation({ requestId: actionId, actionId })
+    socket.emit('make-move', { requestId: actionId, actionId, cards: [], action: 'pass' });
   };
 
   const selectedIsBomb = isBomb();
+  const selectedStillInHand =
+    selectedCards.length === 0 ||
+    (Array.isArray(myHand) &&
+      myHand.length > 0 &&
+      selectedCards.every((sc) => myHand.some((h) => cardMatches(h, sc))));
   const canPlay =
     game?.state === 'playing' &&
+    selectedStillInHand &&
     selectedCards.length > 0 &&
     (isMyTurn || selectedIsBomb);
   const canPass = isMyTurn && game?.state === 'playing';
@@ -525,7 +561,9 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
           disabled={exchangeAssignments.some((x) => !x)}
           onClick={() => {
             if (exchangeAssignments.some((x) => !x)) return;
-            socket.emit('exchange-cards', exchangeAssignments);
+            const actionId = nextActionId()
+            setClientCorrelation({ requestId: actionId, actionId })
+            socket.emit('exchange-cards', { requestId: actionId, actionId, cards: exchangeAssignments });
             setExchangeSubmitted(true);
           }}
         >
@@ -535,7 +573,15 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
       {game.state === 'grand-tichu' && (!game.cardsRevealed?.[playerId] || game.grandTichuDeclarations?.[playerId]) && (
         <>
           {!game.cardsRevealed?.[playerId] && (
-            <button type="button" className="dock-btn dock-btn-secondary dock-btn-rail" onClick={() => socket.emit('reveal-remaining-cards')}>
+            <button
+              type="button"
+              className="dock-btn dock-btn-secondary dock-btn-rail"
+              onClick={() => {
+                const actionId = nextActionId()
+                setClientCorrelation({ requestId: actionId, actionId })
+                socket.emit('reveal-remaining-cards', { requestId: actionId, actionId })
+              }}
+            >
               Reveal cards
             </button>
           )}
@@ -543,9 +589,20 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
             type="button"
             className={`dock-btn dock-btn-primary ${(optimisticGrandTichu === true || (optimisticGrandTichu !== false && game.grandTichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
             onClick={() => {
-              const declared = optimisticGrandTichu === true || (optimisticGrandTichu !== false && game.grandTichuDeclarations?.[playerId]);
-              setOptimisticGrandTichu(!declared);
-              declared ? socket.emit('undeclare-grand-tichu') : socket.emit('declare-grand-tichu');
+              // Emit based on server truth to avoid stale-optimistic actions.
+              const serverDeclared = game?.grandTichuDeclarations?.[playerId] === true;
+              setOptimisticGrandTichu(!serverDeclared);
+              serverDeclared
+                ? (() => {
+                    const actionId = nextActionId()
+                    setClientCorrelation({ requestId: actionId, actionId })
+                    socket.emit('undeclare-grand-tichu', { requestId: actionId, actionId })
+                  })()
+                : (() => {
+                    const actionId = nextActionId()
+                    setClientCorrelation({ requestId: actionId, actionId })
+                    socket.emit('declare-grand-tichu', { requestId: actionId, actionId })
+                  })();
             }}
           >
             Grand Tichu (+200)
@@ -558,9 +615,18 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
           className={`dock-btn dock-btn-secondary ${(optimisticTichu === true || (optimisticTichu !== false && game.tichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
           onClick={() => {
             try {
-              const declared = optimisticTichu === true || (optimisticTichu !== false && game?.tichuDeclarations?.[playerId]);
-              setOptimisticTichu(!declared);
-              declared ? socket.emit('undeclare-tichu') : socket.emit('declare-tichu');
+              // Emit based on server truth to avoid stale-optimistic actions.
+              const serverDeclared = game?.tichuDeclarations?.[playerId] === true;
+              setOptimisticTichu(!serverDeclared);
+              if (serverDeclared) {
+                const actionId = nextActionId()
+                setClientCorrelation({ requestId: actionId, actionId })
+                socket.emit('undeclare-tichu', { requestId: actionId, actionId })
+              } else {
+                const actionId = nextActionId()
+                setClientCorrelation({ requestId: actionId, actionId })
+                socket.emit('declare-tichu', { requestId: actionId, actionId })
+              }
             } catch (err) {
               console.error('[GameBoard] Tichu button click', err);
               reportClientError({ source: 'GameBoard', message: err?.message ?? String(err), stack: err?.stack, context: 'Tichu button' });
@@ -744,7 +810,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
             >
               <div className={`play-mat-zone ${!game.currentTrick?.length ? 'empty' : ''}`}>
                 {game.currentTrick?.length ? (
-                  <Trick trick={game.currentTrick} players={game.players} containerWidth={containerWidth} />
+                  <Trick trick={Array.isArray(game.currentTrick) ? game.currentTrick : []} players={Array.isArray(game.players) ? game.players : []} containerWidth={containerWidth} />
                 ) : game?.state === 'exchanging' && !game.exchangeCards?.[playerId] ? (
                   <span className="play-mat-empty-msg play-mat-empty-msg--instruction">Drag a card to each player, or click to assign to next slot</span>
                 ) : game?.state === 'playing' && currentPlayer?.id === playerId && selectedCards.length === 0 ? (
@@ -825,7 +891,13 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
                   key={opp.id}
                   type="button"
                   className="dock-btn dock-btn-secondary"
-                  onClick={() => socket.emit('select-dragon-opponent', opp.id)}
+                  onClick={() =>
+                    (() => {
+                      const actionId = nextActionId()
+                      setClientCorrelation({ requestId: actionId, actionId })
+                      socket.emit('select-dragon-opponent', { requestId: actionId, actionId, selectedOpponentId: opp.id })
+                    })()
+                  }
                 >
                   Give to {opp.name}
                 </button>
@@ -837,7 +909,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
       <div className="hand-dock-wrapper">
         <HandErrorBoundary onError={(err, info) => reportClientError({ source: 'HandErrorBoundary', message: err?.message ?? String(err), stack: err?.stack, componentStack: info?.componentStack })}>
         <HandDock
-          cards={orderedHand}
+          cards={Array.isArray(orderedHand) ? orderedHand : []}
           selectedCards={game.state === 'exchanging' ? [] : selectedCards}
           selectionDisabled={game?.state === 'exchanging'}
           onCardClick={handleCardClick}

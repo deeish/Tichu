@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import '../styles/drawer.css';
+import { setClientCorrelation } from '../clientErrorReport';
 
 const TABS = ['Chat', 'Players', 'Log', 'Theme'];
 
@@ -47,7 +48,9 @@ function ChatPanel({ playerId, players, socket }) {
     e.preventDefault();
     const trimmed = message.trim();
     if (!trimmed || !socket) return;
-    socket.emit('chat-message', trimmed);
+    const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setClientCorrelation({ requestId });
+    socket.emit('chat-message', { text: trimmed, requestId });
     setMessage('');
     inputRef.current?.focus();
   };
