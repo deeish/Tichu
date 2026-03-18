@@ -56,6 +56,32 @@ describe('validateCombination', () => {
     });
   });
 
+  describe('Card element shape safety', () => {
+    test('should not throw and should reject when a card element is null', () => {
+      expect(() => validateCombination([null])).not.toThrow();
+      const result = validateCombination([null]);
+      expect(result.valid).toBe(false);
+    });
+
+    test('should not throw and should reject when a card element is missing fields', () => {
+      expect(() => validateCombination([{ type: 'standard', rank: 'K' }])).not.toThrow();
+      const result = validateCombination([{ type: 'standard', rank: 'K' }]);
+      expect(result.valid).toBe(false);
+    });
+
+    test('should not throw and should reject when a card element has wrong type fields', () => {
+      expect(() => validateCombination([{ type: 'special', name: 123 }])).not.toThrow();
+      const result = validateCombination([{ type: 'special', name: 123 }]);
+      expect(result.valid).toBe(false);
+    });
+
+    test('should not throw and should reject when cards is not an array', () => {
+      expect(() => validateCombination(null)).not.toThrow();
+      const result = validateCombination(null);
+      expect(result.valid).toBe(false);
+    });
+  });
+
   describe('Sequence of Pairs', () => {
     test('should validate Phoenix, Q, J, J as sequence of pairs', () => {
       const cards = [

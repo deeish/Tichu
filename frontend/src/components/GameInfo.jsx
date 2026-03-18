@@ -59,7 +59,9 @@ function GameInfo({ game, currentPlayer, playerId, variant }) {
         </div>
       </div>
 
-      {game.tichuDeclarations && Object.keys(game.tichuDeclarations).length > 0 && (
+      {game.tichuDeclarations &&
+        typeof game.tichuDeclarations === 'object' &&
+        Object.keys(game.tichuDeclarations).length > 0 && (
         <div className="declarations">
           <h4>Tichu Declarations:</h4>
           {Object.entries(game.tichuDeclarations).map(([pid, declared]) => (
@@ -72,7 +74,9 @@ function GameInfo({ game, currentPlayer, playerId, variant }) {
         </div>
       )}
 
-      {game.grandTichuDeclarations && Object.keys(game.grandTichuDeclarations).length > 0 && (
+      {game.grandTichuDeclarations &&
+        typeof game.grandTichuDeclarations === 'object' &&
+        Object.keys(game.grandTichuDeclarations).length > 0 && (
         <div className="declarations">
           <h4>Grand Declarations:</h4>
           {Object.entries(game.grandTichuDeclarations).map(([pid, declared]) => (

@@ -8,6 +8,7 @@
  */
 let socketRef = null;
 let crashOverlayShown = false;
+let currentCorrelation = { requestId: null, actionId: null };
 
 function getApiBase() {
   if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SOCKET_URL) {
@@ -17,11 +18,15 @@ function getApiBase() {
 }
 
 function sendToServer(payload) {
+  const resolvedRequestId = payload?.requestId ?? currentCorrelation.requestId;
+  const resolvedActionId = payload?.actionId ?? currentCorrelation.actionId;
   const full = {
     ...payload,
     source: payload.source ?? 'global',
     socketId: socketRef?.id ?? null,
     sentAt: new Date().toISOString(),
+    requestId: resolvedRequestId,
+    actionId: resolvedActionId,
   };
   if (socketRef?.connected) {
     try {
@@ -100,8 +105,15 @@ function initClientErrorReport(socket) {
   };
 }
 
+function setClientCorrelation({ requestId, actionId } = {}) {
+  currentCorrelation = {
+    requestId: requestId ?? currentCorrelation.requestId ?? null,
+    actionId: actionId ?? currentCorrelation.actionId ?? null,
+  };
+}
+
 function reportClientError(payload) {
   sendToServer(payload);
 }
 
-export { initClientErrorReport, reportClientError, showGlobalCrashOverlay };
+export { initClientErrorReport, reportClientError, showGlobalCrashOverlay, setClientCorrelation };

@@ -142,6 +142,20 @@ describe('Card Exchange', () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain('not in hand');
     });
+
+    test('should not throw and reject when cards payload contains malformed elements', () => {
+      expect(() => exchangeCards(game, 'p1', [null, undefined, { type: 'standard', rank: '2', suit: 'hearts' }])).not.toThrow();
+      const result = exchangeCards(game, 'p1', [null, undefined, { type: 'standard', rank: '2', suit: 'hearts' }]);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid card element');
+    });
+
+    test('should not throw and reject when cards payload is not an array', () => {
+      expect(() => exchangeCards(game, 'p1', null)).not.toThrow();
+      const result = exchangeCards(game, 'p1', null);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid cards payload');
+    });
   });
 
   describe('completeExchange', () => {

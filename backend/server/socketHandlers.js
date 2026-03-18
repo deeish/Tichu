@@ -17,6 +17,10 @@ const {
   getPlayerView
 } = require('../game/gameState');
 const { capGameForWire } = require('../game/capGameForWire');
+const { sanitizeWireSnapshot } = require('../game/sanitizeWireSnapshot');
+const { createActionDeduper } = require('./actionDeduper');
+const { createFixedWindowRateLimiter } = require('./simpleRateLimiter');
+const { createMetricsStore } = require('./metricsStore');
 const { getBotMove, getDragonOpponentChoice } = require('../game/simpleBot');
 const { assignRandomTeamsToGame, startGame, generateGameId } = require('./gameManager');
 
@@ -27,12 +31,74 @@ function generateId() {
 /** Per-game throttle for broadcastGameUpdate: at most one broadcast per game per BROADCAST_THROTTLE_MS. */
 const BROADCAST_THROTTLE_MS = 80;
 const gameUpdateThrottle = new Map(); // gameId -> { timerId, pending }
+const actionDeduper = createActionDeduper({ ttlMs: 30_000 });
+const gameStateVersionCounter = new Map(); // gameId -> monotonic counter
+const metricsStore = createMetricsStore();
+
+// G1: protect server from high-frequency event spam.
+// Keys are (socketId + ':' + eventName).
+const MAX_CARDS_PER_PLAY = 20;
+const makeMoveRateLimiter = createFixedWindowRateLimiter({ windowMs: 1500, max: 8 });
+const declarationRateLimiter = createFixedWindowRateLimiter({ windowMs: 1500, max: 4 });
+const getGameStateRateLimiter = createFixedWindowRateLimiter({ windowMs: 5000, max: 3 });
 
 /** Resolve socket to stable player id (for game logic). Returns null if not in game or disconnected. */
 function getPlayerIdInGame(game, socketId) {
   if (!game?.players) return null;
   const p = game.players.find((x) => x.socketId === socketId || x.id === socketId);
   return p && !p.disconnected ? p.id : null;
+}
+
+function emitStructuredSocketError(socket, eventName, err, context) {
+  const message = 'Internal server error'
+  const code = 'internal_error'
+
+  // Server logs keep details; the client gets a stable, user-safe payload.
+  try {
+    console.error(
+      '\n********** SERVER HANDLER ERROR **********\n' +
+        `Socket: ${socket?.id ?? 'unknown'}\n` +
+        `Event: ${eventName}\n` +
+        (context ? `Context: ${JSON.stringify(context)}\n` : '') +
+        `Error: ${err?.message ?? String(err)}\n` +
+        (err?.stack ? err.stack : ''),
+    )
+  } catch (_) {}
+
+  try {
+    socket?.emit?.('error', { code, message })
+  } catch (_) {}
+}
+
+/**
+ * Wrap a socket handler so malformed payloads/unexpected logic errors can't crash the server.
+ */
+function safeSocketOn(socket, eventName, handler) {
+  socket.on(eventName, (...args) => {
+    try {
+      return handler(...args)
+    } catch (err) {
+      const first = Array.isArray(args) ? args[0] : null
+      const requestId = first && typeof first === 'object' ? first.requestId : undefined
+      const actionId = first && typeof first === 'object' ? first.actionId : undefined
+      emitStructuredSocketError(socket, eventName, err, {
+        argTypes: Array.isArray(args) ? args.map((a) => typeof a) : [],
+        requestId,
+        actionId,
+      })
+    }
+  })
+}
+
+function safeSetTimeout(socket, eventName, fn, ms, context) {
+  return setTimeout(() => {
+    try {
+      fn()
+    } catch (err) {
+      const ctx = context && typeof context === 'object' ? context : {}
+      emitStructuredSocketError(socket, eventName, err, ctx)
+    }
+  }, ms)
 }
 
 /**
@@ -42,14 +108,35 @@ function setupSocketHandlers(io, games, players) {
   io.on('connection', (socket) => {
     console.log('Player connected:', socket.id);
 
-    socket.on('create-game', (playerName) => {
+    const safeOn = (eventName, handler) => safeSocketOn(socket, eventName, handler);
+
+    function getCurrentStateVersion() {
+      const playerInfo = players.get(socket.id);
+      const game = playerInfo ? games.get(playerInfo.gameId) : null;
+      return typeof game?.stateVersion === 'number' ? game.stateVersion : null;
+    }
+
+    safeOn('create-game', (payloadOrPlayerName) => {
+      const playerName =
+        typeof payloadOrPlayerName === 'object' && payloadOrPlayerName != null
+          ? payloadOrPlayerName.playerName
+          : payloadOrPlayerName;
+      const cleanedName = typeof playerName === 'string' ? playerName.trim() : '';
+      if (!cleanedName) {
+        socket.emit('error', { code: 'bad_payload', message: 'Invalid playerName' });
+        return;
+      }
+      const protocolVersion = 1;
       const gameId = generateGameId();
+      gameStateVersionCounter.set(gameId, 0);
       const playerId = generateId();
       const token = generateId();
       const game = {
         id: gameId,
-        players: [{ id: playerId, socketId: socket.id, name: playerName, team: 1, token }],
+        protocolVersion,
+        players: [{ id: playerId, socketId: socket.id, name: cleanedName, team: 1, token }],
         state: 'waiting',
+        stateVersion: 0,
         deck: [],
         hands: {},
         currentTrick: [],
@@ -64,14 +151,25 @@ function setupSocketHandlers(io, games, players) {
       const roomAfter = io.sockets.adapter.rooms.get(gameId);
       const view = getPlayerView(game, socket.id);
       socket.emit('game-created', { gameId, game: view, playerToken: token });
-      console.log(`Game ${gameId} created by ${playerName} (${socket.id}). Sockets in room: ${roomAfter ? roomAfter.size : 0}`);
+      console.log(`Game ${gameId} created by ${cleanedName} (${socket.id}). Sockets in room: ${roomAfter ? roomAfter.size : 0}`);
     });
 
     // Test mode: Create game with 4 players immediately
-    socket.on('create-test-game', (playerName) => {
+    safeOn('create-test-game', (payloadOrPlayerName) => {
+      const playerName =
+        typeof payloadOrPlayerName === 'object' && payloadOrPlayerName != null
+          ? payloadOrPlayerName.playerName
+          : payloadOrPlayerName;
+      const cleanedName = typeof playerName === 'string' ? playerName.trim() : '';
+      if (!cleanedName) {
+        socket.emit('error', { code: 'bad_payload', message: 'Invalid playerName' });
+        return;
+      }
+      const protocolVersion = 1;
       const gameId = generateGameId();
+      gameStateVersionCounter.set(gameId, 0);
       const testPlayerNames = [
-        playerName || 'Player 1',
+        cleanedName || 'Player 1',
         'Test Player 2',
         'Test Player 3',
         'Test Player 4'
@@ -79,8 +177,10 @@ function setupSocketHandlers(io, games, players) {
       
       const game = {
         id: gameId,
+        protocolVersion,
         players: [],
         state: 'waiting',
+        stateVersion: 0,
         deck: [],
         hands: {},
         currentTrick: [],
@@ -124,14 +224,26 @@ function setupSocketHandlers(io, games, players) {
       console.log(`Test game ${gameId} created with 4 players (teams: ${teamAssignment.join(', ')})`);
     });
 
-    socket.on('join-game', ({ gameId, playerName }) => {
+    safeOn('join-game', (payload) => {
+      const body = payload && typeof payload === 'object' ? payload : null;
+      const gameId = body?.gameId;
+      const playerName = body?.playerName;
+      if (typeof gameId !== 'string' || !gameId.trim()) {
+        socket.emit('error', { code: 'bad_payload', message: 'Invalid gameId' });
+        return;
+      }
+      if (typeof playerName !== 'string' || !playerName.trim()) {
+        socket.emit('error', { code: 'bad_payload', message: 'Invalid playerName' });
+        return;
+      }
+
       const game = games.get(gameId);
       if (!game) {
         socket.emit('error', { message: 'Game not found' });
         return;
       }
 
-      const name = String(playerName || '').trim() || 'Player';
+      const name = playerName.trim();
       const disconnectedSlot = game.players.find((p) => p.disconnected);
 
       if (game.players.length >= 4 && !disconnectedSlot) {
@@ -181,7 +293,7 @@ function setupSocketHandlers(io, games, players) {
       socket.to(gameId).emit('player-joined', { player: { ...player, token: undefined }, game });
     });
 
-    socket.on('start-game', () => {
+    safeOn('start-game', () => {
       const playerInfo = players.get(socket.id);
       if (!playerInfo) {
         socket.emit('error', { message: 'Not in a game' });
@@ -220,11 +332,21 @@ function setupSocketHandlers(io, games, players) {
       if (gameAfter) {
         const hostView = getPlayerView(gameAfter, socket.id);
         capGameForWire(hostView);
+        sanitizeWireSnapshot(hostView);
         socket.emit('game-update', { game: hostView });
       }
     });
 
-    socket.on('update-player-name', (playerName) => {
+    safeOn('update-player-name', (payloadOrPlayerName) => {
+      const playerName =
+        typeof payloadOrPlayerName === 'object' && payloadOrPlayerName != null
+          ? payloadOrPlayerName.name
+          : payloadOrPlayerName;
+      const cleaned = typeof playerName === 'string' ? playerName.trim() : '';
+      if (!cleaned) {
+        socket.emit('error', { code: 'bad_payload', message: 'Invalid player name' });
+        return;
+      }
       const playerInfo = players.get(socket.id);
       if (!playerInfo) {
         socket.emit('error', { message: 'Not in a game' });
@@ -235,7 +357,7 @@ function setupSocketHandlers(io, games, players) {
         socket.emit('error', { message: 'Game not found or already started' });
         return;
       }
-      const name = String(playerName || '').trim() || 'Player';
+      const name = cleaned;
       const player = game.players.find(p => p.socketId === socket.id);
       if (!player) {
         socket.emit('error', { message: 'Player not in game' });
@@ -247,12 +369,13 @@ function setupSocketHandlers(io, games, players) {
         if (p.socketId) {
           const view = getPlayerView(game, p.socketId);
           capGameForWire(view);
+          sanitizeWireSnapshot(view);
           io.to(p.socketId).emit('game-state', { game: view });
         }
       });
     });
 
-    socket.on('set-player-team', (teamOrPayload) => {
+    safeOn('set-player-team', (teamOrPayload) => {
       const playerInfo = players.get(socket.id);
       console.log('[set-player-team] received', { socketId: socket.id, playerInfo: playerInfo ? { gameId: playerInfo.gameId } : null, teamOrPayload });
       if (!playerInfo) {
@@ -267,7 +390,12 @@ function setupSocketHandlers(io, games, players) {
       const team = typeof teamOrPayload === 'object' && teamOrPayload != null && 'team' in teamOrPayload
         ? teamOrPayload.team
         : teamOrPayload;
-      const t = Number(team) === 1 ? 1 : Number(team) === 2 ? 2 : 1;
+      const teamNum = Number(team);
+      if (teamNum !== 1 && teamNum !== 2) {
+        socket.emit('error', { code: 'bad_payload', message: 'Invalid team value', team: teamNum });
+        return;
+      }
+      const t = teamNum;
       const player = game.players.find(p => p.socketId === socket.id || p.id === socket.id);
       if (!player) {
         console.log('[set-player-team] early return: player not found in game.players', { socketId: socket.id, playerIds: game.players.map(p => ({ id: p.id, socketId: p.socketId })) });
@@ -279,12 +407,13 @@ function setupSocketHandlers(io, games, players) {
         if (p.socketId) {
           const view = getPlayerView(game, p.socketId);
           capGameForWire(view);
+          sanitizeWireSnapshot(view);
           io.to(p.socketId).emit('game-state', { game: view });
         }
       });
     });
 
-    socket.on('randomize-teams', () => {
+    safeOn('randomize-teams', () => {
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       const game = games.get(playerInfo.gameId);
@@ -297,12 +426,13 @@ function setupSocketHandlers(io, games, players) {
         if (p.socketId) {
           const view = getPlayerView(game, p.socketId);
           capGameForWire(view);
+          sanitizeWireSnapshot(view);
           io.to(p.socketId).emit('game-state', { game: view });
         }
       });
     });
 
-    socket.on('leave-game', () => {
+    safeOn('leave-game', () => {
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       const game = games.get(playerInfo.gameId);
@@ -317,7 +447,9 @@ function setupSocketHandlers(io, games, players) {
       socket.leave(playerInfo.gameId);
     });
 
-    socket.on('chat-message', (text) => {
+    safeOn('chat-message', (payloadOrText) => {
+      const text = typeof payloadOrText === 'object' && payloadOrText != null ? payloadOrText.text : payloadOrText;
+      if (typeof text !== 'string') return;
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       const game = games.get(playerInfo.gameId);
@@ -334,7 +466,18 @@ function setupSocketHandlers(io, games, players) {
       });
     });
 
-    socket.on('rejoin', ({ gameId, playerToken }) => {
+    safeOn('rejoin', (payload) => {
+      const body = payload && typeof payload === 'object' ? payload : null;
+      const gameId = body?.gameId;
+      const playerToken = body?.playerToken;
+      if (typeof gameId !== 'string' || !gameId.trim()) {
+        socket.emit('error', { code: 'bad_payload', message: 'Invalid rejoin gameId' });
+        return;
+      }
+      if (typeof playerToken !== 'string' || !playerToken.trim()) {
+        socket.emit('error', { code: 'bad_payload', message: 'Invalid rejoin token' });
+        return;
+      }
       const game = games.get(gameId);
       if (!game) {
         socket.emit('error', { message: 'Game not found' });
@@ -358,12 +501,13 @@ function setupSocketHandlers(io, games, players) {
       socket.join(gameId);
       const view = getPlayerView(game, socket.id);
       capGameForWire(view);
+      sanitizeWireSnapshot(view);
       socket.emit('game-state', { game: view });
       broadcastGameUpdate(io, game);
       console.log('Player rejoined:', player.name, socket.id, 'game', gameId);
     });
 
-    socket.on('disconnect', () => {
+    safeOn('disconnect', () => {
       const playerInfo = players.get(socket.id);
       if (playerInfo) {
         const game = games.get(playerInfo.gameId);
@@ -381,21 +525,53 @@ function setupSocketHandlers(io, games, players) {
     });
 
     // Grand Tichu declaration
-    socket.on('declare-grand-tichu', () => {
+    safeOn('declare-grand-tichu', (payload) => {
+      const actionId = payload?.actionId;
+      const requestId = payload?.requestId;
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       const game = games.get(playerInfo.gameId);
       if (!game) return;
       const playerId = getPlayerIdInGame(game, socket.id);
       if (!playerId) return;
+      if (actionId) {
+        const dup = actionDeduper.getResultIfDuplicate(game.id, playerId, actionId);
+        if (dup) {
+          if (dup.ok) {
+            const view = getPlayerView(game, socket.id);
+            capGameForWire(view);
+            sanitizeWireSnapshot(view);
+            socket.emit('game-state', { game: view });
+            return;
+          }
+        socket.emit('error', {
+          message: dup.errorMessage ?? 'Action already processed',
+          stateVersion: getCurrentStateVersion(),
+        });
+          return;
+        }
+      }
+      if (!declarationRateLimiter.allow(`${socket.id}:declare-grand-tichu`)) {
+        metricsStore.inc('rate_limited', 1, { event: 'declare-grand-tichu' });
+        socket.emit('error', {
+          code: 'rate_limited',
+          message: 'Rate limit exceeded',
+          requestId,
+          actionId,
+        });
+        return;
+      }
       const result = declareGrandTichu(game, playerId);
       if (result.success) {
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, { success: true });
+        }
         // Check if all players have revealed cards (either declared Grand Tichu or revealed manually)
         const allRevealed = game.players.every(p => game.cardsRevealed[p.id]);
         
         if (allRevealed) {
           // Auto-advance to exchange phase
-          setTimeout(() => {
+          safeSetTimeout(socket, 'declare-grand-tichu', () => {
             if (game.state === 'grand-tichu') {
               game.state = 'exchanging';
               broadcastGameUpdate(io, game);
@@ -411,16 +587,24 @@ function setupSocketHandlers(io, games, players) {
               });
               broadcastGameUpdate(io, game);
             }
-          }, 1000);
+          }, 1000, { gameId: game?.id });
         }
         broadcastGameUpdate(io, game);
       } else {
-        socket.emit('error', { message: result.error });
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, {
+            success: false,
+            errorMessage: result.error
+          });
+        }
+        metricsStore.inc('declaration_rejected', 1, { event: 'declare-grand-tichu' });
+        socket.emit('error', { message: result.error, stateVersion: getCurrentStateVersion() });
       }
     });
 
     // Reveal remaining cards
-    socket.on('reveal-remaining-cards', () => {
+    safeOn('reveal-remaining-cards', (payload) => {
+      const { actionId } = payload && typeof payload === 'object' ? payload : {};
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       
@@ -429,13 +613,35 @@ function setupSocketHandlers(io, games, players) {
       
       const playerId = getPlayerIdInGame(game, socket.id);
       if (!playerId) return;
+
+      if (actionId) {
+        const dup = actionDeduper.getResultIfDuplicate(game.id, playerId, actionId);
+        if (dup) {
+          if (dup.ok) {
+            const view = getPlayerView(game, socket.id);
+            capGameForWire(view);
+            sanitizeWireSnapshot(view);
+            socket.emit('game-state', { game: view });
+            return;
+          }
+          socket.emit('error', {
+            message: dup.errorMessage ?? 'Action already processed',
+            stateVersion: getCurrentStateVersion(),
+          });
+          return;
+        }
+      }
+
       const result = revealRemainingCards(game, playerId);
       if (result.success) {
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, { success: true });
+        }
         const allRevealed = game.players.every((p) => game.cardsRevealed[p.id]);
         
         if (allRevealed) {
           // Auto-advance to exchange phase
-          setTimeout(() => {
+          safeSetTimeout(socket, 'reveal-remaining-cards', () => {
             if (game.state === 'grand-tichu') {
               game.state = 'exchanging';
               broadcastGameUpdate(io, game);
@@ -451,29 +657,95 @@ function setupSocketHandlers(io, games, players) {
               });
               broadcastGameUpdate(io, game);
             }
-          }, 1000);
+          }, 1000, { gameId: game?.id });
         }
         broadcastGameUpdate(io, game);
       } else {
-        socket.emit('error', { message: result.error });
+        // E2: invalid payload / rejected exchange-cards.
+        metricsStore.inc('invalid_payload', 1, { event: 'exchange-cards', reason: 'exchange_rejected' });
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, {
+            success: false,
+            errorMessage: result.error
+          });
+        }
+        socket.emit('error', { message: result.error, stateVersion: getCurrentStateVersion() });
       }
     });
 
     // Skip Grand Tichu (no longer needed - use reveal-remaining-cards instead)
     // Keeping for backwards compatibility but it now just reveals cards
-    socket.on('skip-declaration', () => {
+    safeOn('skip-declaration', (payload) => {
+      const { actionId } = payload && typeof payload === 'object' ? payload : {};
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       
       const game = games.get(playerInfo.gameId);
       if (!game) return;
       
-      // Just reveal cards instead
-      socket.emit('reveal-remaining-cards');
+      const playerId = getPlayerIdInGame(game, socket.id);
+      if (!playerId) return;
+
+      if (actionId) {
+        const dup = actionDeduper.getResultIfDuplicate(game.id, playerId, actionId);
+        if (dup) {
+          if (dup.ok) {
+            const view = getPlayerView(game, socket.id);
+            capGameForWire(view);
+            sanitizeWireSnapshot(view);
+            socket.emit('game-state', { game: view });
+            return;
+          }
+          socket.emit('error', {
+            message: dup.errorMessage ?? 'Action already processed',
+            stateVersion: getCurrentStateVersion(),
+          });
+          return;
+        }
+      }
+
+      const result = revealRemainingCards(game, playerId);
+      if (result.success) {
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, { success: true });
+        }
+        const allRevealed = game.players.every((p) => game.cardsRevealed[p.id]);
+        if (allRevealed) {
+          // Auto-advance to exchange phase
+          safeSetTimeout(socket, 'reveal-remaining-cards', () => {
+            if (game.state === 'grand-tichu') {
+              game.state = 'exchanging';
+              broadcastGameUpdate(io, game);
+              
+              // Auto-exchange for test players
+              const testPlayers = game.players.filter(p => p.isTestPlayer);
+              testPlayers.forEach(testPlayer => {
+                const testHand = game.hands[testPlayer.id] || [];
+                if (testHand.length >= 3) {
+                  game.exchangeCards[testPlayer.id] = testHand.slice(0, 3);
+                  game.exchangeComplete[testPlayer.id] = true;
+                }
+              });
+              broadcastGameUpdate(io, game);
+            }
+          }, 1000, { gameId: game?.id });
+        }
+        broadcastGameUpdate(io, game);
+      } else {
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, {
+            success: false,
+            errorMessage: result.error
+          });
+        }
+        socket.emit('error', { message: result.error, stateVersion: getCurrentStateVersion() });
+      }
     });
 
     // Tichu declaration (can be called during playing phase when playing first card)
-    socket.on('declare-tichu', () => {
+    safeOn('declare-tichu', (payload) => {
+      const { actionId } = payload && typeof payload === 'object' ? payload : {};
+      const requestId = payload && typeof payload === 'object' ? payload.requestId : undefined;
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       
@@ -482,15 +754,57 @@ function setupSocketHandlers(io, games, players) {
       
       const playerId = getPlayerIdInGame(game, socket.id);
       if (!playerId) return;
+
+      if (actionId) {
+        const dup = actionDeduper.getResultIfDuplicate(game.id, playerId, actionId);
+        if (dup) {
+          if (dup.ok) {
+            const view = getPlayerView(game, socket.id);
+            capGameForWire(view);
+            sanitizeWireSnapshot(view);
+            socket.emit('game-state', { game: view });
+            return;
+          }
+          socket.emit('error', {
+            message: dup.errorMessage ?? 'Action already processed',
+            stateVersion: getCurrentStateVersion(),
+          });
+          return;
+        }
+      }
+
+      if (!declarationRateLimiter.allow(`${socket.id}:declare-tichu`)) {
+        metricsStore.inc('rate_limited', 1, { event: 'declare-tichu' });
+        socket.emit('error', {
+          code: 'rate_limited',
+          message: 'Rate limit exceeded',
+          requestId,
+          actionId,
+        });
+        return;
+      }
+
       const result = declareTichu(game, playerId);
       if (result.success) {
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, { success: true });
+        }
         broadcastGameUpdate(io, game);
       } else {
-        socket.emit('error', { message: result.error });
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, {
+            success: false,
+            errorMessage: result.error
+          });
+        }
+        metricsStore.inc('declaration_rejected', 1, { event: 'declare-tichu' });
+        socket.emit('error', { message: result.error, stateVersion: getCurrentStateVersion() });
       }
     });
 
-    socket.on('undeclare-tichu', () => {
+    safeOn('undeclare-tichu', (payload) => {
+      const { actionId } = payload && typeof payload === 'object' ? payload : {};
+      const requestId = payload && typeof payload === 'object' ? payload.requestId : undefined;
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       
@@ -499,15 +813,57 @@ function setupSocketHandlers(io, games, players) {
       
       const playerId = getPlayerIdInGame(game, socket.id);
       if (!playerId) return;
+
+      if (actionId) {
+        const dup = actionDeduper.getResultIfDuplicate(game.id, playerId, actionId);
+        if (dup) {
+          if (dup.ok) {
+            const view = getPlayerView(game, socket.id);
+            capGameForWire(view);
+            sanitizeWireSnapshot(view);
+            socket.emit('game-state', { game: view });
+            return;
+          }
+          socket.emit('error', {
+            message: dup.errorMessage ?? 'Action already processed',
+            stateVersion: getCurrentStateVersion(),
+          });
+          return;
+        }
+      }
+
+      if (!declarationRateLimiter.allow(`${socket.id}:undeclare-tichu`)) {
+        metricsStore.inc('rate_limited', 1, { event: 'undeclare-tichu' });
+        socket.emit('error', {
+          code: 'rate_limited',
+          message: 'Rate limit exceeded',
+          requestId,
+          actionId,
+        });
+        return;
+      }
+
       const result = undeclareTichu(game, playerId);
       if (result.success) {
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, { success: true });
+        }
         broadcastGameUpdate(io, game);
       } else {
-        socket.emit('error', { message: result.error });
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, {
+            success: false,
+            errorMessage: result.error
+          });
+        }
+        metricsStore.inc('declaration_rejected', 1, { event: 'undeclare-tichu' });
+        socket.emit('error', { message: result.error, stateVersion: getCurrentStateVersion() });
       }
     });
 
-    socket.on('undeclare-grand-tichu', () => {
+    safeOn('undeclare-grand-tichu', (payload) => {
+      const { actionId } = payload && typeof payload === 'object' ? payload : {};
+      const requestId = payload && typeof payload === 'object' ? payload.requestId : undefined;
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       
@@ -516,16 +872,59 @@ function setupSocketHandlers(io, games, players) {
       
       const playerId = getPlayerIdInGame(game, socket.id);
       if (!playerId) return;
+
+      if (actionId) {
+        const dup = actionDeduper.getResultIfDuplicate(game.id, playerId, actionId);
+        if (dup) {
+          if (dup.ok) {
+            const view = getPlayerView(game, socket.id);
+            capGameForWire(view);
+            sanitizeWireSnapshot(view);
+            socket.emit('game-state', { game: view });
+            return;
+          }
+          socket.emit('error', {
+            message: dup.errorMessage ?? 'Action already processed',
+            stateVersion: getCurrentStateVersion(),
+          });
+          return;
+        }
+      }
+
+      if (!declarationRateLimiter.allow(`${socket.id}:undeclare-grand-tichu`)) {
+        metricsStore.inc('rate_limited', 1, { event: 'undeclare-grand-tichu' });
+        socket.emit('error', {
+          code: 'rate_limited',
+          message: 'Rate limit exceeded',
+          requestId,
+          actionId,
+        });
+        return;
+      }
+
       const result = undeclareGrandTichu(game, playerId);
       if (result.success) {
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, { success: true });
+        }
         broadcastGameUpdate(io, game);
       } else {
-        socket.emit('error', { message: result.error });
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, {
+            success: false,
+            errorMessage: result.error
+          });
+        }
+        metricsStore.inc('declaration_rejected', 1, { event: 'undeclare-grand-tichu' });
+        socket.emit('error', { message: result.error, stateVersion: getCurrentStateVersion() });
       }
     });
 
     // Card exchange
-    socket.on('exchange-cards', (cards) => {
+    safeOn('exchange-cards', (payload) => {
+      const isObj = payload && typeof payload === 'object' && !Array.isArray(payload);
+      const actionId = isObj ? payload.actionId : null;
+      const cards = isObj ? payload.cards : payload;
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       
@@ -534,8 +933,30 @@ function setupSocketHandlers(io, games, players) {
       
       const playerId = getPlayerIdInGame(game, socket.id);
       if (!playerId) return;
+
+      if (actionId) {
+        const dup = actionDeduper.getResultIfDuplicate(game.id, playerId, actionId);
+        if (dup) {
+          if (dup.ok) {
+            const view = getPlayerView(game, socket.id);
+            capGameForWire(view);
+            sanitizeWireSnapshot(view);
+            socket.emit('game-state', { game: view });
+            return;
+          }
+          socket.emit('error', {
+            message: dup.errorMessage ?? 'Action already processed',
+            stateVersion: getCurrentStateVersion(),
+          });
+          return;
+        }
+      }
+
       const result = exchangeCards(game, playerId, cards);
       if (result.success) {
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, { success: true });
+        }
         game.exchangeComplete[playerId] = true;
         
         // For test games, auto-exchange for test players
@@ -555,8 +976,8 @@ function setupSocketHandlers(io, games, players) {
         const allExchanged = game.players.every(p => game.exchangeComplete[p.id]);
         if (allExchanged) {
           const exchangeResult = completeExchange(game);
-          if (!exchangeResult.success) {
-            socket.emit('error', { message: exchangeResult.error });
+        if (!exchangeResult.success) {
+            socket.emit('error', { message: exchangeResult.error, stateVersion: getCurrentStateVersion() });
             return;
           }
           // Test games: have one test player "call Tichu" (use a different one than Grand Tichu so both tags are visible)
@@ -571,18 +992,44 @@ function setupSocketHandlers(io, games, players) {
           }
           // Start bot turns so test players play until it's the human's turn
           if (game.players.some(p => p.isTestPlayer)) {
-            setTimeout(() => handleTestPlayerTurn(game, games, io), 500);
+            safeSetTimeout(socket, 'exchange-cards', () => handleTestPlayerTurn(game, games, io), 500, { gameId: game?.id });
           }
         }
         
         broadcastGameUpdate(io, game);
       } else {
-        socket.emit('error', { message: result.error });
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, {
+            success: false,
+            errorMessage: result.error
+          });
+        }
+        socket.emit('error', { message: result.error, stateVersion: getCurrentStateVersion() });
       }
     });
 
     // Make a move (play cards or pass)
-    socket.on('make-move', ({ cards, action, mahJongWish }) => {
+    safeOn('make-move', (payload) => {
+      const { actionId, cards, action, mahJongWish } =
+        payload && typeof payload === 'object' ? payload : {};
+      const requestId = payload && typeof payload === 'object' ? payload.requestId : undefined;
+
+      if (cards != null && !Array.isArray(cards)) {
+        metricsStore.inc('invalid_payload', 1, { event: 'make-move', reason: 'cards_not_array' });
+        socket.emit('error', { code: 'bad_payload', message: 'Invalid cards payload', requestId, actionId });
+        return;
+      }
+      const cardsArr = Array.isArray(cards) ? cards : [];
+      if (cardsArr.length > MAX_CARDS_PER_PLAY) {
+        metricsStore.inc('invalid_payload', 1, { event: 'make-move', reason: 'cards_too_large' });
+        socket.emit('error', {
+          code: 'payload_too_large',
+          message: `Too many cards in one move (max ${MAX_CARDS_PER_PLAY})`,
+          requestId,
+          actionId,
+        });
+        return;
+      }
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       
@@ -591,8 +1038,47 @@ function setupSocketHandlers(io, games, players) {
       
       const playerId = getPlayerIdInGame(game, socket.id);
       if (!playerId) return;
-      const result = makeMove(game, playerId, cards || [], action || 'play', mahJongWish || null);
+      if (actionId) {
+        const dup = actionDeduper.getResultIfDuplicate(game.id, playerId, actionId);
+        if (dup) {
+          if (dup.ok) {
+            const view = getPlayerView(game, socket.id);
+            capGameForWire(view);
+            sanitizeWireSnapshot(view);
+            socket.emit('game-state', { game: view });
+            return;
+          }
+          socket.emit('error', {
+            message: dup.errorMessage ?? 'Action already processed',
+            stateVersion: getCurrentStateVersion(),
+          });
+          return;
+        }
+      }
+
+      // Only rate-limit non-duplicate actions; duplicates should be answered via actionDeduper.
+      if (!makeMoveRateLimiter.allow(`${socket.id}:make-move`)) {
+        metricsStore.inc('rate_limited', 1, { event: 'make-move' });
+        socket.emit('error', {
+          code: 'rate_limited',
+          message: 'Rate limit exceeded',
+          requestId,
+          actionId,
+        });
+        return;
+      }
+
+      const result = makeMove(
+        game,
+        playerId,
+        cardsArr,
+        action || 'play',
+        mahJongWish || null
+      );
       if (result.success) {
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, { success: true });
+        }
         broadcastGameUpdate(io, game);
         if (result.playerWon) {
           io.to(playerInfo.gameId).emit('player-won-round', {
@@ -608,16 +1094,28 @@ function setupSocketHandlers(io, games, players) {
         }
         
         // Auto-handle test players' turns
-        setTimeout(() => {
-          handleTestPlayerTurn(game, games, io);
-        }, 500);
+        safeSetTimeout(socket, 'make-move', () => handleTestPlayerTurn(game, games, io), 500, { gameId: game?.id });
       } else {
-        socket.emit('error', { message: result.error });
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, {
+            success: false,
+            errorMessage: result.error
+          });
+        }
+        metricsStore.inc('move_rejected', 1, { event: 'make-move' });
+        socket.emit('error', { message: result.error, stateVersion: getCurrentStateVersion() });
       }
     });
 
     // Select Dragon opponent (when Dragon wins a trick)
-    socket.on('select-dragon-opponent', (selectedOpponentId) => {
+    safeOn('select-dragon-opponent', (payload) => {
+      const body = payload && typeof payload === 'object' ? payload : null;
+      const actionId = body?.actionId;
+      const selectedOpponentId = body?.selectedOpponentId ?? payload;
+      if (typeof selectedOpponentId !== 'string' || !selectedOpponentId.trim()) {
+        socket.emit('error', { code: 'bad_payload', message: 'Invalid selectedOpponentId' });
+        return;
+      }
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       
@@ -626,16 +1124,42 @@ function setupSocketHandlers(io, games, players) {
       
       const playerId = getPlayerIdInGame(game, socket.id);
       if (!playerId) return;
+
+      if (actionId) {
+        const dup = actionDeduper.getResultIfDuplicate(game.id, playerId, actionId);
+        if (dup) {
+          if (dup.ok) {
+            const view = getPlayerView(game, socket.id);
+            capGameForWire(view);
+            sanitizeWireSnapshot(view);
+            socket.emit('game-state', { game: view });
+            return;
+          }
+          socket.emit('error', {
+            message: dup.errorMessage ?? 'Action already processed',
+            stateVersion: getCurrentStateVersion(),
+          });
+          return;
+        }
+      }
+
       const result = selectDragonOpponent(game, playerId, selectedOpponentId);
       if (result.success) {
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, { success: true });
+        }
         broadcastGameUpdate(io, game);
         
         // Auto-handle test players' turns if needed
-        setTimeout(() => {
-          handleTestPlayerTurn(game, games, io);
-        }, 500);
+        safeSetTimeout(socket, 'select-dragon-opponent', () => handleTestPlayerTurn(game, games, io), 500, { gameId: game?.id });
       } else {
-        socket.emit('error', { message: result.error });
+        if (actionId) {
+          actionDeduper.storeResult(game.id, playerId, actionId, {
+            success: false,
+            errorMessage: result.error
+          });
+        }
+        socket.emit('error', { message: result.error, stateVersion: getCurrentStateVersion() });
       }
     });
 
@@ -656,7 +1180,7 @@ function setupSocketHandlers(io, games, players) {
               if (result.trickWon) {
                 io.to(game.id).emit('trick-won', { winner: result.winner });
               }
-              setTimeout(() => handleTestPlayerTurn(game, games, io), 500);
+              safeSetTimeout(socket, 'handleTestPlayerTurn', () => handleTestPlayerTurn(game, games, io), 500, { gameId: game?.id });
             }
           }
         }
@@ -689,12 +1213,21 @@ function setupSocketHandlers(io, games, players) {
           io.to(game.id).emit('trick-won', { winner: result.winner });
         }
 
-        setTimeout(() => handleTestPlayerTurn(game, games, io), 500);
+        safeSetTimeout(socket, 'handleTestPlayerTurn', () => handleTestPlayerTurn(game, games, io), 500, { gameId: game?.id });
       }
     }
 
     // Request current game state
-    socket.on('get-game-state', () => {
+    safeOn('get-game-state', (payload) => {
+      const requestId = payload && typeof payload === 'object' ? payload.requestId : undefined;
+      if (!getGameStateRateLimiter.allow(`${socket.id}:get-game-state`)) {
+        socket.emit('error', {
+          code: 'rate_limited',
+          message: 'Rate limit exceeded',
+          requestId,
+        });
+        return;
+      }
       const playerInfo = players.get(socket.id);
       if (!playerInfo) return;
       
@@ -703,14 +1236,17 @@ function setupSocketHandlers(io, games, players) {
       
       const playerView = getPlayerView(game, socket.id);
       capGameForWire(playerView);
+      sanitizeWireSnapshot(playerView);
       socket.emit('game-state', { game: playerView });
     });
 
-    socket.on('client-error', (payload) => {
+    safeOn('client-error', (payload) => {
       const src = payload?.source ? ` [${payload.source}]` : '';
       console.error('\n********** CLIENT ERROR **********');
       console.error('Socket:', socket.id);
       if (payload?.sentAt) console.error('Sent at:', payload.sentAt);
+      if (payload?.requestId) console.error('requestId:', payload.requestId);
+      if (payload?.actionId) console.error('actionId:', payload.actionId);
       console.error('[client-error]' + src, payload?.message ?? payload);
       if (payload?.stack) console.error(payload.stack);
       if (payload?.componentStack) console.error('Component stack:', payload.componentStack);
@@ -721,6 +1257,25 @@ function setupSocketHandlers(io, games, players) {
       }
       console.error('**********************************\n');
     });
+
+    // E2: metrics event from the frontend (resync, desync detectors, etc.)
+    // Keep it fire-and-forget; metrics are in-memory and never block gameplay.
+    safeOn('client-metric', (payload) => {
+      const metricType = payload?.metricType;
+      if (typeof metricType !== 'string' || !metricType) return;
+      metricsStore.inc(metricType, 1, {
+        reason: payload?.reason ?? undefined,
+        // correlation ids are helpful for log correlation but should not explode cardinality
+        requestId: payload?.requestId ?? undefined,
+      });
+      try {
+        if (payload?.requestId) {
+          console.log(`[metric:${metricType}]`, { requestId: payload.requestId, reason: payload?.reason ?? undefined });
+        } else {
+          console.log(`[metric:${metricType}]`, { reason: payload?.reason ?? undefined });
+        }
+      } catch (_) {}
+    });
   });
 }
 
@@ -730,6 +1285,7 @@ function emitGameUpdateToAll(io, game) {
     if (player.socketId) {
       const playerView = getPlayerView(game, player.socketId);
       capGameForWire(playerView);
+      sanitizeWireSnapshot(playerView);
       io.to(player.socketId).emit('game-update', { game: playerView });
     }
   });
@@ -741,20 +1297,30 @@ function broadcastGameUpdate(io, game) {
     emitGameUpdateToAll(io, game);
     return;
   }
+
+  // Monotonic server-side state version for ordering / stale snapshot suppression on clients.
+  const nextVersion = (gameStateVersionCounter.get(gameId) ?? 0) + 1;
+  gameStateVersionCounter.set(gameId, nextVersion);
+  game.stateVersion = nextVersion;
+
   let entry = gameUpdateThrottle.get(gameId);
   if (!entry || entry.timerId == null) {
     emitGameUpdateToAll(io, game);
     entry = {
       pending: null,
       timerId: setTimeout(() => {
-        const e = gameUpdateThrottle.get(gameId);
-        const toEmit = e?.pending;
-        if (e) {
-          e.pending = null;
-          e.timerId = null;
-          if (gameUpdateThrottle.get(gameId) === e) gameUpdateThrottle.delete(gameId);
+        try {
+          const e = gameUpdateThrottle.get(gameId);
+          const toEmit = e?.pending;
+          if (e) {
+            e.pending = null;
+            e.timerId = null;
+            if (gameUpdateThrottle.get(gameId) === e) gameUpdateThrottle.delete(gameId);
+          }
+          if (toEmit) emitGameUpdateToAll(io, toEmit);
+        } catch (err) {
+          console.error('[broadcastGameUpdate] throttle emit failed', err?.message ?? String(err), err?.stack ?? '');
         }
-        if (toEmit) emitGameUpdateToAll(io, toEmit);
       }, BROADCAST_THROTTLE_MS)
     };
     gameUpdateThrottle.set(gameId, entry);
@@ -765,5 +1331,10 @@ function broadcastGameUpdate(io, game) {
 
 module.exports = {
   setupSocketHandlers,
-  broadcastGameUpdate
+  broadcastGameUpdate,
+  __test__: {
+    safeSocketOn,
+    emitStructuredSocketError,
+    safeSetTimeout,
+  },
 };
