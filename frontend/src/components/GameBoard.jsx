@@ -57,7 +57,10 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
   const [exchangeDragOverSlot, setExchangeDragOverSlot] = useState(null);
   const [exchangeDraggingIndex, setExchangeDraggingIndex] = useState(null);
   const [exchangeSubmitted, setExchangeSubmitted] = useState(false);
-  const [handOrderOverride, setHandOrderOverride] = useState(null);
+  // Manual hand ordering preference:
+  // array of stable card identity keys (see `cardKey(card)`).
+  // We keep it across plays/resyncs by remapping keys onto the latest displayHand.
+  const [handOrderPreferenceKeys, setHandOrderPreferenceKeys] = useState(null);
   // Optimistic glow for Tichu buttons so click/unclick feels instant; cleared when game state updates
   const [optimisticTichu, setOptimisticTichu] = useState(null);
   const [optimisticGrandTichu, setOptimisticGrandTichu] = useState(null);
@@ -163,11 +166,15 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
     }
   }, [game?.state]);
 
-  // Clear hand order override when the hand content changes (play, exchange, new round)
-  // so old keys aren't applied to a new hand (avoids cards appearing/disappearing or jumping).
+  // Clear manual hand ordering only on real phase transitions that swap out the hand set.
+  // We intentionally DO NOT clear on every handSignature change, because that breaks
+  // "sort/filter + manual reorder persists after play" and resync recovery.
   useEffect(() => {
-    setHandOrderOverride(null);
-  }, [handSignature]);
+    if (!game) return;
+    if (game.state === 'exchanging' || game.state === 'grand-tichu') {
+      setHandOrderPreferenceKeys(null);
+    }
+  }, [game?.state]);
 
   // Clear exchange drag when tab/window hidden or window loses focus (avoids stuck state when switching screen/tab)
   useEffect(() => {
@@ -288,41 +295,55 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
 
   const orderedHand = useMemo(() => {
     if (!displayHand?.length) return displayHand;
-    if (!Array.isArray(handOrderOverride) || handOrderOverride.length === 0) return displayHand;
-    // handOrderOverride is an array of indices into displayHand (preserves duplicate cards)
-    const n = displayHand.length;
-    if (handOrderOverride.length !== n) return displayHand;
-    const inBounds = handOrderOverride.every((i) => typeof i === 'number' && i >= 0 && i < n);
-    if (!inBounds) return displayHand;
-    const ordered = handOrderOverride.map((i) => displayHand[i]);
-    if (ordered.some((c) => c == null)) return displayHand;
-    return ordered;
-  }, [displayHand, handOrderOverride]);
+    if (!Array.isArray(handOrderPreferenceKeys) || handOrderPreferenceKeys.length === 0) return displayHand;
+
+    // Remap the key preference onto the latest displayHand.
+    // - Consume in preference order for keys that still exist in displayHand.
+    // - Append any remaining cards (not mentioned in preference) at the end, preserving
+    //   their current relative order from displayHand.
+    const queues = {};
+    for (const c of displayHand) {
+      const k = cardKey(c);
+      if (!queues[k]) queues[k] = [];
+      queues[k].push(c);
+    }
+
+    const ordered = [];
+    const used = new Set(); // indexes in displayHand are not available; mark by object identity
+
+    // Consume preference
+    for (const k of handOrderPreferenceKeys) {
+      const q = queues[k];
+      if (q && q.length > 0) {
+        const c = q.shift();
+        if (c) {
+          ordered.push(c);
+          used.add(c);
+        }
+      }
+    }
+
+    // Append leftovers
+    for (const c of displayHand) {
+      if (!used.has(c)) ordered.push(c);
+    }
+
+    // Safety: avoid returning arrays with null/undefined
+    return ordered.filter(Boolean);
+  }, [displayHand, handOrderPreferenceKeys]);
 
   const handleSortModeChange = useCallback((mode) => {
     setSortMode(mode);
-    setHandOrderOverride(null);
+    setHandOrderPreferenceKeys(null);
   }, []);
 
   const handleHandReorder = useCallback((newOrderedCards) => {
-    const n = displayHand?.length;
-    if (!n || newOrderedCards.length !== n) return;
-    // Map each card in newOrderedCards back to its index in displayHand; use per-key queues so duplicates get distinct indices
-    const indicesByKey = {};
-    displayHand.forEach((c, i) => {
-      const k = cardKey(c);
-      if (!indicesByKey[k]) indicesByKey[k] = [];
-      indicesByKey[k].push(i);
-    });
-    const indices = newOrderedCards.map((card) => {
-      const k = cardKey(card);
-      const arr = indicesByKey[k];
-      return arr && arr.length > 0 ? arr.shift() : -1;
-    });
-    if (indices.some((i) => i < 0)) return;
-    // Only set if indices form a valid permutation (each 0..n-1 exactly once)
-    if (new Set(indices).size !== n || indices.some((i) => i < 0 || i >= n)) return;
-    setHandOrderOverride(indices);
+    if (!Array.isArray(newOrderedCards) || newOrderedCards.length === 0) {
+      setHandOrderPreferenceKeys(null);
+      return;
+    }
+    // Store a stable key sequence so we can remap it after plays/resyncs.
+    setHandOrderPreferenceKeys(newOrderedCards.map((c) => cardKey(c)));
   }, [displayHand]);
 
   // When Dragon selection is pending, the dragon player is still "acting" until they choose; show their turn.
