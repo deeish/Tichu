@@ -216,23 +216,18 @@ function GameLogPanel({ game, playerId }) {
   );
 }
 
-function Drawer({ game, playerId, isConnected, socket, tableTheme = 'velvet', onTableThemeChange = () => {}, onResync }) {
+function Drawer({ game, playerId, isConnected, socket, tableTheme = 'velvet', onTableThemeChange = () => {} }) {
   const [activeTab, setActiveTab] = useState('Chat');
 
   return (
     <aside className="sidebar-column">
       <div className="drawer-content">
-        {/* Status + party code + optional resync (defensive recovery) */}
+        {/* Status + party code */}
         <div className="sidebar-top-meta">
           <span className={`sidebar-status ${isConnected ? 'connected' : 'disconnected'}`}>
             {isConnected ? 'Connected' : 'Disconnected'}
           </span>
           {game?.id && <span className="sidebar-party-code">{game.id}</span>}
-          {onResync && (
-            <button type="button" className="sidebar-resync" onClick={onResync} title="Fetch latest game state (if something looks wrong)">
-              Resync
-            </button>
-          )}
         </div>
 
         {/* Team scores */}

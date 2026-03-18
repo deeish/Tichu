@@ -494,9 +494,16 @@ function handlePlayerWin(game, playerId) {
     const gotFirst = firstPlaceId !== null && pid !== null && firstPlaceId === pid;
     if (tichuDeclarations[player.id]) {
       game.roundScores[`team${player.team}`] += gotFirst ? 100 : -100;
+      // So "Points (team)" in stats matches team score: add this player's Tichu contribution to their stat
+      if (game.playerStats && game.playerStats[pid]) {
+        game.playerStats[pid].points = (game.playerStats[pid].points || 0) + (gotFirst ? 100 : -100);
+      }
     }
     if (grandTichuDeclarations[player.id]) {
       game.roundScores[`team${player.team}`] += gotFirst ? 200 : -200;
+      if (game.playerStats && game.playerStats[pid]) {
+        game.playerStats[pid].points = (game.playerStats[pid].points || 0) + (gotFirst ? 200 : -200);
+      }
     }
   }
   
