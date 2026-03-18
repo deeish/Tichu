@@ -39,6 +39,9 @@ function HandDock({
   const lastRailWRef = useRef(0);
   const [railW, setRailW] = useState(0);
   const [reorderDrag, setReorderDrag] = useState(null);
+  // UI-only toggle for the upcoming "auto-pass" feature.
+  // This should not change gameplay behavior until we wire it to onPass emission logic.
+  const [autoPassUIEnabled, setAutoPassUIEnabled] = useState(false);
   /** Defer hint + actions to next frame to avoid blocking the same commit as the card list (freeze mitigation). */
   const [showDockActions, setShowDockActions] = useState(false);
   useEffect(() => {
@@ -386,14 +389,25 @@ function HandDock({
                   >
                     {primaryLabel}
                   </button>
-                  <button
-                    type="button"
-                    className="dock-btn dock-btn-secondary"
-                    disabled={!canPass}
-                    onClick={onPass}
-                  >
-                    Pass
-                  </button>
+                  <div className="dock-pass-row">
+                    <button
+                      type="button"
+                      className="dock-btn dock-btn-secondary dock-pass-btn"
+                      disabled={!canPass}
+                      onClick={onPass}
+                    >
+                      Pass
+                    </button>
+                    <button
+                      type="button"
+                      className={`dock-btn dock-btn-secondary dock-auto-pass-btn ${autoPassUIEnabled ? 'dock-auto-pass-btn--on' : ''}`}
+                      onClick={() => setAutoPassUIEnabled((v) => !v)}
+                      aria-pressed={autoPassUIEnabled}
+                      title="UI-only toggle for the upcoming auto-pass feature"
+                    >
+                      Auto-pass: {autoPassUIEnabled ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
                 </>
               )}
             </div>
