@@ -65,6 +65,12 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
   const [optimisticTichu, setOptimisticTichu] = useState(null);
   const [optimisticGrandTichu, setOptimisticGrandTichu] = useState(null);
 
+  // UI toggle for upcoming auto-pass feature.
+  // Gameplay auto-pass uses a conservative server-aligned eligibility check (see effect below).
+  const [autoPassUIEnabled, setAutoPassUIEnabled] = useState(false);
+  const autoPassTimerRef = useRef(null);
+  const autoPassScheduledTurnSigRef = useRef(null);
+
   const layoutRef = useRef(null);
   const tableRef = useRef(null);
   const lastTableSizeRef = useRef({ w: 0, h: 0 });
@@ -520,6 +526,12 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
   };
 
   const handlePass = () => {
+    // Cancel any scheduled auto-pass since the user (or prior scheduling) is now passing.
+    if (autoPassTimerRef.current) {
+      clearTimeout(autoPassTimerRef.current);
+      autoPassTimerRef.current = null;
+      autoPassScheduledTurnSigRef.current = null;
+    }
     const actionId = nextActionId()
     setClientCorrelation({ requestId: actionId, actionId })
     socket.emit('make-move', { requestId: actionId, actionId, cards: [], action: 'pass' });
@@ -537,6 +549,82 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
     selectedCards.length > 0 &&
     (isMyTurn || selectedIsBomb);
   const canPass = isMyTurn && game?.state === 'playing';
+
+  // ---- Auto-pass (UI toggle) ----
+  // Keep this conservative so we don't spam invalid pass actions.
+  // We only auto-pass when:
+  // - it's your turn
+  // - you're not the lead player
+  // - you don't have Dog priority
+  // - the trick isn't empty (server blocks passing to start trick)
+  // - Mah Jong "must play" isn't violated (conservative: block if you hold wished card)
+  // - Dragon opponent selection isn't pending (server blocks other moves)
+  const AUTO_PASS_DELAY_MS = 350;
+  const mahJongWishRank = game?.mahJongWish?.wishedRank;
+  const mahJongWishMustPlay = !!game?.mahJongWish?.mustPlay;
+  const hasWishedCard =
+    mahJongWishMustPlay && mahJongWishRank
+      ? (Array.isArray(myHand) ? myHand : []).some(
+          (c) => c?.type === 'standard' && c?.rank === mahJongWishRank
+        )
+      : false;
+
+  const isLeadPlayer = game?.leadPlayer === playerId;
+  const isDogPriorityPlayer = game?.dogPriorityPlayer === playerId;
+  const isTrickEmpty = !Array.isArray(game?.currentTrick) || game.currentTrick.length === 0;
+  const hasDragonPendingSelection = !!game?.dragonOpponentSelection;
+
+  const canAutoPass =
+    autoPassUIEnabled &&
+    game?.state === 'playing' &&
+    isMyTurn &&
+    selectedCards.length === 0 &&
+    !isLeadPlayer &&
+    !isDogPriorityPlayer &&
+    !isTrickEmpty &&
+    !hasDragonPendingSelection &&
+    !hasWishedCard;
+
+  const autoPassTurnSig = `${game?.state ?? ''}:${game?.currentPlayerIndex ?? ''}:${game?.leadPlayer ?? ''}:${game?.dogPriorityPlayer ?? ''}:${(game?.currentTrick?.length ?? 0)}:${mahJongWishMustPlay ? mahJongWishRank : 'none'}`;
+
+  useEffect(() => {
+    // If not eligible, cancel any scheduled pass.
+    if (!canAutoPass) {
+      if (autoPassTimerRef.current) {
+        clearTimeout(autoPassTimerRef.current);
+        autoPassTimerRef.current = null;
+      }
+      autoPassScheduledTurnSigRef.current = null;
+      return;
+    }
+
+    // Only schedule once per turn signature.
+    if (autoPassScheduledTurnSigRef.current === autoPassTurnSig) return;
+
+    // If a timer is already scheduled, clear it before scheduling a new one.
+    if (autoPassTimerRef.current) {
+      clearTimeout(autoPassTimerRef.current);
+      autoPassTimerRef.current = null;
+    }
+
+    autoPassScheduledTurnSigRef.current = autoPassTurnSig;
+    const scheduledForSig = autoPassTurnSig;
+
+    autoPassTimerRef.current = setTimeout(() => {
+      // Double-check we haven't moved to another turn / lost eligibility.
+      if (autoPassScheduledTurnSigRef.current !== scheduledForSig) return;
+      autoPassTimerRef.current = null;
+      autoPassScheduledTurnSigRef.current = null;
+      handlePass();
+    }, AUTO_PASS_DELAY_MS);
+
+    return () => {
+      if (autoPassTimerRef.current) {
+        clearTimeout(autoPassTimerRef.current);
+        autoPassTimerRef.current = null;
+      }
+    };
+  }, [canAutoPass, autoPassTurnSig]);
 
   const hintText = useMemo(() => {
     if (game?.state === 'exchanging') return ''; // exchange instruction shown in play mat center
@@ -941,6 +1029,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
           canPass={canPass}
           onPlay={handlePlayCards}
           onPass={handlePass}
+          onAutoPassToggle={setAutoPassUIEnabled}
           hintText={hintText}
           containerWidth={containerWidth}
           primaryLabel={selectedIsBomb ? 'Play bomb' : `Play (${selectedCards.length})`}
