@@ -33,6 +33,7 @@ function HandDock({
   onCardDragEnd,
   exchangeDraggingIndex = null,
   onReorder,
+  onAutoPassToggle = () => {},
 }) {
   const cards = Array.isArray(cardsProp) ? cardsProp.slice(0, MAX_HAND_DISPLAY) : [];
   const railRef = useRef(null);
@@ -401,7 +402,13 @@ function HandDock({
                     <button
                       type="button"
                       className={`dock-btn dock-btn-secondary dock-auto-pass-btn ${autoPassUIEnabled ? 'dock-auto-pass-btn--on' : ''}`}
-                      onClick={() => setAutoPassUIEnabled((v) => !v)}
+                      onClick={() => {
+                        setAutoPassUIEnabled((v) => {
+                          const next = !v;
+                          onAutoPassToggle?.(next);
+                          return next;
+                        });
+                      }}
                       aria-pressed={autoPassUIEnabled}
                       title="UI-only toggle for the upcoming auto-pass feature"
                     >
