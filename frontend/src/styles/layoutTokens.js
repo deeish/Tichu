@@ -220,9 +220,11 @@ export const HAND_RAIL_STEP = 65;
 export function getHandRailStep(railW, cardW, visibleCount) {
   if (visibleCount <= 1) return 0;
   if (!Number.isFinite(railW) || railW <= 0 || !Number.isFinite(cardW) || cardW <= 0) return HAND_RAIL_STEP;
+  // Scale preferred overlap with card width so larger cards on wide screens don't look overly stacked.
+  const preferredStep = Math.max(60, Math.min(78, Math.round(cardW * 0.9)));
   const fitStep = (railW - cardW) / (visibleCount - 1);
   // Never exceed preferred spacing. Allow tight spacing on narrow docks so cards stay on-rail.
-  return Math.max(0, Math.min(HAND_RAIL_STEP, Math.floor(fitStep)));
+  return Math.max(0, Math.min(preferredStep, Math.floor(fitStep)));
 }
 
 // Z-index hierarchy
