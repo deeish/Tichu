@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback, Fragment } from 'react';
 import Trick from './Trick';
 import Card from './Card';
 import CardBack from './CardBack';
@@ -214,6 +214,19 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
     () => getCenterRect(tableSize.w, tableSize.h, dockH, sidebarW),
     [tableSize.w, tableSize.h, dockH, sidebarW]
   );
+
+  // Development-only geometry overlay (query param or localStorage flag).
+  // Example: `?geomDebug=1`
+  const geomDebug = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('geomDebug') === '1') return true;
+      return localStorage.getItem('geomDebug') === '1';
+    } catch {
+      return false;
+    }
+  }, []);
   const matSize = useMemo(
     () => getMatSize(centerRect.w, centerRect.h),
     [centerRect.w, centerRect.h]
@@ -226,6 +239,15 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
     () => getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize),
     [tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize]
   );
+
+  // Expose computed geometry to CSS (used for trick scroll sizing, etc.).
+  // Use layout effect to avoid a "one paint behind" mismatch on fast resizes.
+  useLayoutEffect(() => {
+    const root = layoutRef.current;
+    if (!root) return;
+    root.style.setProperty('--mat-w', `${matSize.w}px`);
+    root.style.setProperty('--mat-h', `${matSize.h}px`);
+  }, [matSize.w, matSize.h]);
 
   const opponentsByPosition = useMemo(() => {
     const order = game?.turnOrder?.length >= 4 ? game.turnOrder : game?.players ?? [];
@@ -642,9 +664,21 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
     return <div className="game-board-loading">Loading game...</div>;
   }
 
-  const containerWidth = typeof window !== 'undefined' ? window.innerWidth : 1440;
-  const exchangeCardSize = getExchangeCardSize(containerWidth);
-  const wonCardSize = getWonPileCardSize(containerWidth);
+  // Dock sizing should also be based on measured layout width (single source of truth),
+  // not raw viewport `window.innerWidth`.
+  // Fallback to `window.innerWidth` only during the initial render before ResizeObserver runs.
+  const dockContainerWidth =
+    tableSize.w > 0
+      ? tableSize.w
+      : typeof window !== 'undefined'
+        ? window.innerWidth
+        : 1440;
+  // Table/mat card sizing should be based on the measured center rect so the trick/won visuals
+  // stay aligned to the playmat geometry (not the full viewport width).
+  const tableContainerWidthBasis = centerRect?.w ?? dockContainerWidth;
+
+  const exchangeCardSize = getExchangeCardSize(tableContainerWidthBasis);
+  const wonCardSize = getWonPileCardSize(tableContainerWidthBasis);
   const tableHasSize = tableSize.w >= 10 && tableSize.h >= 10;
 
   const getStateMessage = () => {
@@ -764,6 +798,14 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
 
   return (
     <div className="game-layout" ref={layoutRef} data-theme={tableTheme === 'classic' ? undefined : tableTheme}>
+      {geomDebug && (
+        <div className="geom-debug-overlay" aria-hidden="true">
+          {`centerRect: w=${Math.round(centerRect.w)} h=${Math.round(centerRect.h)} x=${Math.round(centerRect.x)} y=${Math.round(centerRect.y)}\n`}
+          {`mat: w=${Math.round(matSize.w)} h=${Math.round(matSize.h)} x=${Math.round(matPosition.x)} y=${Math.round(matPosition.y)}\n`}
+          {`seats: top=(${Math.round(seatPositions.top.x)},${Math.round(seatPositions.top.y)}) left=(${Math.round(seatPositions.left.x)},${Math.round(seatPositions.left.y)}) right=(${Math.round(seatPositions.right.x)},${Math.round(seatPositions.right.y)})\n`}
+          {`exchangeCard: ${Math.round(exchangeCardSize?.w ?? 0)}x${Math.round(exchangeCardSize?.h ?? 0)} wonCard: ${Math.round(wonCardSize?.w ?? 0)}x${Math.round(wonCardSize?.h ?? 0)}\n`}
+        </div>
+      )}
       <div className="game-left">
         <div className="game-main">
         <div className="table-column" ref={tableRef}>
@@ -919,7 +961,11 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
             >
               <div className={`play-mat-zone ${!game.currentTrick?.length ? 'empty' : ''}`}>
                 {game.currentTrick?.length ? (
-                  <Trick trick={Array.isArray(game.currentTrick) ? game.currentTrick : []} players={Array.isArray(game.players) ? game.players : []} containerWidth={containerWidth} />
+                  <Trick
+                    trick={Array.isArray(game.currentTrick) ? game.currentTrick : []}
+                    players={Array.isArray(game.players) ? game.players : []}
+                    containerWidth={tableContainerWidthBasis}
+                  />
                 ) : game?.state === 'exchanging' && !game.exchangeCards?.[playerId] ? (
                   <span className="play-mat-empty-msg play-mat-empty-msg--instruction">Drag a card to each player, or click to assign to next slot</span>
                 ) : game?.state === 'playing' && currentPlayer?.id === playerId && selectedCards.length === 0 ? (
@@ -1031,7 +1077,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
           onPass={handlePass}
           onAutoPassToggle={setAutoPassUIEnabled}
           hintText={hintText}
-          containerWidth={containerWidth}
+          containerWidth={dockContainerWidth}
           primaryLabel={selectedIsBomb ? 'Play bomb' : `Play (${selectedCards.length})`}
           showDefaultActions={game.state !== 'grand-tichu' && game.state !== 'exchanging'}
           draggable={game.state === 'exchanging' && !exchangeSubmitted && !game.exchangeSubmitted}

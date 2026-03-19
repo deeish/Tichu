@@ -30,6 +30,11 @@ export const STACK_OFFSET = 6;
 export const STACK_MAX_BACKS = 7;
 export const WON_STACK_GAP = 8; // gap between seat panel and "won" cards pile
 
+// Max won-pile card height across getCardSize breakpoints (92/104/116 * 0.7 → 64/73/81). Use max so all viewports are safe.
+const MAX_WON_PILE_CARD_H = Math.round(116 * 0.7);
+/** Reserve at bottom of table for "my won cards" slot. Play mat must stop above this on all screen sizes. */
+export const BOTTOM_BAND_FOR_WON_CARDS = MAX_WON_PILE_CARD_H + WON_STACK_GAP + OUTER_MARGIN;
+
 /** Vertical offset from top of table surface for the wished-card panel (works at any viewport size) */
 export const WISHED_CARD_PANEL_TOP = 12;
 
@@ -45,10 +50,12 @@ export function getRightBand(_drawerWidth) {
   return LEFT_BAND;
 }
 
-// Center rect inside table (safe area for play mat)
+// Center rect inside table (safe area for play mat).
+// Table column height (tableH) already excludes the hand dock (sibling below .game-main).
+// Reserve bottom band for "my won cards" slot so the play mat does not cover it.
 export function getCenterRect(tableW, tableH, dockH, drawerW) {
   const rightBand = getRightBand(drawerW);
-  const bottomBand = dockH + OUTER_MARGIN;
+  const bottomBand = BOTTOM_BAND_FOR_WON_CARDS;
   const x = LEFT_BAND;
   const y = TOP_BAND;
   const w = Math.max(0, tableW - LEFT_BAND - rightBand);
@@ -58,8 +65,27 @@ export function getCenterRect(tableW, tableH, dockH, drawerW) {
 
 // Play mat size: use most of the center zone (~92% width, ~88% height) so the mat and trick area feel large
 export function getMatSize(centerW, centerH) {
-  const matW = Math.max(400, centerW * 0.92);
-  const matH = Math.max(300, centerH * 0.88);
+  // Play mat must always fit inside the measured center rect.
+  // Avoid hard Math.max minimums that can overflow the available space on small/short viewports.
+  // Safety margin so borders/absolute children never touch edges.
+  // Keep this small: too much margin makes the mat feel "too small" on some screens.
+  const epsilon = 2;
+
+  // Width: keep current ratio (user target). Height: use most of center so the mat fills vertical space and removes dead area at bottom.
+  const desiredW = centerW * 0.96;
+  const desiredH = centerH * 0.97;
+
+  // Preserve the "minimum feel" without overflowing:
+  // if the viewport is too small, the available size becomes the effective minimum.
+  const minW = Math.min(400, Math.max(0, centerW - epsilon));
+  const minH = Math.min(300, Math.max(0, centerH - epsilon));
+
+  const maxW = Math.max(0, centerW - epsilon);
+  const maxH = Math.max(0, centerH - epsilon);
+
+  const matW = Math.max(minW, Math.min(desiredW, maxW));
+  const matH = Math.max(minH, Math.min(desiredH, maxH));
+
   return { w: matW, h: matH };
 }
 
@@ -71,24 +97,54 @@ export const MAT_VERTICAL_BIAS = 0.90;
 export const MAT_TOP_OFFSET = 65;
 
 export function getMatPosition(centerRect, matW, matH) {
-  const y = centerRect.y + (centerRect.h - matH) * MAT_VERTICAL_BIAS + MAT_TOP_OFFSET;
-  return {
-    x: centerRect.x + (centerRect.w - matW) / 2,
-    y,
-  };
+  // Clamp mat position so the mat never visually spills outside the measured center rect.
+  const epsilon = 2;
+
+  const desiredX = centerRect.x + (centerRect.w - matW) / 2;
+  const desiredY = centerRect.y + (centerRect.h - matH) * MAT_VERTICAL_BIAS + MAT_TOP_OFFSET;
+
+  const minX = centerRect.x + epsilon;
+  const maxX = centerRect.x + centerRect.w - matW - epsilon;
+  const minY = centerRect.y + epsilon;
+  const maxY = centerRect.y + centerRect.h - matH - epsilon;
+
+  // Defensive: if the available rect is extremely small, ensure we don't produce NaN.
+  const clampedX = Number.isFinite(maxX) && Number.isFinite(minX) ? Math.max(minX, Math.min(maxX, desiredX)) : desiredX;
+  const clampedY = Number.isFinite(maxY) && Number.isFinite(minY) ? Math.max(minY, Math.min(maxY, desiredY)) : desiredY;
+
+  return { x: clampedX, y: clampedY };
 }
 
 // Seat anchor positions (absolute within table). Centered with the play mat.
 // matPosition/matSize are used so top seat aligns with mat horizontal center, left/right with mat vertical center.
 export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition, matSize) {
   const rightX = tableW - OUTER_MARGIN - SEAT_WIDTH;
+  const tableH = _tableH;
+  const seatMinY = 0;
+  const seatMaxY = Math.max(0, tableH - SEAT_HEIGHT);
+
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
   const topSeatY = TABLE_HEADER_HEIGHT + TABLE_HEADER_SEAT_GAP;
   const matCenterX = matPosition.x + matSize.w / 2;
   const matCenterY = matPosition.y + matSize.h / 2;
+
+  const seatMinX = OUTER_MARGIN;
+  const seatMaxX = Math.max(0, tableW - OUTER_MARGIN - SEAT_WIDTH);
+
+  const leftSeatX = clamp(OUTER_MARGIN, seatMinX, seatMaxX);
+  const leftSeatY = clamp(Math.round(matCenterY - SEAT_HEIGHT / 2), seatMinY, seatMaxY);
+
+  const topSeatX = clamp(Math.round(matCenterX - SEAT_WIDTH / 2), seatMinX, seatMaxX);
+  const topSeatYClamped = clamp(topSeatY, seatMinY, seatMaxY);
+
+  const rightSeatX = clamp(Math.max(LEFT_BAND + 16, rightX), seatMinX, seatMaxX);
+  const rightSeatY = leftSeatY;
+
   return {
-    top: { x: Math.round(matCenterX - SEAT_WIDTH / 2), y: topSeatY },
-    left: { x: OUTER_MARGIN, y: Math.round(matCenterY - SEAT_HEIGHT / 2) },
-    right: { x: Math.max(LEFT_BAND + 16, rightX), y: Math.round(matCenterY - SEAT_HEIGHT / 2) },
+    top: { x: topSeatX, y: topSeatYClamped },
+    left: { x: leftSeatX, y: leftSeatY },
+    right: { x: rightSeatX, y: rightSeatY },
   };
 }
 
