@@ -41,13 +41,21 @@
 /* Background uses --layout-bg so themes in tableSurface.css can override */
 .game-layout {
   display: grid;
-  grid-template-columns: 1fr var(--sidebar-w);
+  grid-template-columns: 1fr minmax(0, var(--sidebar-w));
   grid-template-rows: 1fr;
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
   background: var(--layout-bg, #1a1a2e);
   color: #fff;
+}
+
+.game-layout.sidebar-overlay-closed {
+  grid-template-columns: 1fr 0;
+}
+
+.game-layout.sidebar-overlay-open {
+  grid-template-columns: 1fr 0;
 }
 
 /* Left column: vertical stack (HUD, table, prompts, hand dock) - fills height so dock reaches bottom */
@@ -90,4 +98,5 @@
   justify-content: center;
   padding: 0 var(--s16);
   padding-bottom: 0;
+  min-width: 0;
 }
