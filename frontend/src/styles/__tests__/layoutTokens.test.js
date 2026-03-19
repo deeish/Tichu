@@ -79,7 +79,8 @@ describe('layoutTokens geometry guards', () => {
     const wide = getHandRailStep(1200, 72, 14);
     const narrow = getHandRailStep(420, 72, 14);
     expect(wide).toBeGreaterThan(0);
-    expect(wide).toBeLessThanOrEqual(65);
+    expect(wide).toBeLessThanOrEqual(86);
+    expect(wide).toBeGreaterThanOrEqual(66);
     expect(narrow).toBeGreaterThanOrEqual(0);
     expect(narrow).toBeLessThanOrEqual(wide);
   });
