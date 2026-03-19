@@ -38,6 +38,20 @@ export const BOTTOM_BAND_FOR_WON_CARDS = MAX_WON_PILE_CARD_H + WON_STACK_GAP + O
 /** Vertical offset from top of table surface for the wished-card panel (works at any viewport size) */
 export const WISHED_CARD_PANEL_TOP = 12;
 
+// Sidebar behavior: desktop side-by-side, mobile overlay.
+export const SIDEBAR_OVERLAY_BREAKPOINT = 1180;
+export function getSidebarLayoutMode(viewportW) {
+  if (typeof viewportW !== 'number' || viewportW <= 0) return 'side';
+  return viewportW < SIDEBAR_OVERLAY_BREAKPOINT ? 'overlay' : 'side';
+}
+
+export function getSidebarWidth(viewportW) {
+  if (getSidebarLayoutMode(viewportW) === 'overlay') return 0;
+  // Keep desktop sidebar visually close to current 320px, but allow controlled scaling.
+  const dynamic = Math.round(viewportW * 0.22);
+  return Math.max(280, Math.min(360, dynamic));
+}
+
 // Dock height: clamp(180px, 22vh, 240px)
 export function getDockHeight() {
   if (typeof window === 'undefined') return 200;
@@ -185,6 +199,12 @@ export function getExchangeCardSize(containerWidth) {
 export const MAX_HAND_CAP = 14;
 
 export function getVisibleHandCap(containerWidth) {
+  if (!Number.isFinite(containerWidth) || containerWidth <= 0) return MAX_HAND_CAP;
+  if (containerWidth < 640) return 9;
+  if (containerWidth < 760) return 10;
+  if (containerWidth < 920) return 11;
+  if (containerWidth < 1120) return 12;
+  if (containerWidth < 1280) return 13;
   return MAX_HAND_CAP;
 }
 
@@ -199,7 +219,10 @@ export const HAND_RAIL_STEP = 65;
 
 export function getHandRailStep(railW, cardW, visibleCount) {
   if (visibleCount <= 1) return 0;
-  return HAND_RAIL_STEP;
+  if (!Number.isFinite(railW) || railW <= 0 || !Number.isFinite(cardW) || cardW <= 0) return HAND_RAIL_STEP;
+  const fitStep = (railW - cardW) / (visibleCount - 1);
+  // Never exceed preferred spacing. Allow tight spacing on narrow docks so cards stay on-rail.
+  return Math.max(0, Math.min(HAND_RAIL_STEP, Math.floor(fitStep)));
 }
 
 // Z-index hierarchy

@@ -10,6 +10,8 @@ import { DEBUG_HAND_DRAG } from '../debug';
 import { reportClientError, setClientCorrelation } from '../clientErrorReport';
 import {
   getDockHeight,
+  getSidebarLayoutMode,
+  getSidebarWidth,
   getCenterRect,
   getMatSize,
   getMatPosition,
@@ -73,8 +75,21 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
 
   const layoutRef = useRef(null);
   const tableRef = useRef(null);
+  const dockWrapperRef = useRef(null);
+  const sidebarRef = useRef(null);
   const lastTableSizeRef = useRef({ w: 0, h: 0 });
+  const lastDockWrapperSizeRef = useRef({ w: 0, h: 0 });
+  const lastSidebarSizeRef = useRef({ w: 0, h: 0 });
   const [tableSize, setTableSize] = useState({ w: 0, h: 0 });
+  const [dockWrapperSize, setDockWrapperSize] = useState({ w: 0, h: 0 });
+  const [sidebarSize, setSidebarSize] = useState({ w: 0, h: 0 });
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window !== 'undefined' ? window.innerWidth : 1600,
+    h: typeof window !== 'undefined' ? window.innerHeight : 900,
+  }));
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() =>
+    typeof window === 'undefined' ? true : getSidebarLayoutMode(window.innerWidth) === 'side'
+  );
 
   const isMyTurn = useMemo(() => {
     if (!game?.turnOrder) return false;
@@ -91,20 +106,38 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
     if (game?.grandTichuDeclarations?.[playerId] == null) setOptimisticGrandTichu(null);
   }, [game?.grandTichuDeclarations?.[playerId], playerId]);
 
-  // Sync layout CSS vars and measure table/dock (sidebar always 320px)
+  // Sync measured viewport (single source for responsive sidebar mode).
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onResize = () => {
+      setViewport((prev) => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        if (prev.w === w && prev.h === h) return prev;
+        return { w, h };
+      });
+    };
+    window.addEventListener('resize', onResize);
+    onResize();
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const sidebarMode = useMemo(() => getSidebarLayoutMode(viewport.w), [viewport.w]);
+  const sidebarW = useMemo(() => (sidebarMode === 'overlay' ? 0 : getSidebarWidth(viewport.w)), [sidebarMode, viewport.w]);
+  const dockH = useMemo(() => getDockHeight(), [viewport.h]);
+
+  // Keep sidebar open on desktop, keep previous user toggle in overlay mode.
+  useEffect(() => {
+    if (sidebarMode === 'side') setIsSidebarOpen(true);
+  }, [sidebarMode]);
+
+  // Sync computed layout CSS vars.
   useEffect(() => {
     const root = layoutRef.current;
     if (!root) return;
-
-    const updateDockH = () => {
-      root.style.setProperty('--dock-h', `${getDockHeight()}px`);
-    };
-
-    window.addEventListener('resize', updateDockH);
-    updateDockH();
-
-    return () => window.removeEventListener('resize', updateDockH);
-  }, []);
+    root.style.setProperty('--dock-h', `${dockH}px`);
+    root.style.setProperty('--sidebar-w', `${sidebarW}px`);
+  }, [dockH, sidebarW]);
 
   useEffect(() => {
     const el = tableRef.current;
@@ -120,6 +153,36 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    const el = dockWrapperRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0]?.contentRect ?? {};
+      if (width == null || height == null) return;
+      const prev = lastDockWrapperSizeRef.current;
+      if (prev.w === width && prev.h === height) return;
+      lastDockWrapperSizeRef.current = { w: width, h: height };
+      setDockWrapperSize({ w: width, h: height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const el = sidebarRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0]?.contentRect ?? {};
+      if (width == null || height == null) return;
+      const prev = lastSidebarSizeRef.current;
+      if (prev.w === width && prev.h === height) return;
+      lastSidebarSizeRef.current = { w: width, h: height };
+      setSidebarSize({ w: width, h: height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [sidebarMode, isSidebarOpen]);
 
   // Clear selection only when phase changes or selected cards no longer in hand.
   // Use stable hand signature so this effect doesn't run on every game-update (avoids flicker).
@@ -208,8 +271,6 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
     };
   }, []);
 
-  const dockH = getDockHeight();
-  const sidebarW = 320;
   const centerRect = useMemo(
     () => getCenterRect(tableSize.w, tableSize.h, dockH, sidebarW),
     [tableSize.w, tableSize.h, dockH, sidebarW]
@@ -668,8 +729,10 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
   // not raw viewport `window.innerWidth`.
   // Fallback to `window.innerWidth` only during the initial render before ResizeObserver runs.
   const dockContainerWidth =
-    tableSize.w > 0
-      ? tableSize.w
+    dockWrapperSize.w > 0
+      ? dockWrapperSize.w
+      : tableSize.w > 0
+        ? tableSize.w
       : typeof window !== 'undefined'
         ? window.innerWidth
         : 1440;
@@ -797,9 +860,26 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
   ]);
 
   return (
-    <div className="game-layout" ref={layoutRef} data-theme={tableTheme === 'classic' ? undefined : tableTheme}>
+    <div
+      className={`game-layout ${sidebarMode === 'overlay' ? (isSidebarOpen ? 'sidebar-overlay-open' : 'sidebar-overlay-closed') : 'sidebar-side-mode'}`}
+      ref={layoutRef}
+      data-theme={tableTheme === 'classic' ? undefined : tableTheme}
+    >
+      {sidebarMode === 'overlay' && (
+        <button
+          type="button"
+          className="sidebar-toggle-btn"
+          onClick={() => setIsSidebarOpen((v) => !v)}
+          aria-expanded={isSidebarOpen}
+          aria-label={isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+        >
+          {isSidebarOpen ? 'Hide panel' : 'Show panel'}
+        </button>
+      )}
       {geomDebug && (
         <div className="geom-debug-overlay" aria-hidden="true">
+          {`viewport: w=${Math.round(viewport.w)} h=${Math.round(viewport.h)} mode=${sidebarMode} open=${isSidebarOpen}\n`}
+          {`sidebar: cssW=${Math.round(sidebarW)} measuredW=${Math.round(sidebarSize.w)} dockWrapperW=${Math.round(dockWrapperSize.w)}\n`}
           {`centerRect: w=${Math.round(centerRect.w)} h=${Math.round(centerRect.h)} x=${Math.round(centerRect.x)} y=${Math.round(centerRect.y)}\n`}
           {`mat: w=${Math.round(matSize.w)} h=${Math.round(matSize.h)} x=${Math.round(matPosition.x)} y=${Math.round(matPosition.y)}\n`}
           {`seats: top=(${Math.round(seatPositions.top.x)},${Math.round(seatPositions.top.y)}) left=(${Math.round(seatPositions.left.x)},${Math.round(seatPositions.left.y)}) right=(${Math.round(seatPositions.right.x)},${Math.round(seatPositions.right.y)})\n`}
@@ -1061,7 +1141,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
         </div>
       )}
 
-      <div className="hand-dock-wrapper">
+      <div className="hand-dock-wrapper" ref={dockWrapperRef}>
         <HandErrorBoundary onError={(err, info) => reportClientError({ source: 'HandErrorBoundary', message: err?.message ?? String(err), stack: err?.stack, componentStack: info?.componentStack })}>
         <HandDock
           cards={Array.isArray(orderedHand) ? orderedHand : []}
@@ -1099,6 +1179,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
           socket={socket}
           tableTheme={tableTheme}
           onTableThemeChange={handleTableThemeChange}
+          className={sidebarMode === 'overlay' ? `sidebar-overlay ${isSidebarOpen ? 'is-open' : 'is-closed'}` : ''}
+          containerRef={sidebarRef}
         />
     </div>
   );

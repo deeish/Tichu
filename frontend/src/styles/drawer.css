@@ -1,12 +1,37 @@
 /* Right sidebar: always visible, separated from game table by a line */
 .sidebar-column {
   width: var(--sidebar-w);
-  min-width: var(--sidebar-w);
+  min-width: 0;
   background: rgba(0, 0, 0, 0.35);
   border-left: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.sidebar-column.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(92vw, 360px);
+  max-width: 360px;
+  z-index: var(--z-modals);
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.45);
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.sidebar-column.sidebar-overlay.is-closed {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-column.sidebar-overlay.is-open {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .drawer-content {

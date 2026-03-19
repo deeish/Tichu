@@ -216,11 +216,11 @@ function GameLogPanel({ game, playerId }) {
   );
 }
 
-function Drawer({ game, playerId, isConnected, socket, tableTheme = 'velvet', onTableThemeChange = () => {} }) {
+function Drawer({ game, playerId, isConnected, socket, tableTheme = 'velvet', onTableThemeChange = () => {}, className = '', containerRef = null }) {
   const [activeTab, setActiveTab] = useState('Chat');
 
   return (
-    <aside className="sidebar-column">
+    <aside className={`sidebar-column ${className}`.trim()} ref={containerRef}>
       <div className="drawer-content">
         {/* Status + party code */}
         <div className="sidebar-top-meta">

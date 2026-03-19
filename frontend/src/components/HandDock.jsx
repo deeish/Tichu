@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Card from './Card';
-import { getHandRailStep, getDockCardSize, getVisibleHandCap } from '../styles/layoutTokens';
+import { getHandRailStep, getDockCardSize } from '../styles/layoutTokens';
 import { cardKey } from '../utils/cardUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
 import { reportClientError } from '../clientErrorReport';
@@ -9,6 +9,10 @@ import '../styles/handDock.css';
 
 /** Max cards shown in hand; Tichu max hand size is 14. */
 const MAX_HAND_DISPLAY = 14;
+const MIN_RAIL_STEP = 26;
+const MIN_CARD_W = 36;
+const MIN_CARD_H = 52;
+const RAIL_SAFETY_PX = 8;
 
 function HandDock({
   cards: cardsProp = [],
@@ -83,13 +87,31 @@ function HandDock({
     };
   }, []);
 
-  const cardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
-  const visibleCap = Math.min(getVisibleHandCap(containerWidth), MAX_HAND_DISPLAY);
-  const visibleCount = Math.min(Math.max(0, cards.length), visibleCap);
-  const step = getHandRailStep(railW, cardSize.w, visibleCount);
+  const baseCardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
+  const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
+  const cardSize = useMemo(() => {
+    if (visibleCount <= 0) return baseCardSize;
+    if (!Number.isFinite(railW) || railW <= 0) return baseCardSize;
+    const baseStep = getHandRailStep(railW, baseCardSize.w, visibleCount);
+    const baseTotal = baseCardSize.w + (visibleCount - 1) * baseStep;
+    const maxAllowed = Math.max(0, railW - RAIL_SAFETY_PX);
+    if (baseTotal <= maxAllowed) return baseCardSize;
+    const fitScale = baseTotal > 0 ? maxAllowed / baseTotal : 1;
+    return {
+      w: Math.max(MIN_CARD_W, Math.floor(baseCardSize.w * fitScale)),
+      h: Math.max(MIN_CARD_H, Math.floor(baseCardSize.h * fitScale)),
+    };
+  }, [baseCardSize, railW, visibleCount]);
+  const step = useMemo(() => {
+    if (visibleCount <= 1) return 0;
+    if (!Number.isFinite(railW) || railW <= 0) return MIN_RAIL_STEP;
+    const preferred = getHandRailStep(railW, cardSize.w, visibleCount);
+    const fitStep = Math.floor((railW - cardSize.w - RAIL_SAFETY_PX) / (visibleCount - 1));
+    return Math.max(0, Math.min(preferred, fitStep));
+  }, [railW, cardSize.w, visibleCount]);
   const totalCardRowWidth = visibleCount > 0 ? (visibleCount - 1) * step + cardSize.w : 0;
   /* Card has border + margin + box-shadow; reserve space so the last card isn't clipped by overflow */
-  const cardRowExtraRight = 24;
+  const cardRowExtraRight = railW > 0 && railW < 760 ? 8 : 24;
   const cardRowLeftOffset =
     railW > 0 && totalCardRowWidth > 0
       ? Math.max(0, (railW - totalCardRowWidth - cardRowExtraRight) / 2)
@@ -278,8 +300,10 @@ function HandDock({
     };
   }, []);
 
+  const compactDock = containerWidth < 760;
+
   return (
-    <div className="hand-dock">
+    <div className={`hand-dock ${compactDock ? 'hand-dock--compact' : ''}`}>
       <div className="dock-header">
         <h2 className="dock-title">Your Hand</h2>
         <div className="dock-sort">
@@ -372,7 +396,7 @@ function HandDock({
           </div>
           {showDockActions && (
             <div className={`dock-hint ${hintError ? 'error' : ''}`}>
-              {hintText || '\u00A0'}
+              {!compactDock ? (hintText || '\u00A0') : '\u00A0'}
             </div>
           )}
         </div>

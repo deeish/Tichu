@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { getMatSize, getMatPosition, getSeatPositions } from '../layoutTokens';
+import {
+  getMatSize,
+  getMatPosition,
+  getSeatPositions,
+  getSidebarLayoutMode,
+  getSidebarWidth,
+  getVisibleHandCap,
+  getHandRailStep,
+} from '../layoutTokens';
 
 describe('layoutTokens geometry guards', () => {
   it('getMatSize clamps mat dimensions to the available center rect', () => {
@@ -57,6 +65,32 @@ describe('layoutTokens geometry guards', () => {
         expect(s.y + 52).toBeLessThanOrEqual(tableH + 1); // SEAT_HEIGHT = 52
       }
     }
+  });
+
+  it('sidebar mode and width are responsive across viewport sizes', () => {
+    expect(getSidebarLayoutMode(1600)).toBe('side');
+    expect(getSidebarLayoutMode(1024)).toBe('overlay');
+    expect(getSidebarWidth(1024)).toBe(0);
+    expect(getSidebarWidth(1600)).toBeGreaterThanOrEqual(280);
+    expect(getSidebarWidth(1600)).toBeLessThanOrEqual(360);
+  });
+
+  it('getHandRailStep shrinks spacing to fit narrow rails', () => {
+    const wide = getHandRailStep(1200, 72, 14);
+    const narrow = getHandRailStep(420, 72, 14);
+    expect(wide).toBeGreaterThan(0);
+    expect(wide).toBeLessThanOrEqual(65);
+    expect(narrow).toBeGreaterThanOrEqual(0);
+    expect(narrow).toBeLessThanOrEqual(wide);
+  });
+
+  it('getVisibleHandCap decreases on narrow widths', () => {
+    expect(getVisibleHandCap(1440)).toBe(14);
+    expect(getVisibleHandCap(1200)).toBe(13);
+    expect(getVisibleHandCap(980)).toBe(12);
+    expect(getVisibleHandCap(840)).toBe(11);
+    expect(getVisibleHandCap(700)).toBe(10);
+    expect(getVisibleHandCap(600)).toBe(9);
   });
 });
 
