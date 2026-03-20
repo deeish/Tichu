@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, startTransition } from 'react'
+import { useState, useEffect, useRef, useCallback, startTransition } from 'react'
 import { Link } from 'react-router-dom'
 import { socket } from './socket'
 import { subscribe as subscribeSocketEvents } from './socketEventRegistry'
@@ -137,11 +137,37 @@ function App() {
   const [playerId, setPlayerId] = useState(null)
   const [showEndGameTest, setShowEndGameTest] = useState(false)
   const [showStatsPopup, setShowStatsPopup] = useState(false)
+  const [toasts, setToasts] = useState([])
+  const toastTimersRef = useRef(new Map())
   // 'start' | 'join' | null — null = show only the two main buttons
   const [landingMode, setLandingMode] = useState(null)
   // Lobby: editing own name (show input + save)
   const [editingMyName, setEditingMyName] = useState(false)
   const [lobbyNameDraft, setLobbyNameDraft] = useState('')
+
+  const dismissToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+    const timer = toastTimersRef.current.get(id)
+    if (timer) {
+      clearTimeout(timer)
+      toastTimersRef.current.delete(id)
+    }
+  }, [])
+
+  const showToast = useCallback((message, level = 'error') => {
+    const text = String(message || '').trim()
+    if (!text) return
+    const now = Date.now()
+    const id = `${now}-${Math.random().toString(36).slice(2, 8)}`
+    setToasts((prev) => {
+      const last = prev[0]
+      // De-dupe fast repeats from rapid retries/socket bursts.
+      if (last && last.message === text && now - last.createdAt < 1200) return prev
+      return [{ id, message: text, level, createdAt: now }, ...prev].slice(0, 4)
+    })
+    const timer = setTimeout(() => dismissToast(id), 4200)
+    toastTimersRef.current.set(id, timer)
+  }, [dismissToast])
 
   // Pre-fill name on Join Party from last saved name (only if it looks like a real name: 2+ chars)
   useEffect(() => {
@@ -433,7 +459,7 @@ function App() {
           if (msg.includes('rejoin') || msg === 'Game not found' || msg === 'Already in game' || msg === 'Invalid rejoin token') {
             clearRejoinCreds()
           }
-          alert(data?.message ?? msg)
+          showToast((data?.message ?? msg) || 'Unexpected error')
         } catch (e) {
           console.error('[socket error handler]', e); reportClientError({ source: 'socket-error', message: e?.message ?? String(e) })
         }
@@ -455,12 +481,14 @@ function App() {
         cloneWorkerRef.current = null
       }
       if (unsubscribe) unsubscribe()
+      for (const timer of toastTimersRef.current.values()) clearTimeout(timer)
+      toastTimersRef.current.clear()
     }
-  }, [])
+  }, [showToast])
 
   const handleCreateGame = () => {
     if (!playerName.trim()) {
-      alert('Please enter your name')
+      showToast('Please enter your name', 'warning')
       return
     }
     const requestId = nextRequestId()
@@ -473,7 +501,7 @@ function App() {
 
   const handleJoinGame = () => {
     if (!gameId.trim()) {
-      alert('Please enter the party code')
+      showToast('Please enter the party code', 'warning')
       return
     }
     const requestId = nextRequestId()
@@ -564,6 +592,24 @@ function App() {
     socket.emit('create-test-game', { playerName: name, requestId })
   }
 
+  const renderToasts = () => (
+    <div className="toast-stack" role="status" aria-live="assertive" aria-atomic="false">
+      {toasts.map((toast) => (
+        <div key={toast.id} className={`toast toast--${toast.level}`}>
+          <span className="toast-message">{toast.message}</span>
+          <button
+            type="button"
+            className="toast-close"
+            onClick={() => dismissToast(toast.id)}
+            aria-label="Dismiss message"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+
   // Only show game board when game has actually started (host clicked Start game).
   // Stay in lobby for 'waiting' or any unexpected state so joiners never see the game until host starts.
   const ACTIVE_GAME_STATES = ['grand-tichu', 'exchanging', 'playing', 'round-ended', 'finished']
@@ -599,6 +645,7 @@ function App() {
           players={MOCK_FINISHED_GAME.players}
           game={MOCK_FINISHED_GAME}
         />
+        {renderToasts()}
         </GameErrorBoundary>
       </div>
     )
@@ -700,6 +747,7 @@ function App() {
             game={gameState}
           />
         )}
+        {renderToasts()}
       </div>
     );
   }
@@ -915,6 +963,7 @@ function App() {
           </button>
         </div>
       ) : null}
+      {renderToasts()}
     </div>
   )
 }
