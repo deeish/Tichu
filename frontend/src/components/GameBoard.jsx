@@ -444,10 +444,18 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
   const isBomb = useCallback(() => {
     if (selectedCards.length < 4) return false;
     if (selectedCards.length === 4) {
-      const ranks = selectedCards.map((c) => c.rank || c.name).filter((r) => r !== 'phoenix');
+      // Four-of-a-kind bomb must be exactly four STANDARD cards of same rank.
+      // Phoenix cannot be used to create a bomb.
+      const allStandard = selectedCards.every((c) => c?.type === 'standard' && typeof c?.rank === 'string');
+      if (!allStandard) return false;
+      const ranks = selectedCards.map((c) => c.rank);
       if (new Set(ranks).size === 1) return true;
     }
     if (selectedCards.length >= 5) {
+      // Straight-flush bomb must also be all standard cards (no Phoenix/specials).
+      if (!selectedCards.every((c) => c?.type === 'standard' && typeof c?.rank === 'string' && typeof c?.suit === 'string')) {
+        return false;
+      }
       const standard = selectedCards.filter((c) => c.type === 'standard');
       if (standard.length === 0) return false;
       if (new Set(standard.map((c) => c.suit)).size === 1) return true;
