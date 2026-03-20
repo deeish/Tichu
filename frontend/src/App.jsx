@@ -662,13 +662,22 @@ function App() {
           </div>
         )}
         {gameEnded && (
-          <button
-            type="button"
-            className="game-stats-btn"
-            onClick={() => setShowStatsPopup(true)}
-          >
-            View stats
-          </button>
+          <>
+            <button
+              type="button"
+              className="end-game-test-back"
+              onClick={handleLeaveParty}
+            >
+              ← Back to lobby
+            </button>
+            <button
+              type="button"
+              className="end-game-test-stats"
+              onClick={() => setShowStatsPopup(true)}
+            >
+              View stats
+            </button>
+          </>
         )}
         <GameErrorBoundary
           onError={(payload) => reportClientError(payload)}
