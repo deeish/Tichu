@@ -243,6 +243,66 @@ describe('Bug fixes (BUGS.md)', () => {
   });
 
   describe('5. Dog: all scenarios', () => {
+    test('defense: when 3 are out and trick had one play, tailender response still closes round', () => {
+      const game = createTestGame({
+        state: 'playing',
+        playersOut: ['p1', 'p2', 'p3'],
+        currentTrick: [
+          {
+            playerId: 'p3',
+            cards: [createCard('Q', 'hearts')],
+            combination: { type: 'single', cards: [createCard('Q', 'hearts')] }
+          }
+        ],
+        passedPlayers: [],
+        leadPlayer: 'p3',
+        currentPlayerIndex: 3,
+        hands: {
+          p1: [],
+          p2: [],
+          p3: [],
+          p4: [createCard('K', 'hearts'), createCard('A', 'hearts')]
+        }
+      });
+
+      const result = makeMove(game, 'p4', [createCard('K', 'hearts')], 'play');
+      expect(result.success).toBe(true);
+      expect(game.roundEnded).toBe(true);
+      expect(game.state).toBe('round-ended');
+      expect(game.playersOut).toHaveLength(4);
+      expect(game.playersOut).toContain('p4');
+    });
+
+    test('defense: when 3 are out and tailender passes, round still closes', () => {
+      const game = createTestGame({
+        state: 'playing',
+        playersOut: ['p1', 'p2', 'p3'],
+        currentTrick: [
+          {
+            playerId: 'p3',
+            cards: [createCard('Q', 'hearts')],
+            combination: { type: 'single', cards: [createCard('Q', 'hearts')] }
+          }
+        ],
+        passedPlayers: [],
+        leadPlayer: 'p3',
+        currentPlayerIndex: 3,
+        hands: {
+          p1: [],
+          p2: [],
+          p3: [],
+          p4: [createCard('K', 'hearts')]
+        }
+      });
+
+      const result = makeMove(game, 'p4', [], 'pass');
+      expect(result.success).toBe(true);
+      expect(game.roundEnded).toBe(true);
+      expect(game.state).toBe('round-ended');
+      expect(game.playersOut).toHaveLength(4);
+      expect(game.playersOut).toContain('p4');
+    });
+
     test('Dog can only be played as lead (not when trick has cards)', () => {
       const game = createTestGame({
         state: 'playing',

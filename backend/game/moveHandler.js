@@ -37,6 +37,19 @@ function getCurrentHolder(game) {
 }
 
 /**
+ * Defensive guard: if 3+ players are already out but round is still "playing",
+ * re-run round-end evaluation to avoid tailender soft-lock edge cases.
+ */
+function enforceTailenderRoundEnd(game) {
+  if (!game || game.state !== 'playing' || game.roundEnded) return null;
+  if (!Array.isArray(game.playersOut) || game.playersOut.length < 3) return null;
+  const triggerId = game.playersOut[0];
+  if (triggerId == null) return null;
+  const result = handlePlayerWin(game, triggerId);
+  return game.roundEnded ? result : null;
+}
+
+/**
  * Whether this player has already acted "since the current leader" this trick.
  * "Lead" = whoever played last (current holder). We use the lead's LAST play index so that if
  * the same player plays again (e.g. P2 at index 1 and 4), only plays at or after index 4 count as acted (BUGS.md).
@@ -229,6 +242,8 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     game.currentPlayerIndex = nextPlayerIndex;
     ensureCurrentPlayerCanAct(game);
     // Not all players have acted yet; it's the next player's turn
+    const forcedRoundEnd = enforceTailenderRoundEnd(game);
+    if (forcedRoundEnd) return { ...forcedRoundEnd, success: true, game };
     return { success: true, game };
   }
   
@@ -442,6 +457,8 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     
     game.currentPlayerIndex = nextPlayerIndex;
     ensureCurrentPlayerCanAct(game);
+    const forcedRoundEnd = enforceTailenderRoundEnd(game);
+    if (forcedRoundEnd) return { ...forcedRoundEnd, success: true, game, bombPlayed: true };
     return { success: true, game, bombPlayed: true };
   }
   
@@ -647,6 +664,8 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     game.currentPlayerIndex = nextIdx;
     ensureCurrentPlayerCanAct(game);
     if (game.dogPriorityPlayer === playerId) game.dogPriorityPlayer = null;
+    const forcedRoundEnd = enforceTailenderRoundEnd(game);
+    if (forcedRoundEnd) return { ...forcedRoundEnd, success: true, game };
     return { success: true, game, ...(winResult || {}), ...(playerHandEmpty ? { playerWon: true } : {}) };
   }
   
@@ -683,6 +702,8 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       const winResult = handlePlayerWin(game, playerId);
       if (game.roundEnded) return { ...winResult, success: true, game };
     }
+    const forcedRoundEnd = enforceTailenderRoundEnd(game);
+    if (forcedRoundEnd) return { ...forcedRoundEnd, success: true, game };
     return { success: true, game, ...(firstPlayHandEmpty ? { playerWon: true } : {}) };
   }
   
@@ -866,6 +887,8 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   // and cleared when the wished card is actually played
   
   ensureCurrentPlayerCanAct(game);
+  const forcedRoundEnd = enforceTailenderRoundEnd(game);
+  if (forcedRoundEnd) return { ...forcedRoundEnd, success: true, game };
   return { success: true, game };
 }
 
