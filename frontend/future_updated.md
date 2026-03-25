@@ -12,6 +12,7 @@ Playing a card
 When the user plays, animate the selected card(s) from hand → center (e.g. short move + scale), instead of them disappearing and reappearing in the trick. Same idea when opponents play: cards animate from their area into the center.
 Trick layout
 Show the current trick as cards in the center of the table (e.g. in a small pile or by position per player), not as a vertical list. Optionally show who led and who followed.
+
 3. Feedback & timing
 Sound (optional but high impact)
 Card play (place / slide).
@@ -30,15 +31,14 @@ Then show “Trick won by [Name]” and update scores.
 This makes the trick feel like a real round that “resolves” before the next one.
 Phase transitions
 For Grand Tichu → Exchange → Playing (and round end), use short messages or overlays (“Exchanging cards…”, “New round”) so phases don’t feel abrupt.
+
 4. Clarity & “game feel”
-Turn and state
-Keep “Your turn” / “Their turn” but make it very visible (e.g. glow on your hand area when it’s your turn, or a subtle highlight on the active player’s name/area). Optionally a small timer or “waiting for…” for other players.
 Errors
-Replace alert() with in-app messages (toast or inline near the action) so feedback feels part of the game.
 Declarations
 Grand Tichu / Tichu declarations can have a short visual cue (e.g. badge, icon, or one-time animation) so they feel like real “moments” in the game.
 Dragon / Mah Jong
-When Dragon is played and the player must choose who gets the trick, use a clear modal or highlighted buttons. For Mah Jong wish, the same: clear, focused UI so it feels like a distinct decision.
+When Dragon is played and the player must choose who gets the trick, use a clear modal or highlighted buttons. 
+
 5. Suggested order of work
 Table + seating – One clear “table” and fixed player positions (no new logic).
 Card play animation – Hand → center for your plays (and optionally for others).

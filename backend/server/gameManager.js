@@ -110,35 +110,43 @@ function startGame(gameId, games, broadcastGameUpdate) {
   if (game.state === 'grand-tichu') {
     // Test players automatically reveal cards (skip Grand Tichu)
     setTimeout(() => {
-      const testPlayers = game.players.filter(p => p.isTestPlayer);
-      testPlayers.forEach(testPlayer => {
-        if (!game.cardsRevealed[testPlayer.id]) {
-          revealRemainingCards(game, testPlayer.id);
-        }
-      });
-      broadcastGameUpdate(game);
-      
-      // Auto-advance to exchange phase when all revealed
-      setTimeout(() => {
-        if (game.state === 'grand-tichu') {
-          const allRevealed = game.players.every(p => game.cardsRevealed[p.id]);
-          if (allRevealed) {
-            game.state = 'exchanging';
-            broadcastGameUpdate(game);
-            
-            // Auto-exchange for test players
-            const testPlayers = game.players.filter(p => p.isTestPlayer);
-            testPlayers.forEach(testPlayer => {
-              const testHand = game.hands[testPlayer.id] || [];
-              if (testHand.length >= 3) {
-                game.exchangeCards[testPlayer.id] = testHand.slice(0, 3);
-                game.exchangeComplete[testPlayer.id] = true;
-              }
-            });
-            broadcastGameUpdate(game);
+      try {
+        const testPlayers = game.players.filter(p => p.isTestPlayer);
+        testPlayers.forEach(testPlayer => {
+          if (!game.cardsRevealed[testPlayer.id]) {
+            revealRemainingCards(game, testPlayer.id);
           }
-        }
-      }, 1000);
+        });
+        broadcastGameUpdate(game);
+
+        // Auto-advance to exchange phase when all revealed
+        setTimeout(() => {
+          try {
+            if (game.state === 'grand-tichu') {
+              const allRevealed = game.players.every(p => game.cardsRevealed[p.id]);
+              if (allRevealed) {
+                game.state = 'exchanging';
+                broadcastGameUpdate(game);
+
+                // Auto-exchange for test players
+                const testPlayersInner = game.players.filter(p => p.isTestPlayer);
+                testPlayersInner.forEach(testPlayer => {
+                  const testHand = game.hands[testPlayer.id] || [];
+                  if (testHand.length >= 3) {
+                    game.exchangeCards[testPlayer.id] = testHand.slice(0, 3);
+                    game.exchangeComplete[testPlayer.id] = true;
+                  }
+                });
+                broadcastGameUpdate(game);
+              }
+            }
+          } catch (err) {
+            console.error('[startGame] inner test-player timer failed', err?.message ?? err, err?.stack ?? '');
+          }
+        }, 1000);
+      } catch (err) {
+        console.error('[startGame] outer test-player timer failed', err?.message ?? err, err?.stack ?? '');
+      }
     }, 500);
   }
 }

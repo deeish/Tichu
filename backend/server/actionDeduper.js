@@ -55,9 +55,14 @@ function createActionDeduper({ ttlMs = 30_000 } = {}) {
     m.set(k, { ok: !!result?.success, errorMessage: result?.errorMessage, at: now() })
   }
 
+  function removeGame(gameId) {
+    if (gameId) byGame.delete(gameId)
+  }
+
   return {
     getResultIfDuplicate,
     storeResult,
+    removeGame,
     // exported for testing/debugging
     __test__: { actionKey },
   }

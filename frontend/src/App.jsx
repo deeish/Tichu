@@ -456,7 +456,17 @@ function App() {
       onError: (data) => {
         try {
           const msg = data?.message ?? ''
-          if (msg.includes('rejoin') || msg === 'Game not found' || msg === 'Already in game' || msg === 'Invalid rejoin token') {
+          const code = data?.code
+          if (
+            msg.includes('rejoin') ||
+            msg === 'Game not found' ||
+            msg === 'Already in game' ||
+            msg === 'Invalid rejoin token' ||
+            code === 'not_in_game' ||
+            code === 'game_not_found' ||
+            code === 'invalid_rejoin_token' ||
+            code === 'already_in_game'
+          ) {
             clearRejoinCreds()
           }
           showToast((data?.message ?? msg) || 'Unexpected error')

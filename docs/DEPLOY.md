@@ -25,7 +25,15 @@ This guide assumes your code is in a **GitHub** repo. If not, create a repo and 
 5. Click **Create Web Service**. Render will build and deploy. Wait until the service shows **Live**.
 6. Copy your service URL (e.g. `https://tichu-backend.onrender.com`). You need it for the frontend.
 
-**Note:** On the free tier, the service sleeps after ~15 minutes of no traffic. The first request after that may take 30–60 seconds to respond.
+7. (Optional) In the Render service **Settings → Health Checks**, set the path to **`/health`** so deploys use the lightweight probe defined in `backend/server.js`.
+
+8. (Optional) Socket.IO keepalive tuning — only if you see flaky disconnects: set **`SOCKET_IO_PING_TIMEOUT_MS`** (default `45000`) and/or **`SOCKET_IO_PING_INTERVAL_MS`** (default `25000`) in Render **Environment**. See `docs/SERVER_HARDENING_PLAN.md` §P5.
+
+9. (Optional) HTTP request-phase timeouts on the Node server (slow clients on **`/health`** or **`/api/client-error`**): **`HTTP_REQUEST_TIMEOUT_MS`** (default `30000`) and **`HTTP_HEADERS_TIMEOUT_MS`** (default request + 5s, must stay **greater** than request). See `docs/SERVER_HARDENING_PLAN.md` §P2b.
+
+10. (Optional) **Resume games after a backend restart** — provision **Redis** (e.g. [Upstash](https://upstash.com/) or Render Redis), then set **`REDIS_URL`** on the Render service to the connection string (`rediss://…` / `redis://…`). The server snapshots party state periodically and reloads it on boot; every player still shows as disconnected until they **rejoin** with their stored token. **`GET /health`** includes **`persistRedis: true`** when Redis is connected. See `docs/SERVER_HARDENING_PLAN.md` §P4. Optional **`GAME_REDIS_SAVE_DEBOUNCE_MS`** (default `400`) throttles writes.
+
+**Note:** On the **free** tier, the service sleeps after ~15 minutes of no traffic; the first request after that may take 30–60 seconds. **This project uses Render’s paid Starter** web service, which does not spin down from idle that way. Deploys and platform restarts still recycle the Node process — without **`REDIS_URL`**, in-memory games are lost; with it, parties can reload and players can rejoin.
 
 ---
 
@@ -64,6 +72,7 @@ For security, you can limit the backend to only accept requests from your fronte
 |-------------------|----------------------|
 | Backend URL       | Render dashboard → your service → URL at top |
 | Frontend env var  | Vercel → Project → Settings → Environment Variables → `VITE_SOCKET_URL` |
+| Game snapshots (optional) | Render → **`REDIS_URL`** (Redis / Upstash connection string) |
 | Re-deploy         | Push to GitHub; both Vercel and Render will rebuild automatically (if auto-deploy is on). |
 
 ---
