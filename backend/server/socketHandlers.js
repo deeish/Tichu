@@ -410,15 +410,7 @@ function setupSocketHandlers(io, games, players) {
       }
       player.name = name;
       players.set(socket.id, { gameId: playerInfo.gameId, playerName: name, playerId: player.id });
-      game.players.forEach((p) => {
-        if (p.socketId) {
-          const view = getPlayerView(game, p.socketId);
-          capGameForWire(view);
-          sanitizeWireSnapshot(view);
-          io.to(p.socketId).emit('game-state', { game: view });
-        }
-      });
-      notifyGamePersist(game);
+      broadcastGameUpdate(io, game, games);
     });
 
     safeOn('set-player-team', (teamOrPayload) => {
@@ -457,15 +449,7 @@ function setupSocketHandlers(io, games, players) {
       }
       player.team = t;
       console.log('[set-player-team] updated', player.name, 'to team', t);
-      game.players.forEach((p) => {
-        if (p.socketId) {
-          const view = getPlayerView(game, p.socketId);
-          capGameForWire(view);
-          sanitizeWireSnapshot(view);
-          io.to(p.socketId).emit('game-state', { game: view });
-        }
-      });
-      notifyGamePersist(game);
+      broadcastGameUpdate(io, game, games);
     });
 
     safeOn('randomize-teams', () => {
@@ -493,15 +477,9 @@ function setupSocketHandlers(io, games, players) {
         return;
       }
       assignRandomTeamsToGame(game);
-      game.players.forEach((p) => {
-        if (p.socketId) {
-          const view = getPlayerView(game, p.socketId);
-          capGameForWire(view);
-          sanitizeWireSnapshot(view);
-          io.to(p.socketId).emit('game-state', { game: view });
-        }
-      });
-      notifyGamePersist(game);
+      // Must bump stateVersion (via broadcastGameUpdate); plain game-state was dropped by clients
+      // that already applied a snapshot with the same stateVersion (stale suppression).
+      broadcastGameUpdate(io, game, games);
     });
 
     safeOn('leave-game', () => {
