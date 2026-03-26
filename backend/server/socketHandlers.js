@@ -28,6 +28,21 @@ function generateId() {
   return crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
 }
 
+/**
+ * Shallow copy for room-wide emits (player-joined / player-left). In-memory games still have every
+ * player's rejoin token; broadcasting that lets clients that pick "me" via find(p => p.token) lock
+ * onto the first player (host) instead of themselves.
+ */
+function gameSnapshotForRoomPeers(game) {
+  if (!game || typeof game !== 'object') return game;
+  return {
+    ...game,
+    players: Array.isArray(game.players)
+      ? game.players.map((p) => ({ ...p, token: undefined }))
+      : [],
+  };
+}
+
 /** Per-game throttle for broadcastGameUpdate: at most one broadcast per game per BROADCAST_THROTTLE_MS. */
 const BROADCAST_THROTTLE_MS = 80;
 const gameUpdateThrottle = new Map(); // gameId -> { timerId, pending }
@@ -311,7 +326,10 @@ function setupSocketHandlers(io, games, players) {
 
         const view = getPlayerView(game, socket.id);
         socket.emit('player-joined', { player: disconnectedSlot, game: view, playerToken: token });
-        socket.to(gameId).emit('player-joined', { player: { ...disconnectedSlot, token: undefined }, game });
+        socket.to(gameId).emit('player-joined', {
+          player: { ...disconnectedSlot, token: undefined },
+          game: gameSnapshotForRoomPeers(game),
+        });
         broadcastGameUpdate(io, game, games);
         return;
       }
@@ -334,7 +352,10 @@ function setupSocketHandlers(io, games, players) {
 
       const view = getPlayerView(game, socket.id);
       socket.emit('player-joined', { player, game: view, playerToken: token });
-      socket.to(gameId).emit('player-joined', { player: { ...player, token: undefined }, game });
+      socket.to(gameId).emit('player-joined', {
+        player: { ...player, token: undefined },
+        game: gameSnapshotForRoomPeers(game),
+      });
       notifyGamePersist(game);
     });
 
@@ -493,7 +514,10 @@ function setupSocketHandlers(io, games, players) {
       if (game && leaving) {
         game.players = game.players.filter((p) => p.id !== leaving.id);
         if (game.hands) delete game.hands[leaving.id];
-        socket.to(playerInfo.gameId).emit('player-left', { playerId: leaving.id, game });
+        socket.to(playerInfo.gameId).emit('player-left', {
+          playerId: leaving.id,
+          game: gameSnapshotForRoomPeers(game),
+        });
         if (game.players.length === 0) {
           releaseGameResources(playerInfo.gameId);
           games.delete(playerInfo.gameId);

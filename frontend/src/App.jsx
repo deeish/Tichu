@@ -13,6 +13,12 @@ const REJOIN_GAME_KEY = 'tichu_rejoin_gameId'
 const REJOIN_TOKEN_KEY = 'tichu_rejoin_token'
 const EXPECTED_PROTOCOL_VERSION = 1
 
+/** Prefer socket match: room broadcasts used to include every player's token, so find(p => p.token) picked the host. */
+function findMyPlayerInLobbySnapshot(players, socketId) {
+  if (!Array.isArray(players) || !socketId) return undefined
+  return players.find((p) => p.socketId === socketId) ?? players.find((p) => p.token)
+}
+
 /** Throttle game-update apply so we clone + setState at most this often (reduces re-renders and churn). */
 const GAME_UPDATE_THROTTLE_MS = 90
 
@@ -279,7 +285,7 @@ function App() {
             setGameState(game)
             const gid = data.gameId ?? data.game?.id
             setGameId(gid)
-            const me = data.game?.players?.find((p) => p.token)
+            const me = findMyPlayerInLobbySnapshot(data.game?.players, socket.id)
             const myId = me?.id ?? socket.id
             setPlayerId(myId)
             if (data.playerToken && gid) saveRejoinCreds(gid, data.playerToken)
