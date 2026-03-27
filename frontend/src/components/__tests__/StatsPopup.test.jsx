@@ -67,4 +67,52 @@ describe('StatsPopup', () => {
     expect(within(dialog).getByText('Player 1')).toBeInTheDocument()
     expect(within(dialog).getByText('Player 4')).toBeInTheDocument()
   })
+
+  it('finished game: keeps rows for players who left (uses playerStats + turnOrder names)', () => {
+    const playersAfterLeave = [
+      { id: 'p1', name: 'Alice' },
+      { id: 'p3', name: 'Carol' },
+    ]
+    const game = {
+      state: 'finished',
+      playerStats: defaultGame.playerStats,
+      turnOrder: defaultPlayers.map((p) => ({ id: p.id, name: p.name, team: 1 })),
+    }
+    const { container } = render(
+      <StatsPopup open={true} onClose={() => {}} players={playersAfterLeave} game={game} />
+    )
+    const dialog = within(container).getByRole('dialog', { name: /game stats/i })
+    expect(within(dialog).getByText('Alice')).toBeInTheDocument()
+    expect(within(dialog).getByText('Bob')).toBeInTheDocument()
+    expect(within(dialog).getByText('Carol')).toBeInTheDocument()
+    expect(within(dialog).getByText('Dave')).toBeInTheDocument()
+    const rows = within(dialog).getAllByRole('row')
+    expect(rows.length).toBe(5)
+  })
+
+  it('finished game: fills names from roundLog when turnOrder matches short players list (client normalize)', () => {
+    const playersAfterLeave = [{ id: 'p1', name: 'Alice' }, { id: 'p3', name: 'Carol' }]
+    const game = {
+      state: 'finished',
+      playerStats: defaultGame.playerStats,
+      turnOrder: [...playersAfterLeave],
+      roundLog: [
+        {
+          round: 99,
+          players: defaultPlayers.map((p) => ({
+            playerId: p.id,
+            playerName: p.name,
+            team: 1,
+            total: 0,
+          })),
+        },
+      ],
+    }
+    const { container } = render(
+      <StatsPopup open={true} onClose={() => {}} players={playersAfterLeave} game={game} />
+    )
+    const dialog = within(container).getByRole('dialog', { name: /game stats/i })
+    expect(within(dialog).getByText('Bob')).toBeInTheDocument()
+    expect(within(dialog).getByText('Dave')).toBeInTheDocument()
+  })
 })
