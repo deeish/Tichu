@@ -190,6 +190,20 @@
   flex-direction: column;
 }
 
+/* Keep tab panels mounted so Chat (and listeners) persist across tab switches */
+.drawer-tab-panel {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: none;
+  flex-direction: column;
+}
+
+.drawer-tab-panel.drawer-tab-panel--active {
+  display: flex;
+}
+
 .drawer-panel-inner {
   flex: 1;
   min-height: 0;
@@ -379,13 +393,13 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: rgba(255, 255, 255, 0.5);
-  margin-bottom: var(--s12);
+  margin-bottom: var(--s8);
 }
 
 .drawer-log-rounds {
   display: flex;
   flex-direction: column;
-  gap: var(--s16);
+  gap: 14px;
 }
 
 .drawer-log-round {
@@ -393,12 +407,23 @@
 }
 
 .drawer-log-round-title {
-  margin: 0 0 var(--s8) 0;
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px 0;
+  font-size: 11px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.drawer-log-round-title-accent {
+  width: 2px;
+  height: 11px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(147, 197, 253, 0.95), rgba(96, 165, 250, 0.5));
+  flex-shrink: 0;
 }
 
 .drawer-log-player-list {
@@ -407,46 +432,82 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--s8);
+  gap: 5px;
 }
 
 .drawer-log-player-list li {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-panel);
-  padding: var(--s8) var(--s12);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.35));
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 6px 8px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 .drawer-log-player-list li.drawer-log-player--you {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(147, 197, 253, 0.35);
+  background: linear-gradient(145deg, rgba(30, 58, 95, 0.45), rgba(15, 23, 42, 0.4));
+  box-shadow: 0 0 0 1px rgba(147, 197, 253, 0.08);
 }
 
-.drawer-log-player-header {
+.drawer-log-player-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 4px;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.drawer-log-player-ident {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
 }
 
 .drawer-log-player-name {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255, 255, 255, 0.94);
+  line-height: 1.25;
 }
 
-.drawer-log-player-team {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+.drawer-log-team-pill {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.drawer-log-team-pill--t1 {
+  color: rgba(191, 219, 254, 0.95);
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(96, 165, 250, 0.28);
+}
+
+.drawer-log-team-pill--t2 {
+  color: rgba(254, 202, 202, 0.95);
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(248, 113, 113, 0.28);
+}
+
+.drawer-log-player-score {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  flex-shrink: 0;
 }
 
 .drawer-log-player-breakdown {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 10px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
-  margin-bottom: 4px;
+  gap: 3px 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .drawer-log-breakdown-item {
@@ -466,16 +527,75 @@
   color: rgba(251, 146, 60, 0.95);
 }
 
-.drawer-log-player-total {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
-  padding-top: 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+.drawer-log-standings {
+  margin-top: 7px;
+  padding: 6px 7px 7px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.1));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
 }
 
-.drawer-log-player-total strong {
+.drawer-log-standings-caption {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.42);
+  margin-bottom: 5px;
+}
+
+.drawer-log-standings-chips {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.drawer-log-standings-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  padding: 5px 7px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.drawer-log-standings-chip--t1 {
+  background: linear-gradient(160deg, rgba(59, 130, 246, 0.18), rgba(15, 23, 42, 0.35));
+  border-color: rgba(96, 165, 250, 0.22);
+}
+
+.drawer-log-standings-chip--t2 {
+  background: linear-gradient(160deg, rgba(248, 113, 113, 0.14), rgba(15, 23, 42, 0.35));
+  border-color: rgba(248, 113, 113, 0.2);
+}
+
+.drawer-log-standings-chip-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.52);
+  line-height: 1.2;
+}
+
+.drawer-log-standings-chip-value {
+  font-size: 14px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: #fff;
+  line-height: 1.15;
+  margin-top: 1px;
+}
+
+.drawer-log-standings-chip-round {
+  font-size: 9px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.2;
+  margin-top: 2px;
 }
 
 .drawer-log-empty {

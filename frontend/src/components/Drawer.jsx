@@ -25,15 +25,33 @@ function getPlayerName(players, playerId) {
   return p?.name ?? 'Unknown';
 }
 
-function ChatPanel({ playerId, players, socket }) {
+function ChatPanel({ playerId, players, socket, game }) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const inputRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const lastGameIdRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // New match: different game id → fresh chat (lobby → game or switch party).
+  useEffect(() => {
+    const gid = game?.id ?? null;
+    if (gid != null && lastGameIdRef.current != null && gid !== lastGameIdRef.current) {
+      setMessages([]);
+    }
+    if (gid != null) lastGameIdRef.current = gid;
+    else if (game == null) lastGameIdRef.current = null;
+  }, [game?.id, game]);
+
+  // Room rule: keep history for the whole game; clear when the game is finished.
+  useEffect(() => {
+    if (game?.state === 'finished') {
+      setMessages([]);
+    }
+  }, [game?.state]);
 
   useEffect(() => {
     if (!socket) return;
@@ -111,6 +129,24 @@ function formatRoundScore(r) {
   return n > 0 ? `+${n}` : n;
 }
 
+function sumRoundTeamTotals(players, team) {
+  if (!Array.isArray(players)) return 0;
+  const t = Number(team);
+  return players.reduce((sum, p) => {
+    if (Number(p.team) !== t) return sum;
+    const n = Number(p.total);
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+}
+
+/** Human-readable signed points (+50, -20, 0). */
+function formatSignedPoints(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '0';
+  if (v > 0) return `+${v}`;
+  return String(v);
+}
+
 /** Mock round log for visuals; backend will supply game.roundLog when rounds complete. Includes a double-victory round so quick test game Log tab can be verified. */
 function getMockRoundLog(players) {
   const names = (players || []).map((p) => p.name);
@@ -157,57 +193,101 @@ function GameLogPanel({ game, playerId }) {
     hasServerRounds ? serverLog : isTestGame ? getMockRoundLog(game?.players) : [];
   const isYou = (id) => id === playerId;
 
+  let runningTeam1 = 0;
+  let runningTeam2 = 0;
+  const roundsWithStandings = roundLog.map((entry) => {
+    const roundPlayers = Array.isArray(entry.players) ? entry.players : [];
+    const delta1 = sumRoundTeamTotals(roundPlayers, 1);
+    const delta2 = sumRoundTeamTotals(roundPlayers, 2);
+    runningTeam1 += delta1;
+    runningTeam2 += delta2;
+    return {
+      entry,
+      roundPlayers,
+      cumulative1: runningTeam1,
+      cumulative2: runningTeam2,
+      delta1,
+      delta2,
+    };
+  });
+
   return (
     <div className="drawer-log-panel">
-      <div className="drawer-log-heading">Points per round</div>
+      <div className="drawer-log-heading">Round log</div>
       <div className="drawer-log-rounds">
-        {roundLog.map((entry) => (
-          <section key={entry.round} className="drawer-log-round" aria-label={`Round ${entry.round}`}>
-            <h4 className="drawer-log-round-title">Round {entry.round}</h4>
-            <ul className="drawer-log-player-list">
-              {(Array.isArray(entry.players) ? entry.players : []).map((p) => (
-                <li key={`${entry.round}-${p.playerId}`} className={isYou(p.playerId) ? 'drawer-log-player--you' : ''}>
-                  <div className="drawer-log-player-header">
-                    <span className="drawer-log-player-name">{p.playerName}</span>
-                    <span className="drawer-log-player-team">Team {p.team}</span>
-                  </div>
-                  <div className="drawer-log-player-breakdown">
-                    {entry.doubleVictory && (p.placement === 1 || p.placement === 2) ? (
-                      <span className="drawer-log-breakdown-item drawer-log-breakdown-item--placement">
-                        {p.placement === 1 ? '1st' : '2nd'}
+        {roundsWithStandings.map(
+          ({ entry, roundPlayers, cumulative1, cumulative2, delta1, delta2 }) => (
+            <section key={entry.round} className="drawer-log-round" aria-label={`Round ${entry.round}`}>
+              <h4 className="drawer-log-round-title">
+                <span className="drawer-log-round-title-accent" aria-hidden />
+                Round {entry.round}
+              </h4>
+              <ul className="drawer-log-player-list">
+                {roundPlayers.map((p) => (
+                  <li key={`${entry.round}-${p.playerId}`} className={isYou(p.playerId) ? 'drawer-log-player--you' : ''}>
+                    <div className="drawer-log-player-top">
+                      <div className="drawer-log-player-ident">
+                        <span className="drawer-log-player-name">{p.playerName}</span>
+                        <span className={`drawer-log-team-pill drawer-log-team-pill--t${p.team}`}>Team {p.team}</span>
+                      </div>
+                      <span className="drawer-log-player-score" title="Points this round">
+                        {formatSignedPoints(p.total)}
                       </span>
-                    ) : entry.doubleVictory && (p.placement === 3 || p.placement === 4) ? (
-                      <span className="drawer-log-breakdown-item drawer-log-breakdown-item--placement">
-                        {p.placement === 3 ? '3rd' : '4th'}
-                      </span>
-                    ) : p.breakdown && p.breakdown.length > 0 ? (
-                      p.breakdown.map((item, i) => (
-                        <span key={i} className="drawer-log-breakdown-item">
-                          {item.label} ({item.points}){i < p.breakdown.length - 1 ? ',' : ''}
+                    </div>
+                    <div className="drawer-log-player-breakdown">
+                      {entry.doubleVictory && (p.placement === 1 || p.placement === 2) ? (
+                        <span className="drawer-log-breakdown-item drawer-log-breakdown-item--placement">
+                          {p.placement === 1 ? '1st' : '2nd'}
                         </span>
-                      ))
-                    ) : (
-                      <span className="drawer-log-breakdown-item drawer-log-breakdown-item--muted">—</span>
-                    )}
-                    {p.tichu != null && (
-                      <span className="drawer-log-breakdown-item drawer-log-breakdown-item--tichu">
-                        {(entry.doubleVictory && (p.placement === 1 || p.placement === 2)) || (entry.doubleVictory && (p.placement === 3 || p.placement === 4)) || (p.breakdown?.length) ? ', ' : ''}Tichu {p.tichu >= 0 ? `+${p.tichu}` : p.tichu}
-                      </span>
-                    )}
-                    {p.grandTichu != null && (
-                      <span className="drawer-log-breakdown-item drawer-log-breakdown-item--grand">
-                        {(entry.doubleVictory && (p.placement === 1 || p.placement === 2)) || (entry.doubleVictory && (p.placement === 3 || p.placement === 4)) || p.breakdown?.length || p.tichu != null ? ', ' : ''}Grand {p.grandTichu >= 0 ? `+${p.grandTichu}` : p.grandTichu}
-                      </span>
+                      ) : entry.doubleVictory && (p.placement === 3 || p.placement === 4) ? (
+                        <span className="drawer-log-breakdown-item drawer-log-breakdown-item--placement">
+                          {p.placement === 3 ? '3rd' : '4th'}
+                        </span>
+                      ) : p.breakdown && p.breakdown.length > 0 ? (
+                        p.breakdown.map((item, i) => (
+                          <span key={i} className="drawer-log-breakdown-item">
+                            {item.label} ({item.points}){i < p.breakdown.length - 1 ? ',' : ''}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="drawer-log-breakdown-item drawer-log-breakdown-item--muted">—</span>
+                      )}
+                      {p.tichu != null && (
+                        <span className="drawer-log-breakdown-item drawer-log-breakdown-item--tichu">
+                          {(entry.doubleVictory && (p.placement === 1 || p.placement === 2)) || (entry.doubleVictory && (p.placement === 3 || p.placement === 4)) || (p.breakdown?.length) ? ', ' : ''}Tichu {p.tichu >= 0 ? `+${p.tichu}` : p.tichu}
+                        </span>
+                      )}
+                      {p.grandTichu != null && (
+                        <span className="drawer-log-breakdown-item drawer-log-breakdown-item--grand">
+                          {(entry.doubleVictory && (p.placement === 1 || p.placement === 2)) || (entry.doubleVictory && (p.placement === 3 || p.placement === 4)) || p.breakdown?.length || p.tichu != null ? ', ' : ''}Grand {p.grandTichu >= 0 ? `+${p.grandTichu}` : p.grandTichu}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="drawer-log-standings" aria-label={`Standings after round ${entry.round}`}>
+                <div className="drawer-log-standings-caption">After this round</div>
+                <div className="drawer-log-standings-chips">
+                  <div className="drawer-log-standings-chip drawer-log-standings-chip--t1">
+                    <span className="drawer-log-standings-chip-label">Team 1</span>
+                    <span className="drawer-log-standings-chip-value">{formatSignedPoints(cumulative1)}</span>
+                    {delta1 !== 0 && (
+                      <span className="drawer-log-standings-chip-round">{formatSignedPoints(delta1)} this round</span>
                     )}
                   </div>
-                  <div className="drawer-log-player-total">
-                    Total: <strong>{p.total >= 0 ? `+${p.total}` : p.total}</strong>
+                  <div className="drawer-log-standings-chip drawer-log-standings-chip--t2">
+                    <span className="drawer-log-standings-chip-label">Team 2</span>
+                    <span className="drawer-log-standings-chip-value">{formatSignedPoints(cumulative2)}</span>
+                    {delta2 !== 0 && (
+                      <span className="drawer-log-standings-chip-round">{formatSignedPoints(delta2)} this round</span>
+                    )}
                   </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+                </div>
+              </div>
+            </section>
+          )
+        )}
       </div>
       {roundLog.length === 0 && (
         <p className="drawer-log-empty">No rounds yet. Points will appear here as the game progresses.</p>
@@ -278,11 +358,15 @@ function Drawer({
           </div>
         )}
 
-        <div className="drawer-tabs">
+        <div className="drawer-tabs" role="tablist">
           {TABS.map((tab) => (
             <button
               key={tab}
+              id={`drawer-tab-${tab.toLowerCase()}`}
               type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              aria-controls={`drawer-panel-${tab.toLowerCase()}`}
               className={`drawer-tab ${activeTab === tab ? 'active' : ''}`}
               onClick={() => setActiveTab(tab)}
             >
@@ -291,25 +375,53 @@ function Drawer({
           ))}
         </div>
         <div className="drawer-panel">
-          {activeTab === 'Chat' && <ChatPanel playerId={playerId} players={game?.players} socket={socket} />}
-          {activeTab === 'Players' && (game?.players ?? []).length > 0 && (
-            <div className="drawer-panel-inner">
-              <ul className="drawer-players">
-                {(game?.players ?? []).map((p) => (
-                  <li key={p.id} className={p.id === playerId ? 'you' : ''}>
-                    <span className="drawer-player-name">{p.name}</span>
-                    <span className="drawer-player-team">Team {p.team}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {activeTab === 'Log' && (
+          <div
+            className={`drawer-tab-panel ${activeTab === 'Chat' ? 'drawer-tab-panel--active' : ''}`}
+            role="tabpanel"
+            id="drawer-panel-chat"
+            aria-labelledby="drawer-tab-chat"
+          >
+            <ChatPanel playerId={playerId} players={game?.players} socket={socket} game={game} />
+          </div>
+          <div
+            className={`drawer-tab-panel ${activeTab === 'Players' ? 'drawer-tab-panel--active' : ''}`}
+            role="tabpanel"
+            id="drawer-panel-players"
+            aria-labelledby="drawer-tab-players"
+          >
+            {(game?.players ?? []).length > 0 ? (
+              <div className="drawer-panel-inner">
+                <ul className="drawer-players">
+                  {(game?.players ?? []).map((p) => (
+                    <li key={p.id} className={p.id === playerId ? 'you' : ''}>
+                      <span className="drawer-player-name">{p.name}</span>
+                      <span className="drawer-player-team">Team {p.team}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="drawer-panel-inner">
+                <p className="drawer-chat-empty">No players yet.</p>
+              </div>
+            )}
+          </div>
+          <div
+            className={`drawer-tab-panel ${activeTab === 'Log' ? 'drawer-tab-panel--active' : ''}`}
+            role="tabpanel"
+            id="drawer-panel-log"
+            hidden={activeTab !== 'Log'}
+          >
             <div className="drawer-panel-inner drawer-panel-inner--log">
               <GameLogPanel game={game} playerId={playerId} />
             </div>
-          )}
-          {activeTab === 'Theme' && (
+          </div>
+          <div
+            className={`drawer-tab-panel ${activeTab === 'Theme' ? 'drawer-tab-panel--active' : ''}`}
+            role="tabpanel"
+            id="drawer-panel-theme"
+            aria-labelledby="drawer-tab-theme"
+          >
             <div className="drawer-panel-inner">
               <section className="drawer-settings-section" aria-labelledby="theme-label">
                 <h3 id="theme-label" className="drawer-settings-heading">Table theme</h3>
@@ -328,7 +440,7 @@ function Drawer({
                 </div>
               </section>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </aside>

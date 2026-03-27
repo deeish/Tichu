@@ -218,6 +218,46 @@ describe('Scoring Logic', () => {
   });
 
   describe('round log', () => {
+    function sumTeamTotalsFromLogEntry(entry, team) {
+      const t = Number(team);
+      return entry.players.reduce((sum, p) => {
+        if (Number(p.team) !== t) return sum;
+        const n = Number(p.total);
+        return sum + (Number.isFinite(n) ? n : 0);
+      }, 0);
+    }
+
+    test('round log player totals per team match roundScores (same formula as client log)', () => {
+      mockGame.playerStacks.p1.points = 25;
+      mockGame.playerStacks.p2.points = 15;
+      mockGame.playerStacks.p3.points = 10;
+      mockGame.playerStacks.p4.points = 5;
+      mockGame.playersOut = ['p1', 'p2'];
+      mockGame.hands.p1 = [];
+      mockGame.hands.p2 = [];
+      mockGame.hands.p3 = [];
+      mockGame.hands.p4 = [{ type: 'standard', rank: '2', suit: 'hearts' }];
+      handlePlayerWin(mockGame, 'p3');
+
+      const entry = mockGame.roundLog[0];
+      expect(sumTeamTotalsFromLogEntry(entry, 1)).toBe(mockGame.roundScores.team1);
+      expect(sumTeamTotalsFromLogEntry(entry, 2)).toBe(mockGame.roundScores.team2);
+    });
+
+    test('round log team totals match roundScores for double victory', () => {
+      mockGame.playersOut = ['p1'];
+      mockGame.playerStacks.p1.points = 50;
+      mockGame.playerStacks.p2.points = 30;
+      mockGame.playerStacks.p3.points = 20;
+      mockGame.playerStacks.p4.points = 10;
+      handlePlayerWin(mockGame, 'p2');
+
+      const entry = mockGame.roundLog[0];
+      expect(entry.doubleVictory).toBe(true);
+      expect(sumTeamTotalsFromLogEntry(entry, 1)).toBe(mockGame.roundScores.team1);
+      expect(sumTeamTotalsFromLogEntry(entry, 2)).toBe(mockGame.roundScores.team2);
+    });
+
     test('appendRoundToLog is called when round ends and populates game.roundLog', () => {
       mockGame.playerStacks.p1.points = 25;
       mockGame.playerStacks.p2.points = 15;
