@@ -38,15 +38,13 @@ function HandDock({
   exchangeDraggingIndex = null,
   onReorder,
   onAutoPassToggle = () => {},
+  autoPassEnabled = false,
 }) {
   const cards = Array.isArray(cardsProp) ? cardsProp.slice(0, MAX_HAND_DISPLAY) : [];
   const railRef = useRef(null);
   const lastRailWRef = useRef(0);
   const [railW, setRailW] = useState(0);
   const [reorderDrag, setReorderDrag] = useState(null);
-  // UI-only toggle for the upcoming "auto-pass" feature.
-  // This should not change gameplay behavior until we wire it to onPass emission logic.
-  const [autoPassUIEnabled, setAutoPassUIEnabled] = useState(false);
   /** Defer hint + actions to next frame to avoid blocking the same commit as the card list (freeze mitigation). */
   const [showDockActions, setShowDockActions] = useState(false);
   useEffect(() => {
@@ -425,18 +423,14 @@ function HandDock({
                     </button>
                     <button
                       type="button"
-                      className={`dock-btn dock-btn-secondary dock-auto-pass-btn ${autoPassUIEnabled ? 'dock-auto-pass-btn--on' : ''}`}
+                      className={`dock-btn dock-btn-secondary dock-auto-pass-btn ${autoPassEnabled ? 'dock-auto-pass-btn--on' : ''}`}
                       onClick={() => {
-                        setAutoPassUIEnabled((v) => {
-                          const next = !v;
-                          onAutoPassToggle?.(next);
-                          return next;
-                        });
+                        onAutoPassToggle?.(!autoPassEnabled);
                       }}
-                      aria-pressed={autoPassUIEnabled}
+                      aria-pressed={autoPassEnabled}
                       title="UI-only toggle for the upcoming auto-pass feature"
                     >
-                      Auto-pass: {autoPassUIEnabled ? 'ON' : 'OFF'}
+                      Auto-pass: {autoPassEnabled ? 'ON' : 'OFF'}
                     </button>
                   </div>
                 </>

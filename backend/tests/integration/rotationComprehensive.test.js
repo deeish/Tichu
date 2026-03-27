@@ -582,7 +582,7 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
       const r1 = makeMove(game, 'p1', [createCard('10', 'hearts')], 'play');
       expect(r1.success).toBe(true);
       expect(game.roundEnded).toBe(true);
-      expect(game.state).toBe('round-ended');
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
       expect(game.playersOut).toContain('p1');
       expect(game.playersOut).toContain('p4');
     });

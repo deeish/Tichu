@@ -52,7 +52,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     } catch (_) {}
   }, []);
   const [selectedCards, setSelectedCards] = useState([]);
-  const [sortMode, setSortMode] = useState('none');
+  const [sortMode, setSortMode] = useState('desc');
   const [mahJongWish, setMahJongWish] = useState('');
   const [showWishInput, setShowWishInput] = useState(false);
   const [exchangeAssignments, setExchangeAssignments] = useState([null, null, null]);
@@ -72,6 +72,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   const [autoPassUIEnabled, setAutoPassUIEnabled] = useState(false);
   const autoPassTimerRef = useRef(null);
   const autoPassScheduledTurnSigRef = useRef(null);
+  const autoPassResetRoundKeyRef = useRef(null);
 
   const layoutRef = useRef(null);
   const tableRef = useRef(null);
@@ -105,6 +106,21 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   useEffect(() => {
     if (game?.grandTichuDeclarations?.[playerId] == null) setOptimisticGrandTichu(null);
   }, [game?.grandTichuDeclarations?.[playerId], playerId]);
+
+  // Start each round with auto-pass OFF. Key by roundLog length so it runs once per new round.
+  useEffect(() => {
+    if (!game?.id || game?.state !== 'grand-tichu') return;
+    const roundCount = Array.isArray(game?.roundLog) ? game.roundLog.length : 0;
+    const roundKey = `${game.id}:${roundCount}`;
+    if (autoPassResetRoundKeyRef.current === roundKey) return;
+    autoPassResetRoundKeyRef.current = roundKey;
+    setAutoPassUIEnabled(false);
+    if (autoPassTimerRef.current) {
+      clearTimeout(autoPassTimerRef.current);
+      autoPassTimerRef.current = null;
+    }
+    autoPassScheduledTurnSigRef.current = null;
+  }, [game?.id, game?.state, game?.roundLog]);
 
   // Sync measured viewport (single source for responsive sidebar mode).
   useEffect(() => {
@@ -760,6 +776,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       case 'grand-tichu': return 'Grand';
       case 'exchanging': return 'Exchanging';
       case 'playing': return currentPlayer?.id === playerId ? 'Your turn' : `${getPlayerName(currentPlayer?.id)}'s turn`;
+      case 'round-ending-preview': return 'Round ending...';
+      case 'round-ended': return 'Round over';
       case 'finished': return `Team ${game.winner} wins`;
       default: return game.state || '';
     }
@@ -1163,6 +1181,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           canPass={canPass}
           onPlay={handlePlayCards}
           onPass={handlePass}
+          autoPassEnabled={autoPassUIEnabled}
           onAutoPassToggle={setAutoPassUIEnabled}
           hintText={hintText}
           containerWidth={dockContainerWidth}

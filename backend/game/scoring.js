@@ -3,7 +3,6 @@
  * Handles player wins, round scoring, and game completion
  */
 
-const { initializeGame } = require('./initialization');
 const { getCurrentWinningPlay } = require('./trickManager');
 const { compareCombinations } = require('./combinations');
 const { getCardPoints } = require('./deck');
@@ -29,6 +28,48 @@ function ensureStack(game, id) {
     game.playerStacks[key] = { cards: [], points: 0 };
   }
   return game.playerStacks[key];
+}
+
+function markRoundEndingPreview(game, opts = {}) {
+  game.roundEnded = true;
+  game.state = 'round-ending-preview';
+  game.roundPreviewPending = true;
+  game.roundPreviewStartedAt = Date.now();
+  game.roundPreviewMeta = {
+    doubleVictory: !!opts.doubleVictory,
+  };
+}
+
+
+/**
+ * When round is force-ended (tailender), Dragon cannot wait for manual opponent selection.
+ * If winning play is Dragon single, auto-assign trick to an opponent of the dragon player.
+ */
+function resolveForcedDragonRecipient(game, winnerId) {
+  if (!Array.isArray(game?.currentTrick) || game.currentTrick.length === 0) return null;
+  const winningPlay = getCurrentWinningPlay(game.currentTrick);
+  if (!winningPlay) return null;
+  const dragonSingle =
+    winningPlay.playerId != null &&
+    winnerId != null &&
+    String(winningPlay.playerId) === String(winnerId) &&
+    winningPlay.combination?.type === 'single' &&
+    Array.isArray(winningPlay.cards) &&
+    winningPlay.cards.some((c) => c?.name === 'dragon');
+  if (!dragonSingle) return null;
+
+  const winnerPlayer = game.players?.find((p) => p?.id != null && String(p.id) === String(winnerId));
+  if (!winnerPlayer) return null;
+
+  const opponents = (game.players || []).filter(
+    (p) => p?.id != null && p.team !== winnerPlayer.team
+  );
+  if (opponents.length === 0) return null;
+
+  // Prefer an opponent still holding cards (best approximation of normal manual choice context).
+  const withCards = opponents.find((p) => (game.hands?.[p.id]?.length ?? 0) > 0);
+  if (withCards) return withCards.id;
+  return opponents[0].id;
 }
 
 /**
@@ -311,8 +352,7 @@ function handlePlayerWin(game, playerId) {
         const shouldSkipInit =
           looksLikeTestFixture && Array.isArray(game.currentTrick) && game.currentTrick.length > 0;
         if (!shouldSkipInit) {
-          initializeGame(game);
-          game.currentTrick = [];
+          markRoundEndingPreview(game, { doubleVictory: true });
         }
       }
       return { success: true, game, playerWon: true, doubleVictory: true };
@@ -321,49 +361,42 @@ function handlePlayerWin(game, playerId) {
   
   // Round ends when 3 of 4 have finished (tailender) OR when all 4 are out
   // BUGS.md: When P1,P2,P3 are out, round ends immediately; P4 cannot play more or claim points for cards in hand (discarded)
-  // Use string comparison so id type mismatch never counts an out player as "with cards".
-  const outIds = (game.playersOut || []).map(id => (id != null ? String(id) : null)).filter(Boolean);
-  const outSetStr = new Set(outIds);
-  const playersWithCards = game.players.filter(p => {
-    const pid = p.id != null ? String(p.id) : null;
-    const sid = p.socketId != null ? String(p.socketId) : null;
-    return !(pid && outSetStr.has(pid)) && !(sid && outSetStr.has(sid));
+  //
+  // Tailender must use **who still holds cards**, not only `playersOut` membership. If earlier finishers
+  // were not pushed to playersOut (id/socket edge), "not in playersOut" still counts them and length !== 1,
+  // so the round never ends and the last player with cards is wrongly given the turn (BUG: 3 empty hands + 1 hand).
+  const stillHolding = game.players.filter((p) => {
+    const hid = p?.id;
+    if (!hid) return false;
+    return (game.hands[hid]?.length ?? 0) > 0;
   });
-  
+
   // Tailender: as soon as only one player has cards left, round ends. Resolve current trick (if any) to whoever is winning; P4's hand is discarded (not counted).
-  if (playersWithCards.length === 1) {
-    const lastPlayer = playersWithCards[0];
+  if (stillHolding.length === 1) {
+    const lastPlayer = stillHolding[0];
 
     const currentTrickArray = Array.isArray(game.currentTrick) ? game.currentTrick : [];
     const lastPlay = currentTrickArray[currentTrickArray.length - 1];
     const lastPlayCards = Array.isArray(lastPlay?.cards) ? lastPlay.cards : [];
 
-    const trickHasBomb = currentTrickArray.some(p => p?.combination?.type === 'bomb');
-    // Fallback: detect four-of-a-kind bomb from last play cards shape.
-    const lastPlayLooksLikeFourOfAKindBomb =
-      lastPlayCards.length === 4 &&
-      lastPlayCards.every(c => c && c.type === 'standard' && typeof c.rank === 'string') &&
-      new Set(lastPlayCards.map(c => c.rank)).size === 1;
-
     // Scenario (rotation): sole trick play is someone else's lead — tailender may still beat/pass.
     // If the only play is the finishing player's own (e.g. they just emptied on Phoenix), do NOT defer:
     // round must end immediately (3 out / 1 left); otherwise UI shows tailender "acting" on a dead trick.
     if (currentTrickArray.length === 1) {
-      const soleAuthorId = lastPlay?.playerId;
-      const { stableId: soleStable } = resolvePlayerAndId(game, soleAuthorId);
-      const soleStr =
-        soleStable != null ? String(soleStable) : soleAuthorId != null ? String(soleAuthorId) : null;
-      const outgoingStr = playerIdStr;
-      if (soleStr && outgoingStr && soleStr !== outgoingStr) {
+      const soleR = resolvePlayerAndId(game, lastPlay?.playerId);
+      const outR = resolvePlayerAndId(game, playerId);
+      const sameFinishingPlayer =
+        soleR.player &&
+        outR.player &&
+        soleR.player.id != null &&
+        String(soleR.player.id) === String(outR.player.id);
+      const solePlayerId = soleR.player?.id;
+      const soleStillHasCards = solePlayerId != null && (game.hands?.[solePlayerId]?.length ?? 0) > 0;
+      // Defer only when the sole trick play is from a different player who still has cards
+      // (tailender can legitimately respond). If that sole player is already out/empty, end now.
+      if (!sameFinishingPlayer && soleStillHasCards) {
         return { success: true, game, playerWon: true, roundEnded: false };
       }
-    }
-
-    // If a bomb interruption is in progress, do NOT hard-end/reset the round yet.
-    // Specifically: don't push the last (still-holding-cards) player into playersOut,
-    // otherwise we'd immediately satisfy the "all 4 out" path and call initializeGame().
-    if (trickHasBomb || lastPlayLooksLikeFourOfAKindBomb) {
-      return { success: true, game, playerWon: true, roundEnded: false };
     }
 
     // Resolve in-progress trick so points go to current winner (one of P1/P2/P3), not lost
@@ -371,13 +404,15 @@ function handlePlayerWin(game, playerId) {
       const winningPlay = getCurrentWinningPlay(game.currentTrick);
       const winnerId = winningPlay ? winningPlay.playerId : game.currentTrick[0]?.playerId;
       if (winnerId) {
+        const forcedDragonRecipientId = resolveForcedDragonRecipient(game, winnerId);
+        const stackOwnerId = forcedDragonRecipientId ?? winnerId;
         let trickPoints = 0;
         for (const play of game.currentTrick) {
           for (const card of play.cards) {
             trickPoints += getCardPoints(card);
           }
         }
-        const st = ensureStack(game, winnerId);
+        const st = ensureStack(game, stackOwnerId);
         if (st) {
           for (const play of game.currentTrick) {
             st.cards.push(...play.cards);
@@ -542,8 +577,7 @@ appendRoundToLog(game);
       game.roundEnded = true;
       return { success: true, game, playerWon: true, roundEnded: true };
     }
-
-    initializeGame(game);
+    markRoundEndingPreview(game);
   }
 
   return { success: true, game, playerWon: true, roundEnded: true };

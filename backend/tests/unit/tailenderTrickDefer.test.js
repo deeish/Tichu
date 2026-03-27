@@ -56,10 +56,12 @@ describe('Tailender: defer round end when trick has single play', () => {
 
   test('does not end round immediately when third player goes out and trick has one play from another player', () => {
     const game = baseGame();
+    // Valid defer case: sole trick player is someone else and still has cards to continue the trick.
+    game.hands.p1 = [{ type: 'standard', rank: 'Q', suit: 'clubs' }];
     const result = handlePlayerWin(game, 'p3');
 
     expect(game.playersOut).toContain('p3');
-    expect(result.roundEnded).toBe(false);
+    expect(result.roundEnded ?? false).toBe(false);
     expect(game.roundEnded).toBe(false);
     expect(game.state).toBe('playing');
   });
@@ -78,7 +80,7 @@ describe('Tailender: defer round end when trick has single play', () => {
 
     expect(game.playersOut).toContain('p3');
     expect(game.roundEnded).toBe(true);
-    expect(game.state).toBe('round-ended');
+    expect(['round-ended', 'round-ending-preview']).toContain(game.state);
     expect(game.roundEnded).toBe(true);
   });
 
@@ -93,6 +95,23 @@ describe('Tailender: defer round end when trick has single play', () => {
     handlePlayerWin(game, 'p3');
 
     expect(game.roundEnded).toBe(true);
-    expect(game.state).toBe('round-ended');
+    expect(['round-ended', 'round-ending-preview']).toContain(game.state);
+  });
+
+  test('does not defer when sole trick play is from another player who already has no cards', () => {
+    const game = baseGame();
+    game.currentTrick = [
+      {
+        playerId: 'p1',
+        cards: [{ type: 'special', name: 'dragon' }],
+        combination: { type: 'single', cards: [{ type: 'special', name: 'dragon' }] },
+      },
+    ];
+    game.hands.p1 = [];
+
+    handlePlayerWin(game, 'p3');
+
+    expect(game.roundEnded).toBe(true);
+    expect(['round-ended', 'round-ending-preview']).toContain(game.state);
   });
 });

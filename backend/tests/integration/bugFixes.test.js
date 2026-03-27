@@ -107,7 +107,7 @@ describe('Bug fixes (BUGS.md)', () => {
 
       // Same team (p1, p2 = team 1) went out 1st and 2nd → double victory
       expect(r2.doubleVictory).toBe(true);
-      expect(game.state).toBe('round-ended');
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
       expect(game.roundScores.team1).toBe(200);
       expect(game.roundScores.team2).toBe(0);
       expect(game.playersOut).toHaveLength(4); // p3, p4 added as last
@@ -156,7 +156,7 @@ describe('Bug fixes (BUGS.md)', () => {
 
       handlePlayerWin(game, '456'); // second out (string id) -> playersOut becomes [123, '456'], length 2; lookup must match by string
 
-      expect(game.state).toBe('round-ended');
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
       expect(game.roundEnded).toBe(true);
       expect(game.roundScores.team1).toBe(200);
       expect(game.roundScores.team2).toBe(0);
@@ -207,7 +207,349 @@ describe('Bug fixes (BUGS.md)', () => {
       expect(r3.success).toBe(true);
       expect(game.roundEnded).toBe(true);
       expect(game.playersOut).toHaveLength(4); // P4 added as tailender, cannot play
-      expect(game.state).toBe('round-ended');
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
+    });
+
+    test('tailender ends round even if earlier finishers were not listed in playersOut (hand-based check)', () => {
+      const game = createTestGame({
+        state: 'playing',
+        players: [
+          { id: 'p1', team: 1, name: 'Player 1' },
+          { id: 'p2', team: 2, name: 'Player 2' },
+          { id: 'p3', team: 2, name: 'Player 3' },
+          { id: 'p4', team: 1, name: 'Player 4' }
+        ],
+        turnOrder: [
+          { id: 'p1', team: 1, name: 'Player 1' },
+          { id: 'p2', team: 2, name: 'Player 2' },
+          { id: 'p3', team: 2, name: 'Player 3' },
+          { id: 'p4', team: 1, name: 'Player 4' }
+        ],
+        playersOut: [],
+        currentTrick: [],
+        passedPlayers: [],
+        leadPlayer: 'p4',
+        currentPlayerIndex: 3,
+        mahJongPlayed: true,
+        firstCardPlayed: { p1: true, p2: true, p3: true, p4: true },
+        hands: {
+          p1: [],
+          p2: [],
+          p3: [createCard('Q', 'hearts'), createCard('K', 'hearts')],
+          p4: [createCard('A', 'spades')]
+        },
+        scores: { team1: 0, team2: 0 },
+        tichuDeclarations: {},
+        grandTichuDeclarations: {}
+      });
+
+      const r = makeMove(game, 'p4', [createCard('A', 'spades')], 'play');
+      expect(r.success).toBe(true);
+      expect(game.roundEnded).toBe(true);
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
+      expect(game.playersOut).toContain('p3');
+      expect(game.playersOut).toContain('p4');
+    });
+
+    test('when third player goes out as the only play of the trick (two already out), round ends before tailender turn', () => {
+      const game = createTestGame({
+        state: 'playing',
+        players: [
+          { id: 'p1', team: 1, name: 'Player 1' },
+          { id: 'p2', team: 2, name: 'Player 2' },
+          { id: 'p3', team: 2, name: 'Player 3' },
+          { id: 'p4', team: 1, name: 'Player 4' }
+        ],
+        turnOrder: [
+          { id: 'p1', team: 1, name: 'Player 1' },
+          { id: 'p2', team: 2, name: 'Player 2' },
+          { id: 'p3', team: 2, name: 'Player 3' },
+          { id: 'p4', team: 1, name: 'Player 4' }
+        ],
+        playersOut: ['p1', 'p2'],
+        currentTrick: [],
+        passedPlayers: [],
+        leadPlayer: 'p3',
+        currentPlayerIndex: 2,
+        mahJongPlayed: true,
+        firstCardPlayed: { p1: true, p2: true, p3: true, p4: true },
+        hands: {
+          p1: [],
+          p2: [],
+          p3: [createCard('Q', 'hearts')],
+          p4: [createCard('K', 'hearts'), createCard('A', 'hearts')]
+        },
+        scores: { team1: 0, team2: 0 },
+        tichuDeclarations: {},
+        grandTichuDeclarations: {}
+      });
+
+      const r = makeMove(game, 'p3', [createCard('Q', 'hearts')], 'play');
+      expect(r.success).toBe(true);
+      expect(game.roundEnded).toBe(true);
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
+      expect(game.playersOut).toContain('p3');
+      expect(game.playersOut).toContain('p4');
+    });
+
+    test('tailender forced round end: dragon trick points go to opponent, not dragon player', () => {
+      const game = createTestGame({
+        state: 'playing',
+        players: [
+          { id: 'p1', team: 1, name: 'Player 1' },
+          { id: 'p2', team: 2, name: 'Player 2' },
+          { id: 'p3', team: 2, name: 'Player 3' },
+          { id: 'p4', team: 1, name: 'Player 4' }
+        ],
+        turnOrder: [
+          { id: 'p1', team: 1, name: 'Player 1' },
+          { id: 'p2', team: 2, name: 'Player 2' },
+          { id: 'p3', team: 2, name: 'Player 3' },
+          { id: 'p4', team: 1, name: 'Player 4' }
+        ],
+        playersOut: ['p1', 'p2'],
+        currentTrick: [],
+        passedPlayers: [],
+        leadPlayer: 'p3',
+        currentPlayerIndex: 2,
+        mahJongPlayed: true,
+        firstCardPlayed: { p1: true, p2: true, p3: true, p4: true },
+        hands: {
+          p1: [],
+          p2: [],
+          p3: [createSpecialCard('dragon')],
+          p4: [createCard('3', 'clubs'), createCard('4', 'clubs')]
+        },
+        scores: { team1: 0, team2: 0 },
+        tichuDeclarations: {},
+        grandTichuDeclarations: {}
+      });
+
+      const r = makeMove(game, 'p3', [createSpecialCard('dragon')], 'play');
+      expect(r.success).toBe(true);
+      expect(game.roundEnded).toBe(true);
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
+
+      const p3StackCards = game.playerStacks?.p3?.cards || [];
+      const p1StackCards = game.playerStacks?.p1?.cards || [];
+      const p4StackCards = game.playerStacks?.p4?.cards || [];
+      const p3HasDragon = p3StackCards.some((c) => c?.name === 'dragon');
+      const opponentHasDragon =
+        p1StackCards.some((c) => c?.name === 'dragon') ||
+        p4StackCards.some((c) => c?.name === 'dragon');
+      expect(p3HasDragon).toBe(false);
+      expect(opponentHasDragon).toBe(true);
+    });
+
+    test('tailender: final play as bomb still ends round immediately (no tailender turn)', () => {
+      const game = createTestGame({
+        state: 'playing',
+        players: [
+          { id: 'p1', team: 1, name: 'Player 1' },
+          { id: 'p2', team: 2, name: 'Player 2' },
+          { id: 'p3', team: 2, name: 'Player 3' },
+          { id: 'p4', team: 1, name: 'Player 4' }
+        ],
+        turnOrder: [
+          { id: 'p1', team: 1, name: 'Player 1' },
+          { id: 'p2', team: 2, name: 'Player 2' },
+          { id: 'p3', team: 2, name: 'Player 3' },
+          { id: 'p4', team: 1, name: 'Player 4' }
+        ],
+        playersOut: ['p1', 'p2'],
+        currentTrick: [],
+        passedPlayers: [],
+        leadPlayer: 'p3',
+        currentPlayerIndex: 2,
+        mahJongPlayed: true,
+        firstCardPlayed: { p1: true, p2: true, p3: true, p4: true },
+        hands: {
+          p1: [],
+          p2: [],
+          p3: [
+            createCard('2', 'clubs'),
+            createCard('2', 'diamonds'),
+            createCard('2', 'hearts'),
+            createCard('2', 'spades'),
+          ],
+          p4: [createCard('K', 'hearts'), createCard('A', 'hearts')]
+        },
+        scores: { team1: 0, team2: 0 },
+        tichuDeclarations: {},
+        grandTichuDeclarations: {}
+      });
+
+      const r = makeMove(game, 'p3', [
+        createCard('2', 'clubs'),
+        createCard('2', 'diamonds'),
+        createCard('2', 'hearts'),
+        createCard('2', 'spades'),
+      ], 'play');
+      expect(r.success).toBe(true);
+      expect(game.roundEnded).toBe(true);
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
+      expect(game.playersOut).toContain('p3');
+      expect(game.playersOut).toContain('p4');
+    });
+
+    describe('tailender immediate end variants (same base scenario)', () => {
+      function buildTailenderVariantGame(p3Hand, currentTrick) {
+        return createTestGame({
+          state: 'playing',
+          players: [
+            { id: 'p1', team: 1, name: 'Player 1' },
+            { id: 'p2', team: 2, name: 'Player 2' },
+            { id: 'p3', team: 2, name: 'Player 3' },
+            { id: 'p4', team: 1, name: 'Player 4' }
+          ],
+          turnOrder: [
+            { id: 'p1', team: 1, name: 'Player 1' },
+            { id: 'p2', team: 2, name: 'Player 2' },
+            { id: 'p3', team: 2, name: 'Player 3' },
+            { id: 'p4', team: 1, name: 'Player 4' }
+          ],
+          playersOut: ['p1', 'p2'],
+          currentTrick,
+          passedPlayers: [],
+          leadPlayer: 'p2',
+          currentPlayerIndex: 2,
+          mahJongPlayed: true,
+          firstCardPlayed: { p1: true, p2: true, p3: true, p4: true },
+          hands: {
+            p1: [],
+            p2: [],
+            p3: p3Hand,
+            p4: [createCard('K', 'hearts'), createCard('A', 'hearts')]
+          },
+          scores: { team1: 0, team2: 0 },
+          tichuDeclarations: {},
+          grandTichuDeclarations: {}
+        });
+      }
+
+      test.each([
+        {
+          label: 'single',
+          hand: [createCard('Q', 'hearts')],
+          play: [createCard('Q', 'hearts')],
+        },
+        {
+          label: 'dragon single',
+          hand: [createSpecialCard('dragon')],
+          play: [createSpecialCard('dragon')],
+        },
+        {
+          label: 'four-of-a-kind bomb',
+          hand: [
+            createCard('2', 'clubs'),
+            createCard('2', 'diamonds'),
+            createCard('2', 'hearts'),
+            createCard('2', 'spades'),
+          ],
+          play: [
+            createCard('2', 'clubs'),
+            createCard('2', 'diamonds'),
+            createCard('2', 'hearts'),
+            createCard('2', 'spades'),
+          ],
+        },
+      ])('variant $label: final play should still end round immediately', ({ hand, play }) => {
+        const baseTrick = [
+          {
+            playerId: 'p2',
+            cards: [createCard('9', 'spades')],
+            combination: { type: 'single', cards: [createCard('9', 'spades')] },
+          },
+        ];
+        const game = buildTailenderVariantGame(hand, baseTrick);
+        const result = makeMove(game, 'p3', play, 'play');
+        expect(result.success).toBe(true);
+        expect(game.roundEnded).toBe(true);
+        expect(['round-ended', 'round-ending-preview']).toContain(game.state);
+        expect(game.playersOut).toContain('p3');
+        expect(game.playersOut).toContain('p4');
+      });
+    });
+
+    describe('tailender immediate end variants with prior live lead (manual-like flow)', () => {
+      function buildManualLikeTailenderGame(p3Hand, p4LeadCard) {
+        return createTestGame({
+          state: 'playing',
+          players: [
+            { id: 'p1', team: 1, name: 'Player 1' },
+            { id: 'p2', team: 2, name: 'Player 2' },
+            { id: 'p3', team: 2, name: 'Player 3' },
+            { id: 'p4', team: 1, name: 'Player 4' }
+          ],
+          turnOrder: [
+            { id: 'p1', team: 1, name: 'Player 1' },
+            { id: 'p2', team: 2, name: 'Player 2' },
+            { id: 'p3', team: 2, name: 'Player 3' },
+            { id: 'p4', team: 1, name: 'Player 4' }
+          ],
+          playersOut: ['p1', 'p2'],
+          currentTrick: [
+            {
+              playerId: 'p4',
+              cards: [p4LeadCard],
+              combination: { type: 'single', cards: [p4LeadCard] },
+            },
+          ],
+          passedPlayers: [],
+          leadPlayer: 'p4',
+          currentPlayerIndex: 2, // p3 acts after p4 lead
+          mahJongPlayed: true,
+          firstCardPlayed: { p1: true, p2: true, p3: true, p4: true },
+          hands: {
+            p1: [],
+            p2: [],
+            p3: p3Hand,
+            p4: [createCard('6', 'clubs')]
+          },
+          scores: { team1: 0, team2: 0 },
+          tichuDeclarations: {},
+          grandTichuDeclarations: {}
+        });
+      }
+
+      test.each([
+        {
+          label: 'single over lead single',
+          p3Hand: [createCard('Q', 'hearts')],
+          p4LeadCard: createCard('9', 'spades'),
+          play: [createCard('Q', 'hearts')],
+        },
+        {
+          label: 'dragon over lead single',
+          p3Hand: [createSpecialCard('dragon')],
+          p4LeadCard: createCard('A', 'spades'),
+          play: [createSpecialCard('dragon')],
+        },
+        {
+          label: 'bomb over lead single',
+          p3Hand: [
+            createCard('2', 'clubs'),
+            createCard('2', 'diamonds'),
+            createCard('2', 'hearts'),
+            createCard('2', 'spades'),
+          ],
+          p4LeadCard: createCard('A', 'spades'),
+          play: [
+            createCard('2', 'clubs'),
+            createCard('2', 'diamonds'),
+            createCard('2', 'hearts'),
+            createCard('2', 'spades'),
+          ],
+        },
+      ])('manual-like variant $label: third-out play should end round immediately', ({ p3Hand, p4LeadCard, play }) => {
+        const game = buildManualLikeTailenderGame(p3Hand, p4LeadCard);
+        const result = makeMove(game, 'p3', play, 'play');
+        expect(result.success).toBe(true);
+        expect(game.roundEnded).toBe(true);
+        expect(['round-ended', 'round-ending-preview']).toContain(game.state);
+        expect(game.playersOut).toContain('p3');
+        expect(game.playersOut).toContain('p4');
+      });
     });
   });
 
@@ -268,7 +610,7 @@ describe('Bug fixes (BUGS.md)', () => {
       const result = makeMove(game, 'p4', [createCard('K', 'hearts')], 'play');
       expect(result.success).toBe(true);
       expect(game.roundEnded).toBe(true);
-      expect(game.state).toBe('round-ended');
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
       expect(game.playersOut).toHaveLength(4);
       expect(game.playersOut).toContain('p4');
     });
@@ -298,7 +640,7 @@ describe('Bug fixes (BUGS.md)', () => {
       const result = makeMove(game, 'p4', [], 'pass');
       expect(result.success).toBe(true);
       expect(game.roundEnded).toBe(true);
-      expect(game.state).toBe('round-ended');
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
       expect(game.playersOut).toHaveLength(4);
       expect(game.playersOut).toContain('p4');
     });
@@ -348,7 +690,7 @@ describe('Bug fixes (BUGS.md)', () => {
       expect(pairResult.success).toBe(true);
       // P2 went out too: same team 1st+2nd → double victory, round ends, trick is cleared
       expect(game.roundEnded).toBe(true);
-      expect(game.state).toBe('round-ended');
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
       expect(game.roundScores.team1).toBe(200);
     });
 
@@ -373,7 +715,7 @@ describe('Bug fixes (BUGS.md)', () => {
       expect(game.playersOut).toContain('p1');
       expect(game.playersOut).toContain('p2');
       expect(game.roundEnded).toBe(true);
-      expect(game.state).toBe('round-ended');
+      expect(['round-ended', 'round-ending-preview']).toContain(game.state);
       expect(game.roundScores.team1).toBe(200);
     });
 

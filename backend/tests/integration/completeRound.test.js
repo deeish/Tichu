@@ -126,7 +126,7 @@ describe('Complete Round Completion', () => {
     
     // Round should end
     expect(game.roundEnded).toBe(true);
-    expect(game.state).toBe('round-ended');
+    expect(['round-ended', 'round-ending-preview']).toContain(game.state);
     
     // Verify all players are out
     expect(game.playersOut.length).toBe(4);
@@ -193,7 +193,7 @@ describe('Complete Round Completion', () => {
     // Should trigger double victory
     expect(result.doubleVictory).toBe(true);
     expect(game.roundEnded).toBe(true);
-    expect(game.state).toBe('round-ended');
+    expect(['round-ended', 'round-ending-preview']).toContain(game.state);
     
     // Double victory: winning team gets 200 points, losing team gets 0
     // Card points don't count in double victory
@@ -218,7 +218,7 @@ describe('Complete Round Completion', () => {
     expect(game.playersOut).toHaveLength(4); // p1, p2, then p3, p4 added in double-victory block
     expect(r2.doubleVictory).toBe(true);
     expect(game.roundEnded).toBe(true);
-    expect(game.state).toBe('round-ended');
+    expect(['round-ended', 'round-ending-preview']).toContain(game.state);
     expect(game.roundScores.team1).toBe(200);
   });
 });

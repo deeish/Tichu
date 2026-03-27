@@ -47,12 +47,13 @@ function isPlayerOut(game, playerId) {
  * Defensive guard: if 3+ players are already out but round is still "playing",
  * re-run round-end evaluation to avoid tailender soft-lock edge cases.
  */
-function enforceTailenderRoundEnd(game) {
+function enforceTailenderRoundEnd(game, triggerId = null) {
   if (!game || game.state !== 'playing' || game.roundEnded) return null;
   if (!Array.isArray(game.playersOut) || game.playersOut.length < 3) return null;
-  const triggerId = game.playersOut[0];
-  if (triggerId == null) return null;
-  const result = handlePlayerWin(game, triggerId);
+  const fallbackId = game.playersOut[0];
+  const resolvedTriggerId = triggerId != null ? triggerId : fallbackId;
+  if (resolvedTriggerId == null) return null;
+  const result = handlePlayerWin(game, resolvedTriggerId);
   return game.roundEnded ? result : null;
 }
 
@@ -249,7 +250,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     game.currentPlayerIndex = nextPlayerIndex;
     ensureCurrentPlayerCanAct(game);
     // Not all players have acted yet; it's the next player's turn
-    const forcedRoundEnd = enforceTailenderRoundEnd(game);
+    const forcedRoundEnd = enforceTailenderRoundEnd(game, playerId);
     if (forcedRoundEnd) return { ...forcedRoundEnd, success: true, game };
     return { success: true, game };
   }
@@ -464,7 +465,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     
     game.currentPlayerIndex = nextPlayerIndex;
     ensureCurrentPlayerCanAct(game);
-    const forcedRoundEnd = enforceTailenderRoundEnd(game);
+    const forcedRoundEnd = enforceTailenderRoundEnd(game, playerId);
     if (forcedRoundEnd) return { ...forcedRoundEnd, success: true, game, bombPlayed: true };
     return { success: true, game, bombPlayed: true };
   }
@@ -694,6 +695,13 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     game.passedPlayers = [];
     const onlyPlayIsDog = game.currentTrick[0].cards.some(c => c.name === 'dog');
     if (!onlyPlayIsDog && game.dogPriorityPlayer === playerId) game.dogPriorityPlayer = null;
+    // If this play emptied the hand, resolve round-end BEFORE advancing turn. Otherwise we briefly assign the
+    // tailender as currentPlayer while state is still playing (3 out / 1 left stuck UI).
+    const firstPlayHandEmpty = hand.length === 0;
+    if (firstPlayHandEmpty) {
+      const winResult = handlePlayerWin(game, playerId);
+      if (game.roundEnded) return { ...winResult, success: true, game };
+    }
     let nextIdx = (game.currentPlayerIndex + 1) % game.turnOrder.length;
     const maxAttempts = game.turnOrder.length;
     for (let i = 0; i < maxAttempts; i++) {
@@ -704,11 +712,6 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     }
     game.currentPlayerIndex = nextIdx;
     ensureCurrentPlayerCanAct(game);
-    const firstPlayHandEmpty = !game.hands[playerId] || game.hands[playerId].length === 0;
-    if (firstPlayHandEmpty) {
-      const winResult = handlePlayerWin(game, playerId);
-      if (game.roundEnded) return { ...winResult, success: true, game };
-    }
     const forcedRoundEnd = enforceTailenderRoundEnd(game);
     if (forcedRoundEnd) return { ...forcedRoundEnd, success: true, game };
     return { success: true, game, ...(firstPlayHandEmpty ? { playerWon: true } : {}) };
@@ -905,7 +908,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   // and cleared when the wished card is actually played
   
   ensureCurrentPlayerCanAct(game);
-  const forcedRoundEnd = enforceTailenderRoundEnd(game);
+  const forcedRoundEnd = enforceTailenderRoundEnd(game, playerId);
   if (forcedRoundEnd) return { ...forcedRoundEnd, success: true, game };
   return { success: true, game };
 }

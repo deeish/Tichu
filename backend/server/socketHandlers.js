@@ -23,6 +23,7 @@ const { createFixedWindowRateLimiter } = require('./simpleRateLimiter');
 const { createMetricsStore } = require('./metricsStore');
 const { getBotMove, getDragonOpponentChoice } = require('../game/simpleBot');
 const { assignRandomTeamsToGame, startGame, generateGameId } = require('./gameManager');
+const { initializeGame } = require('../game/initialization');
 
 function generateId() {
   return crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
@@ -46,6 +47,7 @@ function gameSnapshotForRoomPeers(game) {
 /** Per-game throttle for broadcastGameUpdate: at most one broadcast per game per BROADCAST_THROTTLE_MS. */
 const BROADCAST_THROTTLE_MS = 80;
 const gameUpdateThrottle = new Map(); // gameId -> { timerId, pending }
+const roundPreviewTimers = new Map(); // gameId -> timeout id
 const actionDeduper = createActionDeduper({ ttlMs: 30_000 });
 const gameStateVersionCounter = new Map(); // gameId -> monotonic counter
 const metricsStore = createMetricsStore();
@@ -1501,6 +1503,9 @@ function setupSocketHandlers(io, games, players) {
 function releaseGameResources(gameId) {
   if (!gameId) return;
   gameStateVersionCounter.delete(gameId);
+  const previewTimer = roundPreviewTimers.get(gameId);
+  if (previewTimer) clearTimeout(previewTimer);
+  roundPreviewTimers.delete(gameId);
   const te = gameUpdateThrottle.get(gameId);
   if (te?.timerId) {
     clearTimeout(te.timerId);
@@ -1567,6 +1572,32 @@ function broadcastGameUpdate(io, game, gamesMap) {
   }
 
   notifyGamePersist(game);
+
+  // Server-driven round-end preview: keep final trick visible briefly before re-deal.
+  if (
+    game?.id &&
+    game.state === 'round-ending-preview' &&
+    game.roundPreviewPending === true &&
+    !roundPreviewTimers.has(game.id)
+  ) {
+    const raw = Number(process.env.ROUND_END_PREVIEW_MS);
+    const previewMs = Number.isFinite(raw) && raw >= 0 ? raw : 1200;
+    const timerId = setTimeout(() => {
+      try {
+        roundPreviewTimers.delete(game.id);
+        const live = gamesMap?.get(game.id);
+        if (!live) return;
+        if (live.state !== 'round-ending-preview' || live.roundPreviewPending !== true) return;
+        live.roundPreviewPending = false;
+        live.roundPreviewEndedAt = Date.now();
+        initializeGame(live);
+        broadcastGameUpdate(io, live, gamesMap);
+      } catch (err) {
+        console.error('[round-preview] finalize failed', err?.message ?? String(err), err?.stack ?? '');
+      }
+    }, previewMs);
+    roundPreviewTimers.set(game.id, timerId);
+  }
 }
 
 module.exports = {

@@ -662,7 +662,7 @@ function App() {
 
   // Only show game board when game has actually started (host clicked Start game).
   // Stay in lobby for 'waiting' or any unexpected state so joiners never see the game until host starts.
-  const ACTIVE_GAME_STATES = ['grand-tichu', 'exchanging', 'playing', 'round-ended', 'finished']
+  const ACTIVE_GAME_STATES = ['grand-tichu', 'exchanging', 'playing', 'round-ending-preview', 'round-ended', 'finished']
   const inActiveGame = gameState && ACTIVE_GAME_STATES.includes(gameState.state)
 
   if (showEndGameTest) {
