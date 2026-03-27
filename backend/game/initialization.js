@@ -59,6 +59,7 @@ function initializeGame(game) {
   game.grandTichuDeclarations = {};
   game.exchangeCards = {}; // Track cards being exchanged
   game.exchangeComplete = {}; // Track who has completed exchange
+  delete game.exchangeReceiptByPlayer; // Per-player “you received” (cleared each round)
   game.roundScores = { team1: 0, team2: 0 };
   game.firstCardPlayed = {}; // Track if each player has played their first card (for Tichu declaration)
   game.mahJongWish = null; // Track Mah Jong wish: { wishedRank: string, mustPlay: boolean }

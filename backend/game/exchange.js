@@ -73,6 +73,17 @@ function exchangeCards(game, playerId, cardsToExchange) {
   return { success: true, game };
 }
 
+function cloneCardForReceipt(card) {
+  if (!card || typeof card !== 'object') return card;
+  if (card.type === 'standard') {
+    return { type: 'standard', rank: card.rank, suit: card.suit };
+  }
+  if (card.type === 'special') {
+    return { type: 'special', name: card.name };
+  }
+  return { ...card };
+}
+
 /**
  * Completes the card exchange phase.
  * Each giver's cards[i] goes to getExchangeRecipients(...)[i].
@@ -89,7 +100,10 @@ function completeExchange(game) {
     exchanges.push({ giver: giver.id, cards: [...game.exchangeCards[giver.id]] });
   }
 
+  game.exchangeReceiptByPlayer = {};
+
   for (const exchange of exchanges) {
+    const giverPlayer = players.find((p) => p.id === exchange.giver);
     const giverHand = game.hands[exchange.giver];
     const recipients = getExchangeRecipients(game, exchange.giver);
     if (recipients.length !== 3) {
@@ -105,6 +119,14 @@ function completeExchange(game) {
       if (cardPos !== -1) {
         giverHand.splice(cardPos, 1);
         game.hands[recipientId].push(card);
+        const rid = recipientId != null ? String(recipientId) : recipientId;
+        if (!game.exchangeReceiptByPlayer[rid]) game.exchangeReceiptByPlayer[rid] = [];
+        game.exchangeReceiptByPlayer[rid].push({
+          fromPlayerId: exchange.giver,
+          fromPlayerName: giverPlayer?.name || 'Player',
+          isPartner: !!recipients[i].isPartner,
+          card: cloneCardForReceipt(card),
+        });
       }
     }
   }

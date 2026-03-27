@@ -18,6 +18,7 @@ import {
   getSeatPositions,
   getWonPileCardSize,
   getExchangeCardSize,
+  getDockCardSize,
   TABLE_HEADER_HEIGHT,
   MAT_VERTICAL_BIAS,
   MAT_TOP_OFFSET,
@@ -34,6 +35,37 @@ import './GameBoard.css';
 
 const THEME_STORAGE_KEY = 'tichu-table-theme';
 const THEMES = ['classic', 'velvet', 'midnight', 'ember', 'forest', 'ocean', 'sunset', 'royal', 'slate', 'autumn', 'jade', 'noir'];
+
+/** Exchange-receipt card flight timing (cards only; labels are in the dock summary strip). */
+const EXCHANGE_FLIGHT_DURATION_MS = 900;
+const EXCHANGE_FLIGHT_STAGGER_MS = 130;
+
+function formatExchangeCardShort(card) {
+  if (!card || typeof card !== 'object') return '?';
+  if (card.type === 'special') {
+    const n = card.name || '';
+    if (n === 'mahjong') return 'Mah Jong';
+    return n ? n.charAt(0).toUpperCase() + n.slice(1) : '?';
+  }
+  if (card.type === 'standard') {
+    const suits = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' };
+    return `${card.rank}${suits[card.suit] || ''}`;
+  }
+  return '?';
+}
+
+function exchangeFlightLabels(entry, seatKey) {
+  const name = (entry?.fromPlayerName && String(entry.fromPlayerName).trim()) || 'Player';
+  const role =
+    entry?.isPartner === true
+      ? 'Partner'
+      : seatKey === 'left'
+        ? 'Left'
+        : seatKey === 'right'
+          ? 'Right'
+          : 'Across';
+  return { role, name };
+}
 
 function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, onBackToLobby = null }) {
   // ----- UI state (do not reset on game update unless invalidated) -----
@@ -76,7 +108,9 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
 
   const layoutRef = useRef(null);
   const tableRef = useRef(null);
+  const tableSurfaceRef = useRef(null);
   const dockWrapperRef = useRef(null);
+  const lastExchangeFlightSigRef = useRef(null);
   const sidebarRef = useRef(null);
   const lastTableSizeRef = useRef({ w: 0, h: 0 });
   const lastDockWrapperSizeRef = useRef({ w: 0, h: 0 });
@@ -91,6 +125,10 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   const [isSidebarOpen, setIsSidebarOpen] = useState(() =>
     typeof window === 'undefined' ? true : getSidebarLayoutMode(window.innerWidth) === 'side'
   );
+  /** Incoming exchange cards flying from seats → hand (client-only animation). */
+  const [exchangeFlights, setExchangeFlights] = useState(null);
+  const [exchangeReceiptSummaryDismissed, setExchangeReceiptSummaryDismissed] = useState(false);
+  const exchangeReceiptSummarySigRef = useRef(null);
 
   const isMyTurn = useMemo(() => {
     if (!game?.turnOrder) return false;
@@ -346,6 +384,134 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       right: uniqueOrder[(myIndex + 3) % n] ?? null,
     };
   }, [game?.turnOrder, game?.players, playerId]);
+
+  const exchangeReceiptSummaryLines = useMemo(() => {
+    const receipt = game?.exchangeReceipt;
+    if (game?.state !== 'playing' || !Array.isArray(receipt) || receipt.length === 0) return [];
+    return receipt.map((entry, idx) => {
+      const fromId = entry.fromPlayerId;
+      let seatKey = 'top';
+      for (const k of ['left', 'top', 'right']) {
+        if (opponentsByPosition[k]?.id === fromId) {
+          seatKey = k;
+          break;
+        }
+      }
+      const { role, name } = exchangeFlightLabels(entry, seatKey);
+      return {
+        key: `${String(fromId)}-${idx}-${formatExchangeCardShort(entry.card)}`,
+        role,
+        name,
+        cardLabel: formatExchangeCardShort(entry.card),
+      };
+    });
+  }, [game?.state, game?.exchangeReceipt, opponentsByPosition]);
+
+  useEffect(() => {
+    lastExchangeFlightSigRef.current = null;
+  }, [game?.id]);
+
+  useEffect(() => {
+    const sig =
+      game?.state !== 'playing' || !Array.isArray(game?.exchangeReceipt) || game.exchangeReceipt.length === 0
+        ? null
+        : JSON.stringify(game.exchangeReceipt);
+    if (sig !== exchangeReceiptSummarySigRef.current) {
+      exchangeReceiptSummarySigRef.current = sig;
+      setExchangeReceiptSummaryDismissed(false);
+    }
+  }, [game?.state, game?.exchangeReceipt]);
+
+  useLayoutEffect(() => {
+    const receipt = game?.exchangeReceipt;
+    if (!game || game.state !== 'playing' || !Array.isArray(receipt) || receipt.length === 0) return;
+
+    const sig = JSON.stringify(receipt);
+    if (sig === lastExchangeFlightSigRef.current) return;
+
+    const surfaceEl = tableSurfaceRef.current;
+    const dockEl = dockWrapperRef.current;
+    if (!surfaceEl || !dockEl) return;
+
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    lastExchangeFlightSigRef.current = sig;
+    if (reduced) return;
+
+    const sRect = surfaceEl.getBoundingClientRect();
+    const dockRect = dockEl.getBoundingClientRect();
+    const basis =
+      dockEl.clientWidth > 40
+        ? dockEl.clientWidth
+        : tableRef.current?.clientWidth > 40
+          ? tableRef.current.clientWidth
+          : typeof window !== 'undefined'
+            ? window.innerWidth
+            : 1200;
+    const cardSz = getDockCardSize(basis);
+    const w = Math.round(cardSz.w * 0.9);
+    const h = Math.round(cardSz.h * 0.9);
+
+    const toXBase = dockRect.left + dockRect.width / 2;
+    const toY = dockRect.top + Math.min(dockRect.height * 0.28, 72);
+
+    const items = receipt.map((entry, index) => {
+      const fromId = entry.fromPlayerId;
+      let seatKey = 'top';
+      for (const k of ['left', 'top', 'right']) {
+        if (opponentsByPosition[k]?.id === fromId) {
+          seatKey = k;
+          break;
+        }
+      }
+      const pos = seatPositions[seatKey];
+      const fromX = sRect.left + pos.x + SEAT_WIDTH / 2;
+      const fromY = sRect.top + pos.y + SEAT_HEIGHT / 2;
+      const fan = (index - 1) * 26;
+      const toX = toXBase + fan;
+      return {
+        card: entry.card,
+        fromX,
+        fromY,
+        dx: toX - fromX,
+        dy: toY - fromY,
+        delay: index * EXCHANGE_FLIGHT_STAGGER_MS,
+        w,
+        h,
+        arrived: false,
+      };
+    });
+
+    setExchangeFlights({ id: Date.now(), items });
+  }, [game, game?.exchangeReceipt, game?.state, opponentsByPosition, seatPositions]);
+
+  useLayoutEffect(() => {
+    if (!exchangeFlights?.items?.length) return;
+    const id = exchangeFlights.id;
+    let cancelled = false;
+    const r1 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setExchangeFlights((prev) => {
+          if (!prev || prev.id !== id) return prev;
+          return { ...prev, items: prev.items.map((x) => ({ ...x, arrived: true })) };
+        });
+      });
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(r1);
+    };
+  }, [exchangeFlights?.id]);
+
+  useEffect(() => {
+    if (!exchangeFlights?.items?.length) return;
+    const maxD = Math.max(0, ...exchangeFlights.items.map((i) => i.delay));
+    const t = window.setTimeout(() => setExchangeFlights(null), maxD + EXCHANGE_FLIGHT_DURATION_MS + 120);
+    return () => clearTimeout(t);
+  }, [exchangeFlights?.id]);
 
   const exchangeRecipients = game?.exchangeRecipients ?? [];
   const cardMatches = (a, b) =>
@@ -918,7 +1084,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       <div className="game-left">
         <div className="game-main">
         <div className="table-column" ref={tableRef}>
-          <div className="table-surface">
+          <div className="table-surface" ref={tableSurfaceRef}>
             {/* Table header: title + current action (above top seat) */}
             <div className="table-header" style={{ height: TABLE_HEADER_HEIGHT }}>
               <h1 className="table-title">Tichu</h1>
@@ -1195,6 +1361,12 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           onCardDragEnd={game.state === 'exchanging' ? handleExchangeDragEnd : undefined}
           exchangeDraggingIndex={game.state === 'exchanging' ? exchangeDraggingIndex : null}
           onReorder={game.state === 'playing' ? handleHandReorder : undefined}
+          exchangeReceiptLines={
+            game.state === 'playing' && !exchangeReceiptSummaryDismissed
+              ? exchangeReceiptSummaryLines
+              : null
+          }
+          onExchangeReceiptDismiss={() => setExchangeReceiptSummaryDismissed(true)}
         >
           {handDockChildren}
         </HandDock>
@@ -1213,6 +1385,30 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           className={sidebarMode === 'overlay' ? `sidebar-overlay ${isSidebarOpen ? 'is-open' : 'is-closed'}` : ''}
           containerRef={sidebarRef}
         />
+
+      {exchangeFlights?.items?.length > 0 && (
+        <div className="exchange-flight-overlay" aria-hidden>
+          {exchangeFlights.items.map((it, i) =>
+            it.card && isValidCard(it.card) ? (
+              <div
+                key={`${exchangeFlights.id}-${i}`}
+                className="exchange-flight-card-wrap"
+                style={{
+                  left: `${it.fromX}px`,
+                  top: `${it.fromY}px`,
+                  transform: it.arrived
+                    ? `translate(calc(-50% + ${it.dx}px), calc(-50% + ${it.dy}px)) scale(0.94)`
+                    : 'translate(-50%, -50%) scale(1)',
+                  transition: `transform ${EXCHANGE_FLIGHT_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+                  transitionDelay: `${it.delay}ms`,
+                }}
+              >
+                <Card card={it.card} width={it.w} height={it.h} compact />
+              </div>
+            ) : null
+          )}
+        </div>
+      )}
     </div>
   );
 }

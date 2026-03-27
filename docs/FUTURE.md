@@ -11,8 +11,6 @@
 -make cards actually move around like real cards(at least when passing out for now)
 
 
-
-
 ***Fix these in the rules****
 -Fix scroll on card definition
 -Fix trick and trun flow steps

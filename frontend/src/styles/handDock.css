@@ -11,7 +11,7 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-bottom: none;
   display: grid;
-  grid-template-rows: 44px 1fr;
+  grid-template-rows: auto 1fr;
   padding: 0 var(--s8);
   gap: 0;
   align-content: stretch;
@@ -136,16 +136,102 @@
 .dock-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--s8);
+  justify-content: flex-start;
+  gap: 10px;
+  flex-wrap: nowrap;
+  padding: 6px var(--s8);
+  min-height: 40px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.dock-header .dock-sort {
+  margin-left: auto;
+}
+
 .dock-title {
+  flex-shrink: 0;
   font-size: 14px;
   font-weight: 600;
   color: #fff;
   margin: 0;
+}
+
+/* Private exchange recap: same row as “Your Hand”, ellipsized; full detail in native tooltip */
+.dock-exchange-recap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.dock-exchange-recap-inner {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.82);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dock-exchange-recap-label {
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin-right: 6px;
+}
+
+.dock-exchange-recap-card {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.dock-exchange-recap-meta,
+.dock-exchange-recap-from {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.dock-exchange-recap-name {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.dock-exchange-recap-role {
+  font-weight: 600;
+  font-size: 11px;
+  color: rgba(191, 219, 254, 0.88);
+}
+
+.dock-exchange-recap-dismiss {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dock-exchange-recap-dismiss:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.hand-dock.hand-dock--compact .dock-exchange-recap-label {
+  display: none;
+}
+
+.hand-dock.hand-dock--compact .dock-exchange-recap-inner {
+  font-size: 11px;
 }
 
 .dock-sort {

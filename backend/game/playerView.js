@@ -25,6 +25,17 @@ function getPlayerView(game, socketIdOrPlayerId) {
   const view = { ...game };
   const me = findPlayerForView(game, socketIdOrPlayerId);
   const playerId = me ? me.id : socketIdOrPlayerId;
+  const playerIdKey = playerId != null ? String(playerId) : null;
+
+  // Per-player exchange receipts (full map must never leave the server on room-wide snapshots)
+  if (game.exchangeReceiptByPlayer && typeof game.exchangeReceiptByPlayer === 'object') {
+    const mine = playerIdKey != null ? game.exchangeReceiptByPlayer[playerIdKey] : null;
+    view.exchangeReceipt = Array.isArray(mine) ? mine : null;
+    delete view.exchangeReceiptByPlayer;
+  } else {
+    delete view.exchangeReceiptByPlayer;
+    view.exchangeReceipt = null;
+  }
 
   // Only show this player's hand (keyed by stable player.id so rejoin gets same cards)
   view.hands = {};

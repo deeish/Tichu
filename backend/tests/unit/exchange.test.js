@@ -211,6 +211,44 @@ describe('Card Exchange', () => {
       expect(result.error).toContain('All players must exchange');
     });
 
+    test('records exchangeReceiptByPlayer for each recipient (giver, card, partner flag)', () => {
+      game.exchangeCards = {
+        p1: [
+          { type: 'standard', rank: '2', suit: 'hearts' },
+          { type: 'standard', rank: '3', suit: 'hearts' },
+          { type: 'standard', rank: '4', suit: 'hearts' }
+        ],
+        p2: [
+          { type: 'standard', rank: '7', suit: 'hearts' },
+          { type: 'standard', rank: '8', suit: 'hearts' },
+          { type: 'standard', rank: '9', suit: 'hearts' }
+        ],
+        p3: [
+          { type: 'standard', rank: 'Q', suit: 'hearts' },
+          { type: 'standard', rank: 'K', suit: 'hearts' },
+          { type: 'standard', rank: 'A', suit: 'hearts' }
+        ],
+        p4: [
+          { type: 'standard', rank: '4', suit: 'diamonds' },
+          { type: 'standard', rank: '5', suit: 'diamonds' },
+          { type: 'standard', rank: '6', suit: 'diamonds' }
+        ]
+      };
+      const result = completeExchange(game);
+      expect(result.success).toBe(true);
+      expect(game.exchangeReceiptByPlayer).toBeDefined();
+      for (const pid of ['p1', 'p2', 'p3', 'p4']) {
+        expect(game.exchangeReceiptByPlayer[pid].length).toBe(3);
+        for (const row of game.exchangeReceiptByPlayer[pid]) {
+          expect(row).toHaveProperty('fromPlayerId');
+          expect(row).toHaveProperty('fromPlayerName');
+          expect(typeof row.isPartner).toBe('boolean');
+          expect(row.card).toBeDefined();
+          expect(row.card.type).toBeDefined();
+        }
+      }
+    });
+
     test('should update lead player to new Mah Jong holder after exchange', () => {
       // Give Mah Jong to p3 initially
       game.hands.p3.push({ type: 'special', name: 'mahjong' });

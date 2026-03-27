@@ -36,8 +36,10 @@ function generateId() {
  */
 function gameSnapshotForRoomPeers(game) {
   if (!game || typeof game !== 'object') return game;
+  // Never broadcast per-player exchange receipts map (privacy); use getPlayerView + game-update instead.
+  const { exchangeReceiptByPlayer, ...rest } = game;
   return {
-    ...game,
+    ...rest,
     players: Array.isArray(game.players)
       ? game.players.map((p) => ({ ...p, token: undefined }))
       : [],
@@ -525,6 +527,7 @@ function setupSocketHandlers(io, games, players) {
           games.delete(playerInfo.gameId);
         } else {
           notifyGamePersist(game);
+          broadcastGameUpdate(io, game, games);
         }
       }
       players.delete(socket.id);

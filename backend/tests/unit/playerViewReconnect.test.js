@@ -53,4 +53,28 @@ describe('getPlayerView (reconnection)', () => {
     expect(view.players.find((p) => p.id === 'p1').token).toBe('t1');
     expect(view.players.find((p) => p.id === 'p2').token).toBeUndefined();
   });
+
+  test('includes only own exchangeReceipt and omits exchangeReceiptByPlayer map', () => {
+    const game = {
+      id: 'GAME4',
+      state: 'playing',
+      players: [
+        { id: 'p1', socketId: 's1', name: 'A', team: 1 },
+        { id: 'p2', socketId: 's2', name: 'B', team: 2 },
+      ],
+      hands: { p1: [], p2: [] },
+      exchangeReceiptByPlayer: {
+        p1: [{ fromPlayerId: 'p2', fromPlayerName: 'B', isPartner: false, card: { type: 'standard', rank: '2', suit: 'hearts' } }],
+        p2: [{ fromPlayerId: 'p1', fromPlayerName: 'A', isPartner: false, card: { type: 'standard', rank: '3', suit: 'hearts' } }],
+      },
+    };
+    const v1 = getPlayerView(game, 's1');
+    expect(v1.exchangeReceipt).toHaveLength(1);
+    expect(v1.exchangeReceipt[0].fromPlayerId).toBe('p2');
+    expect(v1.exchangeReceiptByPlayer).toBeUndefined();
+
+    const v2 = getPlayerView(game, 's2');
+    expect(v2.exchangeReceipt[0].fromPlayerId).toBe('p1');
+    expect(v2.exchangeReceiptByPlayer).toBeUndefined();
+  });
 });

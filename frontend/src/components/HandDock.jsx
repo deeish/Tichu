@@ -39,6 +39,9 @@ function HandDock({
   onReorder,
   onAutoPassToggle = () => {},
   autoPassEnabled = false,
+  /** While playing: compact “who passed you what” (private to this client). */
+  exchangeReceiptLines = null,
+  onExchangeReceiptDismiss,
 }) {
   const cards = Array.isArray(cardsProp) ? cardsProp.slice(0, MAX_HAND_DISPLAY) : [];
   const railRef = useRef(null);
@@ -300,10 +303,50 @@ function HandDock({
 
   const compactDock = containerWidth < 760;
 
+  const receiptLines = Array.isArray(exchangeReceiptLines) ? exchangeReceiptLines : [];
+  const showExchangeRecap = receiptLines.length > 0;
+  const exchangeRecapTitle = showExchangeRecap
+    ? receiptLines
+        .map((line) => `${line.cardLabel} from ${line.name} (${line.role})`)
+        .join('\n')
+    : '';
+
   return (
     <div className={`hand-dock ${compactDock ? 'hand-dock--compact' : ''}`}>
       <div className="dock-header">
         <h2 className="dock-title">Your Hand</h2>
+        {showExchangeRecap && (
+          <div
+            className="dock-exchange-recap"
+            role="region"
+            aria-label="Exchange: cards you received"
+          >
+            <span className="dock-exchange-recap-inner" title={exchangeRecapTitle}>
+              <span className="dock-exchange-recap-label">Received:</span>
+              {receiptLines.map((line, i) => (
+                <span key={line.key} className="dock-exchange-recap-item">
+                  {i > 0 ? <span className="dock-exchange-recap-sep"> · </span> : null}
+                  <span className="dock-exchange-recap-card">{line.cardLabel}</span>
+                  <span className="dock-exchange-recap-meta">
+                    {' '}
+                    <span className="dock-exchange-recap-from">from</span>{' '}
+                    <strong className="dock-exchange-recap-name">{line.name}</strong>{' '}
+                    <span className="dock-exchange-recap-role">({line.role})</span>
+                  </span>
+                </span>
+              ))}
+            </span>
+            {typeof onExchangeReceiptDismiss === 'function' && (
+              <button
+                type="button"
+                className="dock-exchange-recap-dismiss"
+                onClick={() => onExchangeReceiptDismiss()}
+              >
+                Dismiss
+              </button>
+            )}
+          </div>
+        )}
         <div className="dock-sort">
           {['none', 'asc', 'desc'].map((mode) => (
             <button

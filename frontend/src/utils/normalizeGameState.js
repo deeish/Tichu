@@ -26,6 +26,15 @@ export function normalizeGameState(game, { reportError } = {}) {
   // Crash prevention: guarantee players and turnOrder are always arrays.
   next.players = Array.isArray(next.players) ? next.players : []
 
+  // Per-player view only; strip if malformed (never trust wire shape).
+  if (next.exchangeReceipt != null && !Array.isArray(next.exchangeReceipt)) {
+    next.exchangeReceipt = null
+  }
+  if (Array.isArray(next.exchangeReceipt) && next.exchangeReceipt.length > 8) {
+    next.exchangeReceipt = next.exchangeReceipt.slice(0, 8)
+  }
+  delete next.exchangeReceiptByPlayer
+
   const turnOrderRaw = next.turnOrder
   next.turnOrder =
     Array.isArray(turnOrderRaw) && turnOrderRaw.length >= 4
