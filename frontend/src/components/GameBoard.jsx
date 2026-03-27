@@ -655,7 +655,9 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     selectedStillInHand &&
     selectedCards.length > 0 &&
     (isMyTurn || selectedIsBomb);
-  const canPass = isMyTurn && game?.state === 'playing';
+  const mustPlayAfterTichu =
+    !!game?.tichuDeclarations?.[playerId] && !game?.firstCardPlayed?.[playerId];
+  const canPass = isMyTurn && game?.state === 'playing' && !mustPlayAfterTichu;
 
   // ---- Auto-pass (UI toggle) ----
   // Keep this conservative so we don't spam invalid pass actions.
@@ -690,7 +692,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     !isDogPriorityPlayer &&
     !isTrickEmpty &&
     !hasDragonPendingSelection &&
-    !hasWishedCard;
+    !hasWishedCard &&
+    !mustPlayAfterTichu;
 
   const autoPassTurnSig = `${game?.state ?? ''}:${game?.currentPlayerIndex ?? ''}:${game?.leadPlayer ?? ''}:${game?.dogPriorityPlayer ?? ''}:${(game?.currentTrick?.length ?? 0)}:${mahJongWishMustPlay ? mahJongWishRank : 'none'}`;
 

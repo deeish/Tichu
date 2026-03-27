@@ -126,6 +126,14 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       return { success: false, error: 'You have priority from Dog and must play a card (cannot pass)' };
     }
 
+    // 2b) Small Tichu: after declaring before your first card, you must play at least once before passing
+    if (game.tichuDeclarations && game.tichuDeclarations[playerId] && !game.firstCardPlayed[playerId]) {
+      return {
+        success: false,
+        error: 'You declared Tichu and must play a card before you can pass'
+      };
+    }
+
     // 3) If current trick is empty, only the lead would have the turn; already blocked above
     if (game.currentTrick.length === 0) {
       return { success: false, error: 'You are the lead player and must play a card to start the trick (cannot pass)' };

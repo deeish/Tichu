@@ -863,6 +863,41 @@ describe('Bug fixes (BUGS.md)', () => {
     });
   });
 
+  describe('Small Tichu: must play before pass', () => {
+    test('cannot pass after declaring Tichu until first card is played', () => {
+      const ninePlay = {
+        playerId: 'p2',
+        cards: [createCard('9', 'hearts')],
+        combination: { type: 'single', cards: [createCard('9', 'hearts')] },
+      };
+      const game = createTestGame({
+        currentTrick: [ninePlay],
+        passedPlayers: [],
+        leadPlayer: 'p2',
+        currentPlayerIndex: 0,
+        firstCardPlayed: { p2: true },
+        tichuDeclarations: { p1: true },
+        hands: {
+          p1: [createCard('J', 'clubs'), createCard('Q', 'clubs')],
+          p2: [createCard('K', 'hearts')],
+          p3: [createCard('5', 'hearts')],
+          p4: [createCard('6', 'hearts')],
+        },
+      });
+
+      const passResult = makeMove(game, 'p1', [], 'pass');
+      expect(passResult.success).toBe(false);
+      expect(passResult.error).toMatch(/declared Tichu|play a card/i);
+
+      const playResult = makeMove(game, 'p1', [createCard('J', 'clubs')], 'play');
+      expect(playResult.success).toBe(true);
+      expect(game.firstCardPlayed.p1).toBe(true);
+
+      const passAfter = makeMove(game, 'p2', [], 'pass');
+      expect(passAfter.success).toBe(true);
+    });
+  });
+
   describe('Tichu/Grand Tichu: penalty when declarer does not get first (BUGS.md)', () => {
     test('when round ends with declarer not first, team gets -100 (not +100)', () => {
       const game = createTestGame({
