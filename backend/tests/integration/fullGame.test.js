@@ -82,9 +82,10 @@ function runPlayingPhase(game, stats) {
       continue;
     }
 
+    const hand = game.hands[currentPlayer.id] || [];
     let move = getBotMove(game, currentPlayer.id) || { action: 'pass' };
-    if (move.action === 'pass' && game.leadPlayer === currentPlayer.id && !game.currentTrick?.length && (game.hands[currentPlayer.id]?.length > 0)) {
-      const hand = game.hands[currentPlayer.id];
+    // Server: leadPlayer may never pass while they still have cards (empty or in-progress trick).
+    if (move.action === 'pass' && game.leadPlayer === currentPlayer.id && hand.length > 0) {
       const card = hand.find((c) => c.name === 'mahjong') || hand[0];
       move = { cards: [card], action: 'play', mahJongWish: card.name === 'mahjong' ? '2' : null };
     }
@@ -97,8 +98,18 @@ function runPlayingPhase(game, stats) {
     );
 
     if (!result.success && result.error) {
-      const hand = game.hands[currentPlayer.id] || [];
-      if (result.error.includes('Mah Jong first') && hand.length > 0) {
+      if (
+        hand.length > 0 &&
+        result.error.includes('lead player') &&
+        result.error.includes('cannot pass')
+      ) {
+        for (const card of hand) {
+          move = { cards: [card], action: 'play', mahJongWish: card.name === 'mahjong' ? '2' : null };
+          result = makeMove(game, currentPlayer.id, move.cards, move.action, move.mahJongWish);
+          if (result.success) break;
+        }
+      }
+      if (!result.success && result.error.includes('Mah Jong first') && hand.length > 0) {
         const mahjong = hand.find((c) => c.name === 'mahjong');
         if (mahjong) {
           move = { cards: [mahjong], action: 'play', mahJongWish: '2' };

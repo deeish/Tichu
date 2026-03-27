@@ -13,10 +13,19 @@ const REJOIN_GAME_KEY = 'tichu_rejoin_gameId'
 const REJOIN_TOKEN_KEY = 'tichu_rejoin_token'
 const EXPECTED_PROTOCOL_VERSION = 1
 
-/** Prefer socket match: room broadcasts used to include every player's token, so find(p => p.token) picked the host. */
-function findMyPlayerInLobbySnapshot(players, socketId) {
+/** Prefer socket match: token-based find(p => p.token) can mis-identify when multiple tokens leak or order differs. */
+function findMyPlayerInWireSnapshot(players, socketId) {
   if (!Array.isArray(players) || !socketId) return undefined
   return players.find((p) => p.socketId === socketId) ?? players.find((p) => p.token)
+}
+
+/** Opt-in: set VITE_DEBUG_GAME_SYNC=true or localStorage tichu_debug_game_sync=1 — logs stale snapshot drops (H-B1/H-B4). */
+function isDebugGameSync() {
+  try {
+    if (import.meta.env?.VITE_DEBUG_GAME_SYNC === 'true') return true
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('tichu_debug_game_sync') === '1') return true
+  } catch (_) {}
+  return false
 }
 
 /** Throttle game-update apply so we clone + setState at most this often (reduces re-renders and churn). */
@@ -268,7 +277,7 @@ function App() {
             if (typeof game?.stateVersion === 'number') lastAppliedServerStateVersionRef.current = game.stateVersion
             setGameState(game)
             setGameId(data.gameId)
-            const me = data.game?.players?.find((p) => p.token)
+            const me = findMyPlayerInWireSnapshot(data.game?.players, socket.id)
             const myId = me?.id ?? socket.id
             setPlayerId(myId)
             if (data.playerToken) saveRejoinCreds(data.gameId, data.playerToken)
@@ -285,7 +294,7 @@ function App() {
             setGameState(game)
             const gid = data.gameId ?? data.game?.id
             setGameId(gid)
-            const me = findMyPlayerInLobbySnapshot(data.game?.players, socket.id)
+            const me = findMyPlayerInWireSnapshot(data.game?.players, socket.id)
             const myId = me?.id ?? socket.id
             setPlayerId(myId)
             if (data.playerToken && gid) saveRejoinCreds(gid, data.playerToken)
@@ -315,13 +324,25 @@ function App() {
               return
             }
             const incomingVersion = typeof game?.stateVersion === 'number' ? game.stateVersion : null
-            if (incomingVersion != null && incomingVersion <= lastAppliedServerStateVersionRef.current) return
+            if (incomingVersion != null && incomingVersion <= lastAppliedServerStateVersionRef.current) {
+              if (isDebugGameSync()) {
+                console.warn('[game-sync] game-update dropped as stale', {
+                  incomingVersion,
+                  lastApplied: lastAppliedServerStateVersionRef.current,
+                  state: game.state,
+                })
+              }
+              return
+            }
             pendingGameRef.current = game
             const hasPlays = Array.isArray(game.currentTrick) && game.currentTrick.length > 0
-            const me = game.players?.find((p) => p.token)
+            const me = findMyPlayerInWireSnapshot(game.players, socket.id)
             const myId = me?.id
             const playerWentOut = myId && Array.isArray(game.hands?.[myId]) && game.hands[myId].length === 0
-            if (hasPlays || playerWentOut) {
+            // Throttle only in lobby; during play/exchange/etc. delayed apply can drop passes or trick resolution.
+            const applyImmediately =
+              game.state !== 'waiting' || hasPlays || playerWentOut
+            if (applyImmediately) {
               if (flushTimerRef.current != null) {
                 clearTimeout(flushTimerRef.current)
                 flushTimerRef.current = null
@@ -331,7 +352,7 @@ function App() {
               if (typeof game?.stateVersion === 'number') lastAppliedServerStateVersionRef.current = game.stateVersion
               const applyGameUpdate = (g) => {
                 setGameStateRef.current(g)
-                const foundMe = g.players?.find((p) => p.token)
+                const foundMe = findMyPlayerInWireSnapshot(g.players, socket.id)
                 if (foundMe?.id) setPlayerId(foundMe.id)
               }
               if (cloneWorkerRef.current) {
@@ -359,7 +380,7 @@ function App() {
                     if (typeof pending?.stateVersion === 'number') lastAppliedServerStateVersionRef.current = pending.stateVersion
                     const applyGameUpdate = (g) => {
                       setGameStateRef.current(g)
-                      const me = g.players?.find((p) => p.token)
+                      const me = findMyPlayerInWireSnapshot(g.players, socket.id)
                       if (me?.id) setPlayerId(me.id)
                     }
                     if (cloneWorkerRef.current) {
@@ -411,13 +432,26 @@ function App() {
             return
           }
           const incomingVersion = typeof data?.game?.stateVersion === 'number' ? data.game.stateVersion : null
-          if (incomingVersion != null && incomingVersion <= lastAppliedServerStateVersionRef.current) return
-          if (pendingGameRef.current != null) return
+          if (incomingVersion != null && incomingVersion <= lastAppliedServerStateVersionRef.current) {
+            if (isDebugGameSync()) {
+              console.warn('[game-sync] game-state dropped as stale', {
+                incomingVersion,
+                lastApplied: lastAppliedServerStateVersionRef.current,
+                state: data.game?.state,
+              })
+            }
+            return
+          }
+          if (flushTimerRef.current != null) {
+            clearTimeout(flushTimerRef.current)
+            flushTimerRef.current = null
+          }
+          pendingGameRef.current = null
           const payload = data.game
           const normalized = normalizeGameState(payload, { reportError: reportClientError })
           const applyGameState = (g) => {
             if (typeof g?.stateVersion === 'number') lastAppliedServerStateVersionRef.current = g.stateVersion
-            const me = g.players?.find((p) => p.token)
+            const me = findMyPlayerInWireSnapshot(g.players, socket.id)
             if (me && g.id) {
               saveRejoinCreds(g.id, me.token)
               setPlayerId(me.id)

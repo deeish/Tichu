@@ -1241,14 +1241,32 @@ function setupSocketHandlers(io, games, players) {
         return;
       }
 
+      const moveAction = action || 'play';
       const result = makeMove(
         game,
         playerId,
         cardsArr,
-        action || 'play',
+        moveAction,
         mahJongWish || null
       );
       if (result.success) {
+        if (process.env.DEBUG_TICHU_PASS === '1' && moveAction === 'pass') {
+          try {
+            console.log(
+              '[pass]',
+              JSON.stringify({
+                gameId: game.id,
+                playerId,
+                stateVersion: game.stateVersion,
+                passedLen: game.passedPlayers?.length,
+                trickLen: game.currentTrick?.length,
+                currentIdx: game.currentPlayerIndex,
+                roundEnded: game.roundEnded,
+                requestId,
+              }),
+            );
+          } catch (_) {}
+        }
         if (actionId) {
           actionDeduper.storeResult(game.id, playerId, actionId, { success: true });
         }

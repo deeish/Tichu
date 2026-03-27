@@ -345,14 +345,18 @@ function handlePlayerWin(game, playerId) {
       lastPlayCards.every(c => c && c.type === 'standard' && typeof c.rank === 'string') &&
       new Set(lastPlayCards.map(c => c.rank)).size === 1;
 
-    // Scenario (rotation): if the tailender would be the only player with cards
-    // but the trick is still at its early stage, defer ending the round so the
-    // tailender can respond within the trick.
-    // This specifically preserves the "P1 plays, P2 out, P3 out, P4 should get turn"
-    // rotation expectation, while still allowing the "3rd out ends immediately"
-    // behavior to trigger later in the trick.
+    // Scenario (rotation): sole trick play is someone else's lead — tailender may still beat/pass.
+    // If the only play is the finishing player's own (e.g. they just emptied on Phoenix), do NOT defer:
+    // round must end immediately (3 out / 1 left); otherwise UI shows tailender "acting" on a dead trick.
     if (currentTrickArray.length === 1) {
-      return { success: true, game, playerWon: true, roundEnded: false };
+      const soleAuthorId = lastPlay?.playerId;
+      const { stableId: soleStable } = resolvePlayerAndId(game, soleAuthorId);
+      const soleStr =
+        soleStable != null ? String(soleStable) : soleAuthorId != null ? String(soleAuthorId) : null;
+      const outgoingStr = playerIdStr;
+      if (soleStr && outgoingStr && soleStr !== outgoingStr) {
+        return { success: true, game, playerWon: true, roundEnded: false };
+      }
     }
 
     // If a bomb interruption is in progress, do NOT hard-end/reset the round yet.

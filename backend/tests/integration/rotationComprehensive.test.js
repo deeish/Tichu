@@ -559,8 +559,9 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
       expect(p3Result.success).toBe(true);
     });
 
-    test('Scenario 17: P1 plays, P2 out, P3 out, P4 should get turn', () => {
-      // P1 and P2 different teams so P1 going out does not trigger double victory
+    test('Scenario 17: P1 plays last card as 3rd out (P2,P3 already out) — round ends; P4 does not act', () => {
+      // Teams differ so P1+P2 first-two-out is not double victory. Tailender: only P4 had cards;
+      // once P1 empties, three are finished — round ends immediately (no response trick for P4).
       game.players = [
         { id: 'p1', team: 1, name: 'Player 1' },
         { id: 'p2', team: 2, name: 'Player 2' },
@@ -578,12 +579,12 @@ describe('Comprehensive Rotation Tests - All Play Variations', () => {
       game.leadPlayer = 'p1';
       game.currentPlayerIndex = 0;
 
-      makeMove(game, 'p1', [createCard('10', 'hearts')], 'play');
-      
-      const currentPlayer = game.turnOrder[game.currentPlayerIndex];
-      expect(currentPlayer?.id).toBe('p4');
-      const p4Result = makeMove(game, 'p4', [createCard('J', 'hearts')], 'play');
-      expect(p4Result.success).toBe(true);
+      const r1 = makeMove(game, 'p1', [createCard('10', 'hearts')], 'play');
+      expect(r1.success).toBe(true);
+      expect(game.roundEnded).toBe(true);
+      expect(game.state).toBe('round-ended');
+      expect(game.playersOut).toContain('p1');
+      expect(game.playersOut).toContain('p4');
     });
   });
 

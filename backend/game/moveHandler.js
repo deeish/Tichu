@@ -17,7 +17,7 @@ function ensureCurrentPlayerCanAct(game) {
   if (game.state !== 'playing' || !game.turnOrder?.length) return;
   const currentId = game.turnOrder[game.currentPlayerIndex]?.id;
   if (!currentId) return;
-  const canAct = !game.playersOut?.includes(currentId) && game.hands[currentId]?.length > 0;
+  const canAct = !isPlayerOut(game, currentId) && game.hands[currentId]?.length > 0;
   if (canAct) return;
   const next = getNextPlayerWithCards(game, currentId);
   if (next) {
@@ -34,6 +34,13 @@ function ensureCurrentPlayerCanAct(game) {
 function getCurrentHolder(game) {
   if (!game.currentTrick || game.currentTrick.length === 0) return null;
   return game.currentTrick[game.currentTrick.length - 1].playerId;
+}
+
+/** String-normalized membership in playersOut (avoids stuck turns when id vs stored id types differ). */
+function isPlayerOut(game, playerId) {
+  if (!game?.playersOut?.length || playerId == null) return false;
+  const s = String(playerId);
+  return game.playersOut.some((id) => id != null && String(id) === s);
 }
 
 /**
@@ -84,7 +91,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
   }
 
   // BUGS.md: Players who have finished their hand are out of the pool until next round - they cannot act.
-  if (game.playersOut?.includes(playerId)) {
+  if (isPlayerOut(game, playerId)) {
     return { success: false, error: 'You have already finished this round and cannot play or pass' };
   }
 
@@ -179,7 +186,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     // Get all players who should have a turn (everyone except the lead player and those who have gone out)
     const playersWhoShouldHaveTurn = game.players
       .filter(p => p.id !== leadPlayerId && 
-        !game.playersOut?.includes(p.id) && 
+        !isPlayerOut(game, p.id) && 
         game.hands[p.id] && 
         game.hands[p.id].length > 0)
       .map(p => p.id);
@@ -208,7 +215,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       if (!nextPlayerId) break;
       
       // Skip if player has gone out or has no cards
-      const hasGoneOut = game.playersOut?.includes(nextPlayerId);
+      const hasGoneOut = isPlayerOut(game, nextPlayerId);
       const hasNoCards = !game.hands[nextPlayerId] || game.hands[nextPlayerId].length === 0;
       
       // If the next player we would give the turn to is the lead, end the trick (don't give lead a second turn).
@@ -390,7 +397,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
           continue;
         }
         
-        const hasGoneOut = game.playersOut?.includes(nextPlayerId);
+        const hasGoneOut = isPlayerOut(game, nextPlayerId);
         const hasNoCards = !game.hands[nextPlayerId] || game.hands[nextPlayerId].length === 0;
         const hasActed = hasActedSinceLead(game, nextPlayerId, game.leadPlayer);
         
@@ -437,7 +444,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
         continue;
       }
       
-      const hasGoneOut = game.playersOut?.includes(nextPlayerId);
+      const hasGoneOut = isPlayerOut(game, nextPlayerId);
       const hasNoCards = !game.hands[nextPlayerId] || game.hands[nextPlayerId].length === 0;
       const hasActed = hasActedSinceLead(game, nextPlayerId, game.leadPlayer);
       
@@ -691,7 +698,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     const maxAttempts = game.turnOrder.length;
     for (let i = 0; i < maxAttempts; i++) {
       const nextId = game.turnOrder[nextIdx]?.id;
-      const out = nextId && (game.playersOut?.includes(nextId) || !(game.hands[nextId]?.length));
+      const out = nextId && (isPlayerOut(game, nextId) || !(game.hands[nextId]?.length));
       if (!nextId || !out) break;
       nextIdx = (nextIdx + 1) % game.turnOrder.length;
     }
@@ -715,8 +722,19 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     const playJustAdded = game.currentTrick[game.currentTrick.length - 1];
     const isDragonSingle = playJustAdded?.cards?.some(c => c.name === 'dragon') && playJustAdded?.combination?.type === 'single';
 
+    // All *active* opponents (still in round with cards) have passed — not always 3 when some are out (Bug A).
+    const othersStillInWithCards = game.players.filter(
+      (p) =>
+        p.id !== playerId &&
+        !isPlayerOut(game, p.id) &&
+        game.hands[p.id] &&
+        game.hands[p.id].length > 0
+    ).length;
+    const allOtherActivePlayersPassed =
+      othersStillInWithCards > 0 && game.passedPlayers.length === othersStillInWithCards;
+
     // Check if all others passed before going out - but never end trick on the same move when Dragon was just played
-    if (game.passedPlayers.length === game.players.length - 1 && !isDragonSingle) {
+    if (allOtherActivePlayersPassed && !isDragonSingle) {
       // Win the trick first, then handle going out
       const trickResult = winTrick(game, playerId);
       const winResult = handlePlayerWin(game, playerId);
@@ -744,7 +762,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
           continue;
         }
         
-        const hasGoneOut = game.playersOut?.includes(nextPlayerId);
+        const hasGoneOut = isPlayerOut(game, nextPlayerId);
         const hasNoCards = !game.hands[nextPlayerId] || game.hands[nextPlayerId].length === 0;
         const hasActed = hasActedSinceLead(game, nextPlayerId, leadPlayerId);
         
@@ -834,7 +852,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
       }
       
       // Skip if player has gone out or has no cards
-      const hasGoneOut = game.playersOut?.includes(nextPlayerId);
+      const hasGoneOut = isPlayerOut(game, nextPlayerId);
       const hasNoCards = !game.hands[nextPlayerId] || game.hands[nextPlayerId].length === 0;
       
       // Acted since current leader (after bomb, only play at/after bomb counts)
