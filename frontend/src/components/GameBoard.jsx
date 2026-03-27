@@ -35,7 +35,7 @@ import './GameBoard.css';
 const THEME_STORAGE_KEY = 'tichu-table-theme';
 const THEMES = ['classic', 'velvet', 'midnight', 'ember', 'forest', 'ocean', 'sunset', 'royal', 'slate', 'autumn', 'jade', 'noir'];
 
-function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame }) {
+function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, onBackToLobby = null }) {
   // ----- UI state (do not reset on game update unless invalidated) -----
   const [tableTheme, setTableTheme] = useState(() => {
     try {
@@ -1187,6 +1187,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame })
           socket={socket}
           tableTheme={tableTheme}
           onTableThemeChange={handleTableThemeChange}
+          onBackToLobby={onBackToLobby}
           className={sidebarMode === 'overlay' ? `sidebar-overlay ${isSidebarOpen ? 'is-open' : 'is-closed'}` : ''}
           containerRef={sidebarRef}
         />

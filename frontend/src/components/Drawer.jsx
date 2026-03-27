@@ -216,18 +216,52 @@ function GameLogPanel({ game, playerId }) {
   );
 }
 
-function Drawer({ game, playerId, isConnected, socket, tableTheme = 'velvet', onTableThemeChange = () => {}, className = '', containerRef = null }) {
+function Drawer({
+  game,
+  playerId,
+  isConnected,
+  socket,
+  tableTheme = 'velvet',
+  onTableThemeChange = () => {},
+  onBackToLobby = null,
+  className = '',
+  containerRef = null,
+}) {
   const [activeTab, setActiveTab] = useState('Chat');
+
+  const handleBackToLobbyClick = () => {
+    if (!onBackToLobby) return;
+    const st = game?.state;
+    const midRound =
+      st === 'playing' ||
+      st === 'exchanging' ||
+      st === 'grand-tichu' ||
+      st === 'round-ended';
+    const msg = midRound
+      ? 'Leave this game? Your seat will open.'
+      : 'Leave this party?';
+    if (!window.confirm(msg)) return;
+    onBackToLobby();
+  };
+
+  const showBackToLobby = typeof onBackToLobby === 'function' && game?.state !== 'finished';
 
   return (
     <aside className={`sidebar-column ${className}`.trim()} ref={containerRef}>
       <div className="drawer-content">
-        {/* Status + party code */}
+        {/* Status + party code + leave (session controls) */}
         <div className="sidebar-top-meta">
-          <span className={`sidebar-status ${isConnected ? 'connected' : 'disconnected'}`}>
-            {isConnected ? 'Connected' : 'Disconnected'}
-          </span>
-          {game?.id && <span className="sidebar-party-code">{game.id}</span>}
+          <div className="sidebar-top-meta-left">
+            <span className={`sidebar-status ${isConnected ? 'connected' : 'disconnected'}`}>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </span>
+            {game?.id && <span className="sidebar-party-code">{game.id}</span>}
+          </div>
+          {showBackToLobby && (
+            <button type="button" className="drawer-back-to-lobby" onClick={handleBackToLobbyClick}>
+              Back to lobby
+            </button>
+          )}
         </div>
 
         {/* Team scores */}

@@ -787,6 +787,7 @@ function App() {
             playerId={playerId || socket.id}
             isConnected={isConnected}
             onResyncGame={handleResyncGame}
+            onBackToLobby={handleLeaveParty}
           />
         </GameErrorBoundary>
         {gameEnded && (
