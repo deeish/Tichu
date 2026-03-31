@@ -73,6 +73,14 @@ function ChatPanel({ playerId, players, socket, game }) {
     inputRef.current?.focus();
   };
 
+  const scrollChatInputIntoView = () => {
+    requestAnimationFrame(() => {
+      try {
+        inputRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } catch (_) {}
+    });
+  };
+
   return (
     <div className="drawer-chat-panel">
       <div className="drawer-chat-messages" aria-label="Chat messages">
@@ -107,6 +115,7 @@ function ChatPanel({ playerId, players, socket, game }) {
           placeholder="Type a message…"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          onFocus={scrollChatInputIntoView}
           maxLength={500}
           aria-label="Chat message"
           autoComplete="off"

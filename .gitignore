@@ -25,3 +25,8 @@ Thumbs.db
 
 # Deploy / tooling
 .vercel
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/

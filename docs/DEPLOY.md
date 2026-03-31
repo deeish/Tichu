@@ -60,9 +60,9 @@ This guide assumes your code is in a **GitHub** repo. If not, create a repo and 
 For security, you can limit the backend to only accept requests from your frontend:
 
 1. In **Render**, open your web service → **Environment**.
-2. Add a variable, e.g. `FRONTEND_ORIGIN` = `https://your-app.vercel.app` (your Vercel URL).
-3. In the repo, update `backend/server.js`: where you have `cors: { origin: "*" }`, change it to use `process.env.FRONTEND_ORIGIN || "*"` for the `origin` option.
-4. Commit, push; Render will redeploy automatically.
+2. Add a variable **`FRONTEND_ORIGIN`** = `https://your-app.vercel.app` (your Vercel URL, no path).
+3. **No code change needed:** `backend/server.js` already uses `process.env.FRONTEND_ORIGIN || "*"` for Express CORS and Socket.IO.
+4. Save env; Render will redeploy automatically (or trigger a manual deploy).
 
 ---
 

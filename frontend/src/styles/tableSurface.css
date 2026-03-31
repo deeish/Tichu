@@ -183,6 +183,15 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2), 0 2px 12px rgba(0, 0, 0, 0.25);
 }
 
+/* Touch exchange: hand card picked, seat ready for tap */
+.seat-panel.seat--exchange-pick-target {
+  cursor: pointer;
+  border-color: rgba(232, 197, 71, 0.65);
+  box-shadow:
+    0 0 0 2px rgba(232, 197, 71, 0.45),
+    0 2px 14px rgba(0, 0, 0, 0.3);
+}
+
 /* Disconnected player: dim seat and show overlay */
 .seat-disconnected-overlay {
   position: absolute;
@@ -463,6 +472,8 @@
   max-height: none;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding-right: 6px;
 }
 

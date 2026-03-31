@@ -42,11 +42,13 @@ const onPlayerWonRound = delegator('onPlayerWonRound')
 const onTrickWon = delegator('onTrickWon')
 const onPlayerLeft = delegator('onPlayerLeft')
 const onError = delegator('onError')
+const onConnectError = delegator('onConnectError')
 
 function install(socket) {
   if (installed) return
   socket.on('connect', onConnect)
   socket.on('disconnect', onDisconnect)
+  socket.on('connect_error', onConnectError)
   socket.on('game-created', onGameCreated)
   socket.on('player-joined', onPlayerJoined)
   socket.on('game-started', onGameStarted)
@@ -72,6 +74,7 @@ function uninstall(socket) {
   socket.off('trick-won', onTrickWon)
   socket.off('player-left', onPlayerLeft)
   socket.off('error', onError)
+  socket.off('connect_error', onConnectError)
   latestHandlers = null
   installed = false
 }

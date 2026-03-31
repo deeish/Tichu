@@ -1,10 +1,15 @@
 /* Keep background exactly as-is */
 .how-to-play {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 1.5rem 1rem 2rem;
+  padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
+  padding-right: calc(1rem + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px) + var(--vv-keyboard-gap, 0px));
+  padding-left: calc(1rem + env(safe-area-inset-left, 0px));
+  overscroll-behavior: none;
   background: linear-gradient(165deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
 }
 
@@ -78,11 +83,21 @@
   transform: translateY(-1px);
 }
 
+@media (hover: none), (pointer: coarse) {
+  .how-to-play-close {
+    width: auto;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 /* Scroll area */
 .how-to-play-body {
   padding: 1.1rem 1.25rem 1.35rem;
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.96rem;
   line-height: 1.6;
@@ -393,6 +408,8 @@
 .htp-tablewrap {
   margin-top: 0.6rem;
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }

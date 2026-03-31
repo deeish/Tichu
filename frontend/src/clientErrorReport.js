@@ -10,6 +10,13 @@ let socketRef = null;
 let crashOverlayShown = false;
 let currentCorrelation = { requestId: null, actionId: null };
 
+/** Playwright / CI static smoke (`vite build --mode e2e`): no backend; suppress blocking crash UI + error beacons. */
+const isE2EBuild =
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'e2e') ||
+  (typeof import.meta !== 'undefined' &&
+    import.meta.env &&
+    (import.meta.env.VITE_E2E === 'true' || import.meta.env.VITE_E2E === '1'));
+
 function getApiBase() {
   if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SOCKET_URL) {
     return import.meta.env.VITE_SOCKET_URL.replace(/\/$/, '');
@@ -18,6 +25,7 @@ function getApiBase() {
 }
 
 function sendToServer(payload) {
+  if (isE2EBuild) return;
   const resolvedRequestId = payload?.requestId ?? currentCorrelation.requestId;
   const resolvedActionId = payload?.actionId ?? currentCorrelation.actionId;
   const full = {
@@ -84,6 +92,9 @@ function initClientErrorReport(socket) {
   socketRef = socket;
 
   window.onerror = function (message, source, lineno, colno, error) {
+    if (isE2EBuild) {
+      return false;
+    }
     sendToServer({
       source: 'window.onerror',
       message: typeof message === 'string' ? message : String(message),
@@ -95,6 +106,12 @@ function initClientErrorReport(socket) {
   };
 
   window.onunhandledrejection = function (event) {
+    if (isE2EBuild) {
+      try {
+        event.preventDefault();
+      } catch (_) {}
+      return;
+    }
     const reason = event?.reason;
     sendToServer({
       source: 'unhandledrejection',

@@ -3,6 +3,12 @@
  * --dock-h is set from JS on .game-layout; --sidebar-w is fixed (right panel always visible).
  */
 :root {
+  /* iOS / notched devices — use with max() where a minimum padding already exists */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
   /* Spacing */
   --s4: 4px;
   --s8: 8px;
@@ -46,6 +52,7 @@
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
+  overscroll-behavior: none;
   background: var(--layout-bg, #1a1a2e);
   color: #fff;
 }
@@ -72,6 +79,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .game-layout .table-column {
@@ -91,12 +99,12 @@
 
 .game-layout .hand-dock-wrapper {
   flex-shrink: 0;
-  min-height: 180px;
-  height: var(--dock-h);
+  box-sizing: border-box;
+  min-height: calc(180px + var(--safe-bottom));
+  height: calc(var(--dock-h) + var(--safe-bottom));
   display: flex;
   align-items: stretch;
   justify-content: center;
-  padding: 0 var(--s16);
-  padding-bottom: 0;
+  padding: 0 max(var(--s16), var(--safe-left)) var(--safe-bottom) max(var(--s16), var(--safe-right));
   min-width: 0;
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  getCenterRect,
   getMatSize,
   getMatPosition,
   getSeatPositions,
@@ -7,6 +8,9 @@ import {
   getSidebarWidth,
   getVisibleHandCap,
   getHandRailStep,
+  getDockCardSize,
+  getExchangeCardSize,
+  getDockWidthClamp,
 } from '../layoutTokens';
 
 describe('layoutTokens geometry guards', () => {
@@ -92,6 +96,69 @@ describe('layoutTokens geometry guards', () => {
     expect(getVisibleHandCap(840)).toBe(11);
     expect(getVisibleHandCap(700)).toBe(10);
     expect(getVisibleHandCap(600)).toBe(9);
+  });
+
+  /**
+   * Regression matrix for phone-style table/center sizes (not full browser automation).
+   * GameBoard measures the table column; center rect is what getMatSize / getMatPosition use.
+   */
+  it('phone-class center rects: mat + position stay finite and inside center zone', () => {
+    const cases = [
+      { w: 240, h: 160 },
+      { w: 320, h: 200 },
+      { w: 420, h: 260 },
+      { w: 520, h: 280 },
+      { w: 580, h: 300 },
+      { w: 640, h: 320 },
+      { w: 700, h: 340 },
+      { w: 780, h: 360 },
+    ];
+
+    for (const { w: cw, h: ch } of cases) {
+      const { w: matW, h: matH } = getMatSize(cw, ch);
+      const centerRect = { x: 8, y: 72, w: cw, h: ch };
+      const pos = getMatPosition(centerRect, matW, matH);
+
+      expect(Number.isFinite(matW), `matW cw=${cw}`).toBe(true);
+      expect(Number.isFinite(matH), `matH ch=${ch}`).toBe(true);
+      expect(matW).toBeGreaterThan(0);
+      expect(matH).toBeGreaterThan(0);
+      expect(matW).toBeLessThanOrEqual(cw);
+      expect(matH).toBeLessThanOrEqual(ch);
+
+      expect(pos.x + matW).toBeLessThanOrEqual(centerRect.x + centerRect.w + 2);
+      expect(pos.y + matH).toBeLessThanOrEqual(centerRect.y + centerRect.h + 2);
+    }
+  });
+
+  it('phone table sizes: center rect, dock cards, exchange mini-cards stay usable', () => {
+    const tableSizes = [
+      { tw: 480, th: 320 },
+      { tw: 667, th: 375 },
+      { tw: 736, th: 414 },
+      { tw: 844, th: 390 },
+      { tw: 926, th: 428 },
+    ];
+    const dockH = 200;
+    const drawerW = 0;
+
+    for (const { tw, th } of tableSizes) {
+      const center = getCenterRect(tw, th, dockH, drawerW);
+      expect(center.w).toBeGreaterThanOrEqual(0);
+      expect(center.h).toBeGreaterThanOrEqual(0);
+
+      const basis = Math.max(320, center.w || tw * 0.5);
+      const dockCard = getDockCardSize(basis);
+      const ex = getExchangeCardSize(basis);
+      expect(dockCard.w).toBeGreaterThan(16);
+      expect(dockCard.h).toBeGreaterThan(24);
+      expect(ex.w).toBeGreaterThan(8);
+      expect(ex.h).toBeGreaterThan(12);
+
+      const clamp = getDockWidthClamp(basis);
+      expect(clamp.min).toBeGreaterThan(0);
+      expect(clamp.max).toBeGreaterThanOrEqual(clamp.min);
+    }
   });
 });
 

@@ -4,9 +4,10 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   align-items: center;
-  padding: 28px var(--s24) var(--s16);
+  padding: max(28px, env(safe-area-inset-top, 0px)) max(var(--s24), env(safe-area-inset-right, 0px)) var(--s16)
+    max(var(--s24), env(safe-area-inset-left, 0px));
   z-index: var(--z-dock);
-  min-height: var(--hud-height);
+  min-height: var(--hud-height, 64px);
   box-sizing: border-box;
 }
 

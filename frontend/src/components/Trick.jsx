@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Card from './Card';
 import { getWonPileCardSize } from '../styles/layoutTokens';
 import './Trick.css';
@@ -6,6 +6,7 @@ import './Trick.css';
 function Trick({ trick, players, containerWidth = 1440 }) {
   const playsScrollRef = useRef(null);
   const userNearBottomRef = useRef(true);
+  const [moreBelow, setMoreBelow] = useState(false);
 
   if (!trick || !Array.isArray(trick) || trick.length === 0) {
     return (
@@ -52,22 +53,27 @@ function Trick({ trick, players, containerWidth = 1440 }) {
     ? `${trick.length}-${lastPlay.playerId}-${lastPlay.cards.length}-${lastPlay._omitted || 0}-${lastCardKey}`
     : `${trick.length}-none`;
 
-  // Track whether the user is at/near the bottom via scroll events.
-  // This avoids the common "scrollHeight increased after new render" problem where we can't tell
-  // whether they were at the bottom before the new cards arrived.
+  const refreshScrollMetrics = useCallback(() => {
+    const el = playsScrollRef.current;
+    if (!el) return;
+    const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+    userNearBottomRef.current = gap < 16;
+    setMoreBelow(gap > 12 && el.scrollHeight > el.clientHeight);
+  }, []);
+
   useEffect(() => {
     const el = playsScrollRef.current;
     if (!el) return;
 
-    const updateNearBottom = () => {
-      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      userNearBottomRef.current = distanceFromBottom < 16;
+    refreshScrollMetrics();
+    el.addEventListener('scroll', refreshScrollMetrics, { passive: true });
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => refreshScrollMetrics()) : null;
+    ro?.observe(el);
+    return () => {
+      el.removeEventListener('scroll', refreshScrollMetrics);
+      ro?.disconnect();
     };
-
-    updateNearBottom();
-    el.addEventListener('scroll', updateNearBottom, { passive: true });
-    return () => el.removeEventListener('scroll', updateNearBottom);
-  }, []);
+  }, [refreshScrollMetrics]);
 
   // On trick update, auto-scroll if the user was previously near the bottom.
   useLayoutEffect(() => {
@@ -77,23 +83,34 @@ function Trick({ trick, players, containerWidth = 1440 }) {
     if (userNearBottomRef.current) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [lastPlaySignature]);
+    refreshScrollMetrics();
+  }, [lastPlaySignature, refreshScrollMetrics]);
 
   return (
     <div className="trick">
       <h3>Current Trick</h3>
-      <div className="trick-plays" ref={playsScrollRef}>
-        {safePlays.map((play, index) => (
-          <div key={`${play.playerId}-${index}`} className="trick-play">
-            <div className="play-player">{getPlayerName(play.playerId)}</div>
-            <div className="play-cards">
-              {play.cards.map((card, cardIndex) => (
-                <Card key={cardIndex} card={card} width={cardSize.w} height={cardSize.h} />
-              ))}
-              {play._omitted > 0 && <span className="trick-play-omitted">+{play._omitted}</span>}
+      <div className="trick-plays-outer">
+        <div className="trick-plays" ref={playsScrollRef}>
+          {safePlays.map((play, index) => (
+            <div key={`${play.playerId}-${index}`} className="trick-play">
+              <div className="play-player">{getPlayerName(play.playerId)}</div>
+              <div className="play-cards">
+                {play.cards.map((card, cardIndex) => (
+                  <Card key={cardIndex} card={card} width={cardSize.w} height={cardSize.h} />
+                ))}
+                {play._omitted > 0 && <span className="trick-play-omitted">+{play._omitted}</span>}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+        {moreBelow ? (
+          <>
+            <div className="trick-plays-bottom-fade" aria-hidden />
+            <span className="trick-plays-more-hint" aria-hidden="true">
+              More below
+            </span>
+          </>
+        ) : null}
       </div>
     </div>
   );

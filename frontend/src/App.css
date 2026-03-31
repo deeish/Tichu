@@ -20,14 +20,24 @@
 
 .toast-stack {
   position: fixed;
-  right: 26px;
+  right: max(12px, env(safe-area-inset-right, 0px));
   bottom: 96px;
-  z-index: 12000;
+  z-index: 120500;
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: min(84vw, 300px);
   pointer-events: none;
+}
+
+/* Above hand dock (~22vh clamped in layoutTokens) so toasts stay readable on touch in-game */
+@media (hover: none), (pointer: coarse) {
+  .toast-stack {
+    bottom: max(
+      96px,
+      calc(env(safe-area-inset-bottom, 0px) + min(260px, 30vh) + 12px)
+    );
+  }
 }
 
 .toast {
@@ -45,6 +55,15 @@
   animation: toastIn 160ms ease-out;
 }
 
+.toast-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
 .toast--error {
   background: rgba(136, 34, 34, 0.82);
 }
@@ -56,16 +75,48 @@
 .toast-message {
   font-size: 0.84rem;
   line-height: 1.35;
+  white-space: pre-line;
+}
+
+.toast-retry {
+  flex-shrink: 0;
+  align-self: flex-start;
+  min-height: 40px;
+  padding: 0 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.toast-retry:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .toast-close {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -0.35rem -0.25rem -0.35rem 0;
   border: 0;
+  border-radius: 8px;
   background: transparent;
   color: rgba(255, 255, 255, 0.88);
   cursor: pointer;
   font-size: 0.95rem;
   line-height: 1;
-  padding: 0.1rem;
+  padding: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .toast-close:hover {
@@ -97,10 +148,14 @@ body {
 .landing {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding-top: calc(2rem + env(safe-area-inset-top, 0px));
+  padding-left: calc(2rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(2rem + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px) + var(--vv-keyboard-gap, 0px));
   background: linear-gradient(165deg, #252542 0%, #222238 50%, #1e2438 100%);
   color: rgba(255, 255, 255, 0.9);
 }
@@ -139,6 +194,20 @@ body {
   font-size: 0.95rem;
   color: rgba(255, 255, 255, 0.65);
   font-weight: 400;
+}
+
+.landing-subtitle--error {
+  color: #fca5a5;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  max-width: 100%;
+}
+
+.landing-subtitle--slow {
+  color: #fcd34d;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  max-width: 100%;
 }
 
 .landing-actions {
@@ -350,6 +419,42 @@ body {
   align-self: center;
 }
 
+/* Touch-primary: footer links + secondary links meet ~44px min tap height */
+@media (hover: none), (pointer: coarse) {
+  .landing-link {
+    min-height: 44px;
+    padding: 0.65rem 0.75rem;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+  }
+
+  .landing-link:active {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .landing-footer-link {
+    min-height: 44px;
+    padding: 0.5rem 0.85rem;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+  }
+
+  .landing-footer-link:active {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .landing-join-back,
+  .landing-join-submit {
+    min-height: 44px;
+  }
+}
+
 .landing-credit {
   margin-top: 0.75rem;
   font-size: 0.85rem;
@@ -380,6 +485,14 @@ body {
   color: rgba(255, 255, 255, 0.95);
   letter-spacing: 0.08em;
   margin-bottom: 0.15rem;
+}
+
+.lobby-connection-warning {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #fca5a5;
+  margin: 0.5rem 0 0;
+  max-width: 100%;
 }
 
 .lobby-card {
@@ -486,13 +599,19 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0.25rem;
+  margin: -0.35rem 0;
   color: rgba(255, 255, 255, 0.5);
   background: none;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
   transition: color 0.2s, background 0.2s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .lobby-player-edit:hover {
@@ -533,6 +652,15 @@ body {
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
   flex-shrink: 0;
+  touch-action: manipulation;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .lobby-player-save,
+  .lobby-player-cancel {
+    min-height: 44px;
+    padding: 0.45rem 0.85rem;
+  }
 }
 
 .lobby-player-save {
@@ -605,6 +733,14 @@ body {
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.35);
   color: #fff;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .lobby-team-btn {
+    min-height: 44px;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.85rem;
+  }
 }
 
 .lobby-start-wrap {

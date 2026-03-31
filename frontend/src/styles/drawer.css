@@ -11,9 +11,9 @@
 
 .sidebar-column.sidebar-overlay {
   position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
+  top: env(safe-area-inset-top, 0px);
+  right: env(safe-area-inset-right, 0px);
+  bottom: env(safe-area-inset-bottom, 0px);
   width: min(92vw, 360px);
   max-width: 360px;
   z-index: var(--z-modals);
@@ -208,6 +208,8 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.75);
 }
@@ -225,6 +227,8 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: var(--s12);
   background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-panel);
@@ -308,6 +312,7 @@
   gap: var(--s8);
   align-items: center;
   padding-top: var(--s12);
+  padding-bottom: var(--vv-keyboard-gap, 0px);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -384,6 +389,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding-right: 2px;
 }
 

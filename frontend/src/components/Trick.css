@@ -22,17 +22,47 @@
   font-size: 1.2rem;
 }
 
+.trick-plays-outer {
+  position: relative;
+  min-height: 0;
+}
+
 .trick-plays {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   /* Keep scroll region proportional to the playmat height (set by GameBoard via --mat-h). */
   max-height: calc(var(--mat-h, 400px) * 0.55);
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
-  /* Overlay scrollbar: track hidden; thumb only on hover so the bar isn't always visible */
+  /* Overlay scrollbar: desktop shows thumb on hover; touch/coarse keeps a faint thumb for discoverability */
+}
+
+.trick-plays-bottom-fade {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 8px;
+  bottom: 0;
+  height: 2.25rem;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.92) 15%, transparent);
+  border-radius: 0 0 8px 8px;
+}
+
+.trick-plays-more-hint {
+  pointer-events: none;
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(80, 80, 80, 0.75);
 }
 
 /* WebKit: hide track; show thumb only when hovering the trick area */
@@ -56,6 +86,12 @@
 
 .trick-plays::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.35);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .trick-plays::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.22);
+  }
 }
 
 /* Firefox: thin scrollbar, subtle so it doesn't dominate when not needed */

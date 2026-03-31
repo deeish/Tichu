@@ -18,6 +18,8 @@ function HandDock({
   cards: cardsProp = [],
   selectedCards = [],
   selectionDisabled = false,
+  /** During touch exchange: hand card currently chosen before tapping a seat */
+  exchangeTouchPickCard = null,
   onCardClick,
   playable,
   sortMode,
@@ -372,18 +374,31 @@ function HandDock({
               {visibleCards.map((card, i) => {
                 if (card == null) return <div key={`card-placeholder-${i}`} className="dock-card-wrap" style={{ left: `${cardRowLeftOffset}px`, transform: `translateX(${i * step}px)`, width: cardSize.w, height: cardSize.h }} aria-hidden="true" />;
                 const isSelected = isCardSelected(card);
+                let isExchangeTouchPick = false;
+                if (exchangeTouchPickCard && card) {
+                  try {
+                    isExchangeTouchPick =
+                      card.type === exchangeTouchPickCard.type &&
+                      (card.type === 'standard'
+                        ? card.suit === exchangeTouchPickCard.suit && card.rank === exchangeTouchPickCard.rank
+                        : card.name === exchangeTouchPickCard.name);
+                  } catch {
+                    isExchangeTouchPick = false;
+                  }
+                }
                 // Use index in key so duplicate cards (e.g. two 7♥) get unique keys; otherwise
                 // React reuses one DOM node and the other can render invisible but keep layout.
                 const key = `card-${i}-${cardKey(card)}`;
                 const isDraggingThis = reorderDrag && i === reorderDrag.currentDropIndex;
                 const isExchangeDraggingThis = exchangeDraggingIndex === i;
+                const liftCard = isSelected || isExchangeTouchPick;
                 return (
                   <div
                     key={key}
-                    className={`dock-card-wrap ${isSelected ? 'selected' : ''} ${!playable ? 'disabled' : ''} ${isDraggingThis ? 'dock-card-wrap--reorder-dragging' : ''} ${isExchangeDraggingThis ? 'dock-card-wrap--exchange-dragging' : ''}`}
+                    className={`dock-card-wrap ${isSelected ? 'selected' : ''} ${isExchangeTouchPick ? 'dock-card-wrap--exchange-pick' : ''} ${!playable ? 'disabled' : ''} ${isDraggingThis ? 'dock-card-wrap--reorder-dragging' : ''} ${isExchangeDraggingThis ? 'dock-card-wrap--exchange-dragging' : ''}`}
                     style={{
                       left: `${cardRowLeftOffset}px`,
-                      transform: `translateX(${i * step}px)${isSelected ? ' translateY(-12px)' : ''}`,
+                      transform: `translateX(${i * step}px)${liftCard ? ' translateY(-12px)' : ''}`,
                       ...(isReorderDrag ? { touchAction: 'none' } : {}),
                     }}
                     onPointerDown={isReorderDrag ? (e) => handleReorderPointerDown(e, card, i) : undefined}

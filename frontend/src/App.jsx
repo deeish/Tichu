@@ -2,7 +2,11 @@ import { useState, useEffect, useRef, useCallback, startTransition } from 'react
 import { Link } from 'react-router-dom'
 import { socket } from './socket'
 import { subscribe as subscribeSocketEvents } from './socketEventRegistry'
+import { useVisualViewportInsetCssVar } from './hooks/useVisualViewportInset'
+import { formatConnectErrorToast, formatConnectErrorSubtitle } from './utils/connectErrorMessage'
+import { getSocketDisplayUrl } from './utils/socketDisplayUrl'
 import GameBoard from './components/GameBoard'
+import RotateToPlayOverlay from './components/RotateToPlayOverlay'
 import GameErrorBoundary from './components/GameErrorBoundary'
 import StatsPopup from './components/StatsPopup'
 import { reportClientError, setClientCorrelation, showGlobalCrashOverlay } from './clientErrorReport'
@@ -34,6 +38,9 @@ const GAME_UPDATE_THROTTLE_MS = 90
 /** Render-loop guard: if this many commits in RENDER_LOOP_WINDOW_MS we show crash overlay (infinite re-render protection). */
 const RENDER_LOOP_THRESHOLD = 200
 const RENDER_LOOP_WINDOW_MS = 2000
+
+/** How long to wait (no socket yet, no connect_error) before treating the connection as slow (subtitle + toast). */
+const CONNECT_STALL_WARNING_MS = 12_000
 
 function saveRejoinCreds(gameId, playerToken) {
   if (gameId && playerToken) {
@@ -82,6 +89,8 @@ const MOCK_FINISHED_GAME = {
 }
 
 function App() {
+  useVisualViewportInsetCssVar()
+
   const [gameState, setGameState] = useState(null)
   const [gameStateVersion, setGameStateVersion] = useState(0)
   const [resyncVersion, setResyncVersion] = useState(0)
@@ -97,6 +106,9 @@ function App() {
   const lastAppliedServerStateVersionRef = useRef(-1)
   const requestSeqRef = useRef(0)
   const pendingRejoinRef = useRef({ gameId: null, timerId: null, resolved: false })
+  const lastConnectErrorToastAtRef = useRef(0)
+  const hasConnectErrorRef = useRef(false)
+  const connectStallToastFiredRef = useRef(false)
   const nextRequestId = () => {
     requestSeqRef.current += 1
     return `${Date.now()}-${requestSeqRef.current}`
@@ -159,6 +171,18 @@ function App() {
   // Lobby: editing own name (show input + save)
   const [editingMyName, setEditingMyName] = useState(false)
   const [lobbyNameDraft, setLobbyNameDraft] = useState('')
+  const [connectErrorHint, setConnectErrorHint] = useState(null)
+  const [connectSlowHint, setConnectSlowHint] = useState(false)
+
+  const scrollFormFieldIntoView = useCallback((e) => {
+    const el = e?.currentTarget
+    if (!el) return
+    requestAnimationFrame(() => {
+      try {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      } catch (_) {}
+    })
+  }, [])
 
   const dismissToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -169,20 +193,48 @@ function App() {
     }
   }, [])
 
-  const showToast = useCallback((message, level = 'error') => {
+  const showToast = useCallback((message, level = 'error', options = {}) => {
     const text = String(message || '').trim()
     if (!text) return
     const now = Date.now()
     const id = `${now}-${Math.random().toString(36).slice(2, 8)}`
+    const action = options.action === 'reconnect' ? 'reconnect' : null
     setToasts((prev) => {
       const last = prev[0]
       // De-dupe fast repeats from rapid retries/socket bursts.
       if (last && last.message === text && now - last.createdAt < 1200) return prev
-      return [{ id, message: text, level, createdAt: now }, ...prev].slice(0, 4)
+      return [{ id, message: text, level, createdAt: now, action }, ...prev].slice(0, 4)
     })
-    const timer = setTimeout(() => dismissToast(id), 4200)
+    const linger = action === 'reconnect' ? 12_000 : level === 'warning' ? 10_000 : 4200
+    const timer = setTimeout(() => dismissToast(id), linger)
     toastTimersRef.current.set(id, timer)
   }, [dismissToast])
+
+  useEffect(() => {
+    if (gameState != null) {
+      setConnectSlowHint(false)
+      return
+    }
+    if (isConnected) {
+      setConnectSlowHint(false)
+      connectStallToastFiredRef.current = false
+      return
+    }
+    const id = window.setTimeout(() => {
+      if (socket.connected || hasConnectErrorRef.current) return
+      setConnectSlowHint(true)
+      if (!connectStallToastFiredRef.current) {
+        connectStallToastFiredRef.current = true
+        const url = getSocketDisplayUrl()
+        showToast(
+          `Still connecting. Free-tier hosts can take 30–60s to wake, or the socket URL may be wrong.\nServer: ${url}\nTap Retry or keep waiting.`,
+          'warning',
+          { action: 'reconnect' }
+        )
+      }
+    }, CONNECT_STALL_WARNING_MS)
+    return () => clearTimeout(id)
+  }, [isConnected, gameState, showToast])
 
   // Pre-fill name on Join Party from last saved name (only if it looks like a real name: 2+ chars)
   useEffect(() => {
@@ -241,6 +293,9 @@ function App() {
     const handlers = {
       onConnect: () => {
         setIsConnected(true)
+        setConnectErrorHint(null)
+        hasConnectErrorRef.current = false
+        lastConnectErrorToastAtRef.current = 0
         setPlayerId(socket.id)
         const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
         const savedToken = localStorage.getItem(REJOIN_TOKEN_KEY)
@@ -269,6 +324,21 @@ function App() {
           clearTimeout(pendingRejoinRef.current.timerId)
         }
         pendingRejoinRef.current = { gameId: null, timerId: null, resolved: false }
+      },
+      onConnectError: (err) => {
+        try {
+          setIsConnected(false)
+          hasConnectErrorRef.current = true
+          setConnectSlowHint(false)
+          setConnectErrorHint(formatConnectErrorSubtitle(err))
+          const now = Date.now()
+          if (now - lastConnectErrorToastAtRef.current < 4000) return
+          lastConnectErrorToastAtRef.current = now
+          showToast(formatConnectErrorToast(err), 'error', { action: 'reconnect' })
+        } catch (e) {
+          console.error('[connect_error]', e)
+          reportClientError({ source: 'connect-error', message: e?.message ?? String(e), stack: e?.stack })
+        }
       },
       onGameCreated: (data) => {
         try {
@@ -646,7 +716,23 @@ function App() {
     <div className="toast-stack" role="status" aria-live="assertive" aria-atomic="false">
       {toasts.map((toast) => (
         <div key={toast.id} className={`toast toast--${toast.level}`}>
-          <span className="toast-message">{toast.message}</span>
+          <div className="toast-main">
+            <span className="toast-message">{toast.message}</span>
+            {toast.action === 'reconnect' ? (
+              <button
+                type="button"
+                className="toast-retry"
+                onClick={() => {
+                  try {
+                    socket.connect()
+                  } catch (_) {}
+                  dismissToast(toast.id)
+                }}
+              >
+                Retry
+              </button>
+            ) : null}
+          </div>
           <button
             type="button"
             className="toast-close"
@@ -696,6 +782,7 @@ function App() {
           game={MOCK_FINISHED_GAME}
         />
         {renderToasts()}
+        <RotateToPlayOverlay active />
         </GameErrorBoundary>
       </div>
     )
@@ -799,6 +886,7 @@ function App() {
           />
         )}
         {renderToasts()}
+        <RotateToPlayOverlay active />
       </div>
     );
   }
@@ -809,8 +897,22 @@ function App() {
         <div className="landing-content">
           <header className="landing-header">
             <h1>{landingMode === 'join' || landingMode === 'start' ? 'Tichu' : 'Welcome to Tichu'}</h1>
-            <p className="landing-subtitle">
-              {isConnected ? 'Connected' : 'Connecting…'}
+            <p
+              className={`landing-subtitle${
+                !isConnected && connectErrorHint
+                  ? ' landing-subtitle--error'
+                  : !isConnected && connectSlowHint
+                    ? ' landing-subtitle--slow'
+                    : ''
+              }`}
+            >
+              {isConnected
+                ? 'Connected'
+                : connectErrorHint
+                  ? connectErrorHint
+                  : connectSlowHint
+                    ? 'Still connecting — if nothing changes, the server may be waking (free hosting) or the socket URL may not match your deploy.'
+                    : 'Connecting…'}
             </p>
           </header>
 
@@ -833,6 +935,7 @@ function App() {
                 placeholder="Your name"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
+                onFocus={scrollFormFieldIntoView}
               />
               <div className="landing-buttons">
                 <button type="button" className="landing-btn" onClick={handleCreateGame}>
@@ -852,6 +955,7 @@ function App() {
                 placeholder="Your name"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
+                onFocus={scrollFormFieldIntoView}
               />
               <input
                 type="text"
@@ -859,6 +963,7 @@ function App() {
                 placeholder="Party code"
                 value={gameId}
                 onChange={(e) => setGameId(e.target.value.toUpperCase())}
+                onFocus={scrollFormFieldIntoView}
               />
               <div className="landing-join-buttons">
                 <button type="button" className="landing-join-back" onClick={() => setLandingMode(null)}>
@@ -899,6 +1004,11 @@ function App() {
           <header className="lobby-header">
             <h1 className="lobby-title">Tichu</h1>
             <p className="lobby-code">{gameState.id}</p>
+            {!isConnected && connectErrorHint ? (
+              <p className="lobby-connection-warning" role="status">
+                {connectErrorHint}
+              </p>
+            ) : null}
           </header>
 
           <section className="lobby-card lobby-players-card">
@@ -926,6 +1036,7 @@ function App() {
                             if (e.key === 'Enter') saveMyName()
                             if (e.key === 'Escape') cancelEditMyName()
                           }}
+                          onFocus={scrollFormFieldIntoView}
                           autoFocus
                         />
                         <button type="button" className="lobby-player-save" onClick={saveMyName}>

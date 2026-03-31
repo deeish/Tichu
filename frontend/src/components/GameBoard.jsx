@@ -8,6 +8,7 @@ import HandErrorBoundary from './HandErrorBoundary';
 import { sortCardsByRank, cardKey, isValidCard } from '../utils/cardUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
 import { reportClientError, setClientCorrelation } from '../clientErrorReport';
+import { isTouchPrimaryInput } from '../utils/inputCapabilities';
 import {
   getDockHeight,
   getSidebarLayoutMode,
@@ -20,6 +21,7 @@ import {
   getExchangeCardSize,
   getDockCardSize,
   TABLE_HEADER_HEIGHT,
+  HUD_HEIGHT,
   MAT_VERTICAL_BIAS,
   MAT_TOP_OFFSET,
   OUTER_MARGIN,
@@ -91,6 +93,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   const [exchangeDragOverSlot, setExchangeDragOverSlot] = useState(null);
   const [exchangeDraggingIndex, setExchangeDraggingIndex] = useState(null);
   const [exchangeSubmitted, setExchangeSubmitted] = useState(false);
+  /** Touch exchange: card selected in hand, waiting for a seat tap (see handleCardClick + seat onClick). */
+  const [exchangeTapPick, setExchangeTapPick] = useState(null);
   // Manual hand ordering preference:
   // array of stable card identity keys (see `cardKey(card)`).
   // We keep it across plays/resyncs by remapping keys onto the latest displayHand.
@@ -176,6 +180,21 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // HTML5 drag-for-exchange breaks card taps on many touch browsers; keep drag on mouse-first desktops only.
+  const [allowExchangeHtml5Drag, setAllowExchangeHtml5Drag] = useState(() =>
+    typeof window !== 'undefined' ? !isTouchPrimaryInput() : true
+  );
+  useEffect(() => {
+    const sync = () => setAllowExchangeHtml5Drag(!isTouchPrimaryInput());
+    sync();
+    window.addEventListener('orientationchange', sync);
+    window.addEventListener('resize', sync);
+    return () => {
+      window.removeEventListener('orientationchange', sync);
+      window.removeEventListener('resize', sync);
+    };
+  }, []);
+
   const sidebarMode = useMemo(() => getSidebarLayoutMode(viewport.w), [viewport.w]);
   const sidebarW = useMemo(() => (sidebarMode === 'overlay' ? 0 : getSidebarWidth(viewport.w)), [sidebarMode, viewport.w]);
   const dockH = useMemo(() => getDockHeight(), [viewport.h]);
@@ -191,6 +210,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     if (!root) return;
     root.style.setProperty('--dock-h', `${dockH}px`);
     root.style.setProperty('--sidebar-w', `${sidebarW}px`);
+    root.style.setProperty('--hud-height', `${HUD_HEIGHT}px`);
   }, [dockH, sidebarW]);
 
   useEffect(() => {
@@ -286,6 +306,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       setExchangeAssignments([null, null, null]);
       setExchangeDraggingIndex(null);
       setExchangeSubmitted(false);
+      setExchangeTapPick(null);
     }
   }, [game?.state]);
 
@@ -308,6 +329,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           return null;
         });
         setExchangeDragOverSlot(null);
+        setExchangeTapPick(null);
       }
     };
     const onWindowBlur = () => {
@@ -316,6 +338,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
         return null;
       });
       setExchangeDragOverSlot(null);
+      setExchangeTapPick(null);
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('blur', onWindowBlur);
@@ -654,13 +677,18 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       if (!validCard) return;
 
       if (game?.state === 'exchanging') {
-        setExchangeAssignments((prev) => {
-          const i = prev.findIndex((x) => !x);
-          if (i === -1) return prev;
-          const n = [...prev];
-          n[i] = card;
-          return n;
-        });
+        if (exchangeSubmitted || game?.exchangeSubmitted || game?.exchangeCards?.[playerId]) return;
+        if (allowExchangeHtml5Drag) {
+          setExchangeAssignments((prev) => {
+            const i = prev.findIndex((x) => !x);
+            if (i === -1) return prev;
+            const n = [...prev];
+            n[i] = card;
+            return n;
+          });
+          return;
+        }
+        setExchangeTapPick((prev) => (prev && cardMatches(prev, card) ? null : card));
         return;
       }
       if (game?.state !== 'playing') return;
@@ -694,11 +722,16 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   const handleRemoveFromSlot = (i) => {
     try {
       const idx = Math.max(0, Math.min(Number(i), 2));
+      let removed = null;
       setExchangeAssignments((prev) => {
         const n = Array.isArray(prev) ? [...prev] : [null, null, null];
+        removed = n[idx];
         n[idx] = null;
         return n.slice(0, 3);
       });
+      if (removed) {
+        setExchangeTapPick((pick) => (pick && cardMatches(removed, pick) ? null : pick));
+      }
     } catch (err) {
       console.error('[GameBoard] handleRemoveFromSlot', err);
       reportClientError({
@@ -717,9 +750,18 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       const validCard = card && typeof card === 'object' && ((card.type === 'standard' && card.suit && card.rank) || (card.type === 'special' && card.name));
       setExchangeAssignments((prev) => {
         const n = Array.isArray(prev) ? [...prev] : [null, null, null];
-        n[idx] = validCard ? card : null;
+        if (validCard) {
+          const k = cardKey(card);
+          for (let j = 0; j < n.length; j++) {
+            if (j !== idx && n[j] && cardKey(n[j]) === k) n[j] = null;
+          }
+          n[idx] = card;
+        } else {
+          n[idx] = null;
+        }
         return n.slice(0, 3);
       });
+      setExchangeTapPick(null);
     } catch (err) {
       console.error('[GameBoard] handleDropOnSlot', err);
       reportClientError({
@@ -903,7 +945,17 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   }, [canAutoPass, autoPassTurnSig]);
 
   const hintText = useMemo(() => {
-    if (game?.state === 'exchanging') return ''; // exchange instruction shown in play mat center
+    if (game?.state === 'exchanging') {
+      if (
+        allowExchangeHtml5Drag ||
+        exchangeSubmitted ||
+        game.exchangeSubmitted ||
+        game.exchangeCards?.[playerId]
+      ) {
+        return '';
+      }
+      return exchangeTapPick ? 'Tap a highlighted seat to give that card.' : 'Tap a hand card, then a highlighted seat.';
+    }
     if (game?.state !== 'playing') return '';
     if (selectedCards.length === 0) return ''; // "Select cards to play" shown in play mat center when your turn
     if (selectedCards.length === 1) return 'Single';
@@ -912,7 +964,17 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     if (selectedIsBomb) return 'Bomb';
     if (selectedCards.length >= 5) return 'Combo';
     return `${selectedCards.length} cards`;
-  }, [game?.state, selectedCards.length, selectedIsBomb]);
+  }, [
+    game?.state,
+    game?.exchangeSubmitted,
+    game?.exchangeCards,
+    playerId,
+    selectedCards.length,
+    selectedIsBomb,
+    allowExchangeHtml5Drag,
+    exchangeSubmitted,
+    exchangeTapPick,
+  ]);
 
   if (!game) {
     return <div className="game-board-loading">Loading game...</div>;
@@ -962,6 +1024,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           disabled={exchangeAssignments.some((x) => !x)}
           onClick={() => {
             if (exchangeAssignments.some((x) => !x)) return;
+            setExchangeTapPick(null);
             const actionId = nextActionId()
             setClientCorrelation({ requestId: actionId, actionId })
             socket.emit('exchange-cards', { requestId: actionId, actionId, cards: exchangeAssignments });
@@ -1117,6 +1180,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
               const exchangeLocked = exchangeSubmitted || game.exchangeSubmitted;
               const isExchangeDropTarget = exchangeSlotIndex >= 0 && !exchangeAssignedCard && !exchangeLocked;
               const isDragOverThisSeat = exchangeDragOverSlot === exchangeSlotIndex;
+              const isExchangeSeatTapTarget = !allowExchangeHtml5Drag && isExchangeDropTarget && !!exchangeTapPick;
 
               const isTop = pos === 'top';
               const wonStackLeft = isTop
@@ -1129,13 +1193,21 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
               return (
                 <Fragment key={`seat-${pos}-${player.id}`}>
                   <div
-                    className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''} ${isDisconnected ? 'seat--disconnected' : ''} ${isExchangeDropTarget ? 'seat--exchange-drop' : ''} ${isDragOverThisSeat ? 'seat--exchange-drag-over' : ''}`}
+                    className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''} ${isDisconnected ? 'seat--disconnected' : ''} ${isExchangeDropTarget ? 'seat--exchange-drop' : ''} ${isDragOverThisSeat ? 'seat--exchange-drag-over' : ''} ${isExchangeSeatTapTarget ? 'seat--exchange-pick-target' : ''}`}
                     style={{
                       left: `${posObj.x}px`,
                       top: `${posObj.y}px`,
                       width: SEAT_WIDTH,
                       height: SEAT_HEIGHT,
                     }}
+                    onClick={
+                      isExchangeSeatTapTarget
+                        ? (e) => {
+                            if (e.target.closest('.seat-exchange-card')) return;
+                            handleDropOnSlot(exchangeSlotIndex, exchangeTapPick);
+                          }
+                        : undefined
+                    }
                     onDragOver={isExchangeDropTarget ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setExchangeDragOverSlot(exchangeSlotIndex); } : undefined}
                     onDragLeave={isExchangeDropTarget ? () => setExchangeDragOverSlot(null) : undefined}
                     onDrop={isExchangeDropTarget ? (e) => {
@@ -1242,7 +1314,11 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
                     containerWidth={tableContainerWidthBasis}
                   />
                 ) : game?.state === 'exchanging' && !game.exchangeCards?.[playerId] ? (
-                  <span className="play-mat-empty-msg play-mat-empty-msg--instruction">Drag a card to each player, or click to assign to next slot</span>
+                  <span className="play-mat-empty-msg play-mat-empty-msg--instruction">
+                    {allowExchangeHtml5Drag
+                      ? 'Drag a card to each highlighted seat, or tap cards in your hand to fill the next empty seat in order.'
+                      : 'Tap a card in your hand, then tap a highlighted seat to give it to that player. Tap the same hand card again to clear your pick.'}
+                  </span>
                 ) : game?.state === 'playing' && currentPlayer?.id === playerId && selectedCards.length === 0 ? (
                   <span className="play-mat-empty-msg play-mat-empty-msg--instruction">Select cards to play</span>
                 ) : (
@@ -1342,6 +1418,11 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           cards={Array.isArray(orderedHand) ? orderedHand : []}
           selectedCards={game.state === 'exchanging' ? [] : selectedCards}
           selectionDisabled={game?.state === 'exchanging'}
+          exchangeTouchPickCard={
+            game.state === 'exchanging' && !allowExchangeHtml5Drag && !exchangeSubmitted && !game.exchangeSubmitted && !game.exchangeCards?.[playerId]
+              ? exchangeTapPick
+              : null
+          }
           onCardClick={handleCardClick}
           playable={game.state === 'exchanging' || game.state === 'playing'}
           sortMode={sortMode}
@@ -1356,9 +1437,18 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           containerWidth={dockContainerWidth}
           primaryLabel={selectedIsBomb ? 'Play bomb' : `Play (${selectedCards.length})`}
           showDefaultActions={game.state !== 'grand-tichu' && game.state !== 'exchanging'}
-          draggable={game.state === 'exchanging' && !exchangeSubmitted && !game.exchangeSubmitted}
-          onCardDragStart={game.state === 'exchanging' && !exchangeSubmitted && !game.exchangeSubmitted ? handleExchangeDragStart : undefined}
-          onCardDragEnd={game.state === 'exchanging' ? handleExchangeDragEnd : undefined}
+          draggable={
+            game.state === 'exchanging' &&
+            !exchangeSubmitted &&
+            !game.exchangeSubmitted &&
+            allowExchangeHtml5Drag
+          }
+          onCardDragStart={
+            game.state === 'exchanging' && !exchangeSubmitted && !game.exchangeSubmitted && allowExchangeHtml5Drag
+              ? handleExchangeDragStart
+              : undefined
+          }
+          onCardDragEnd={game.state === 'exchanging' && allowExchangeHtml5Drag ? handleExchangeDragEnd : undefined}
           exchangeDraggingIndex={game.state === 'exchanging' ? exchangeDraggingIndex : null}
           onReorder={game.state === 'playing' ? handleHandReorder : undefined}
           exchangeReceiptLines={

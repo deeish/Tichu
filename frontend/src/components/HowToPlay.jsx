@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom'
+import { useVisualViewportInsetCssVar } from '../hooks/useVisualViewportInset'
 import './HowToPlay.css'
 
 function HowToPlay() {
+  useVisualViewportInsetCssVar()
   const navigate = useNavigate()
   const goBack = () => navigate('/')
 
