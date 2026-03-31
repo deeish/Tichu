@@ -32,6 +32,7 @@ function HandDock({
   hintError = false,
   primaryLabel = 'Play',
   containerWidth = 1440,
+  containerHeight = 900,
   showDefaultActions = true,
   children,
   draggable = false,
@@ -90,7 +91,7 @@ function HandDock({
     };
   }, []);
 
-  const baseCardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
+  const baseCardSize = useMemo(() => getDockCardSize(containerWidth, containerHeight), [containerWidth, containerHeight]);
   const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
   const cardSize = useMemo(() => {
     if (visibleCount <= 0) return baseCardSize;

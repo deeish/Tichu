@@ -22,6 +22,41 @@
   transition: transform 0.22s ease, opacity 0.22s ease;
 }
 
+@media (orientation: landscape) and (max-height: 430px) {
+  .sidebar-column.sidebar-overlay {
+    width: min(78vw, 300px);
+    max-width: 300px;
+  }
+
+  .drawer-content {
+    padding: var(--s12);
+  }
+
+  .drawer-tabs {
+    margin-bottom: var(--s8);
+  }
+
+  .drawer-tab {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .sidebar-score-chip {
+    height: 42px;
+  }
+
+  .sidebar-score-value {
+    font-size: 16px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 375px) {
+  .sidebar-column.sidebar-overlay {
+    width: min(76vw, 280px);
+    max-width: 280px;
+  }
+}
+
 .sidebar-column.sidebar-overlay.is-closed {
   transform: translateX(100%);
   opacity: 0;

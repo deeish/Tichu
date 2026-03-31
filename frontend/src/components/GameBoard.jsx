@@ -17,6 +17,7 @@ import {
   getMatSize,
   getMatPosition,
   getSeatPositions,
+  getSeatSize,
   getWonPileCardSize,
   getExchangeCardSize,
   getDockCardSize,
@@ -25,8 +26,6 @@ import {
   MAT_VERTICAL_BIAS,
   MAT_TOP_OFFSET,
   OUTER_MARGIN,
-  SEAT_WIDTH,
-  SEAT_HEIGHT,
   SEAT_MAT_GAP,
   WON_STACK_GAP,
   WISHED_CARD_PANEL_TOP,
@@ -473,7 +472,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           : typeof window !== 'undefined'
             ? window.innerWidth
             : 1200;
-    const cardSz = getDockCardSize(basis);
+    const tableHForSizing = tableRef.current?.clientHeight || tableSize.h || viewport.h;
+    const cardSz = getDockCardSize(basis, tableHForSizing);
     const w = Math.round(cardSz.w * 0.9);
     const h = Math.round(cardSz.h * 0.9);
 
@@ -490,8 +490,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
         }
       }
       const pos = seatPositions[seatKey];
-      const fromX = sRect.left + pos.x + SEAT_WIDTH / 2;
-      const fromY = sRect.top + pos.y + SEAT_HEIGHT / 2;
+      const fromX = sRect.left + pos.x + seatSize.w / 2;
+      const fromY = sRect.top + pos.y + seatSize.h / 2;
       const fan = (index - 1) * 26;
       const toX = toXBase + fan;
       return {
@@ -508,7 +508,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     });
 
     setExchangeFlights({ id: Date.now(), items });
-  }, [game, game?.exchangeReceipt, game?.state, opponentsByPosition, seatPositions]);
+  }, [game, game?.exchangeReceipt, game?.state, opponentsByPosition, seatPositions, seatSize.w, seatSize.h, tableSize.h, viewport.h]);
 
   useLayoutEffect(() => {
     if (!exchangeFlights?.items?.length) return;
@@ -994,9 +994,16 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   // Table/mat card sizing should be based on the measured center rect so the trick/won visuals
   // stay aligned to the playmat geometry (not the full viewport width).
   const tableContainerWidthBasis = centerRect?.w ?? dockContainerWidth;
+  const tableContainerHeightBasis =
+    tableSize.h > 0
+      ? tableSize.h
+      : typeof window !== 'undefined'
+        ? window.innerHeight
+        : 900;
+  const seatSize = getSeatSize(tableSize.w, tableSize.h);
 
-  const exchangeCardSize = getExchangeCardSize(tableContainerWidthBasis);
-  const wonCardSize = getWonPileCardSize(tableContainerWidthBasis);
+  const exchangeCardSize = getExchangeCardSize(tableContainerWidthBasis, tableContainerHeightBasis);
+  const wonCardSize = getWonPileCardSize(tableContainerWidthBasis, tableContainerHeightBasis);
   const tableHasSize = tableSize.w >= 10 && tableSize.h >= 10;
 
   const getStateMessage = () => {
@@ -1184,11 +1191,11 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
 
               const isTop = pos === 'top';
               const wonStackLeft = isTop
-                ? posObj.x + SEAT_WIDTH + WON_STACK_GAP
-                : posObj.x + (SEAT_WIDTH - wonCardSize.w) / 2;
+                ? posObj.x + seatSize.w + WON_STACK_GAP
+                : posObj.x + (seatSize.w - wonCardSize.w) / 2;
               const wonStackTop = isTop
-                ? posObj.y + (SEAT_HEIGHT - wonCardSize.h) / 2
-                : posObj.y + SEAT_HEIGHT + WON_STACK_GAP;
+                ? posObj.y + (seatSize.h - wonCardSize.h) / 2
+                : posObj.y + seatSize.h + WON_STACK_GAP;
 
               return (
                 <Fragment key={`seat-${pos}-${player.id}`}>
@@ -1197,8 +1204,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
                     style={{
                       left: `${posObj.x}px`,
                       top: `${posObj.y}px`,
-                      width: SEAT_WIDTH,
-                      height: SEAT_HEIGHT,
+                      width: seatSize.w,
+                      height: seatSize.h,
                     }}
                     onClick={
                       isExchangeSeatTapTarget
@@ -1435,6 +1442,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           onAutoPassToggle={setAutoPassUIEnabled}
           hintText={hintText}
           containerWidth={dockContainerWidth}
+          containerHeight={tableContainerHeightBasis}
           primaryLabel={selectedIsBomb ? 'Play bomb' : `Play (${selectedCards.length})`}
           showDefaultActions={game.state !== 'grand-tichu' && game.state !== 'exchanging'}
           draggable={

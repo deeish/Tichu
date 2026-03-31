@@ -191,3 +191,118 @@ A lot of **layout math and breakpoints already exist**; this phase is mostly **Q
 | 5 Quality bar | ☐ | Partial a11y already |
 
 Update the **“What we already have”** table when you ship new behavior. File new defects in `docs/BUGS.md` where appropriate.
+
+---
+
+## Phase 6 — Mobile sizing calibration (new)
+
+Preview testing on a real phone showed that core game surfaces are still oversized in landscape:
+
+- hand cards are too large
+- deck / center playfield consumes too much vertical space
+- player name panels (seat badges) are too large
+- drawer panel and "Show panel" affordance feel oversized on phone landscape
+
+This phase is a focused pass to tune geometry for phone-class landscape without changing desktop behavior.
+
+### Scope (what to change)
+
+1. **Hand cards + dock row**
+   - Reduce base card height/width for phone landscape tiers.
+   - Tighten rail spacing and horizontal overlap only on compact screens.
+   - Keep tap targets usable (card hit-box must remain comfortable for thumbs).
+
+2. **Deck / center playfield**
+   - Lower minimum center-rect height on short viewports.
+   - Reduce stacked/deck visual footprint and spacing around trick area.
+   - Preserve readability of current-trick cards and key controls.
+
+3. **Player name panels / seat badges**
+   - Decrease font, badge padding, and card-count chip size on compact tiers.
+   - Shorten max label widths and clamp overflow safely.
+   - Keep disconnected / declaration indicators legible.
+
+4. **Drawer panel + toggle**
+   - Add a compact landscape drawer width tier (phone-class) so panel does not crowd the table.
+   - Reduce drawer header/tab/control sizing slightly on compact landscape while preserving touch usability.
+   - Keep "Show panel" button thumb-reachable and avoid overlap with key table controls.
+
+### Initial numeric guardrails (start points)
+
+Treat these as first-pass caps for phone landscape; tune with device QA.
+
+- **Hand cards (phone landscape):**
+  - target card height cap: `clamp(..., ..., 84px)` on `~390px` tall viewports
+  - tighter cap for short tier (`<=375px` tall): `80px`
+- **Seat/name panels:**
+  - name font cap: `15px` (short tier `14px`)
+  - badge/card-count chip font cap: `12px`
+  - compact vertical padding reduction: `~10-20%` from current phone tier
+- **Drawer panel (overlay):**
+  - phone landscape width cap: `min(78vw, 300px)` (short tier: `min(76vw, 280px)`)
+  - keep internal controls at touch-safe heights (do not drop below `40px`; prefer `44px`)
+- **Show panel toggle:**
+  - keep tap target at least `44x44` CSS px
+  - reduce visual padding/font, not hit-area size
+
+### Device-first sizing targets
+
+Use real-device checks first; emulator is optional.
+
+- **Primary baseline:** iPhone 12/13 class landscape (`~844x390` CSS px).
+- **Small baseline:** iPhone SE class landscape (`~667x375` CSS px).
+- **Accept criteria for both:**
+  - full hand row visible without covering critical center content
+  - center playfield shows trick/deck clearly without clipping
+  - all 3 opponent seat panels readable at a glance
+  - drawer open state still leaves the board understandable; drawer closed state keeps a reachable toggle
+  - no horizontal page scroll; no cut-off controls near safe areas
+
+### Golden viewport QA table
+
+Use these as mandatory checkpoints before calling Phase 6 done.
+
+| Viewport (landscape) | Must be true |
+|---|---|
+| `844x390` | hand + center + 3 seat panels fit simultaneously; drawer can open without obscuring all center context |
+| `780x360` | no clipped deck/trick area; seat labels remain readable; toggle stays reachable |
+| `667x375` | compact tier applies; cards/labels smaller but still tappable/readable; no horizontal scroll |
+
+### Implementation order
+
+1. **Tokens first (single source of truth)**
+   - Update compact breakpoints and size clamps in layout token helpers.
+   - Recompute card/dock scale before touching many CSS selectors.
+
+2. **Apply CSS tier adjustments**
+   - `handDock.css` / card sizing classes
+   - `tableSurface.css` center zone + deck/trick spacing
+   - seat/name panel styles in board/table CSS
+   - `drawer.css` compact landscape width + inner spacing; sidebar toggle sizing in board CSS
+
+3. **Guard with tests + screenshots**
+   - Extend `layoutTokens` tests with phone-landscape assertions for:
+     - max card size cap
+     - center rect minimums
+     - seat panel dimensions
+     - compact drawer width caps
+   - Keep Playwright smoke passing; add one compact-landscape assertion if needed.
+
+4. **Manual phone QA (required)**
+   - Safari iPhone + Chrome Android landscape pass
+   - Verify touch interactions still reliable after size reductions
+
+### Definition of done for Phase 6
+
+- Phone landscape no longer feels "zoomed" or oversized.
+- Hand, center playfield, seat panels, and drawer/toggle proportions fit the same phone-class landscape experience.
+- No regressions on desktop/tablet layout tiers.
+- `npm test` and `npm run test:e2e` both pass after changes.
+
+### Safety / rollback rule
+
+If a compact-phone adjustment regresses tablet/desktop tiers or makes touch targets unreliable:
+
+1. keep token-level improvements that pass all tiers
+2. revert only the CSS overrides that caused the regression
+3. ship the stable subset, then iterate in a follow-up patch

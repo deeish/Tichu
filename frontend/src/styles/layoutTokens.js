@@ -22,8 +22,6 @@ export const OUTER_MARGIN = 20;
 export const SEAT_MAT_GAP = 12;
 export const TABLE_HEADER_HEIGHT = 88; // title + current move line above top seat (was 52; increased to fit both)
 export const TABLE_HEADER_SEAT_GAP = 8;
-export const TOP_BAND = TABLE_HEADER_HEIGHT + TABLE_HEADER_SEAT_GAP + SEAT_HEIGHT + SEAT_MAT_GAP; // header + gap + top seat + gap to mat
-export const LEFT_BAND = OUTER_MARGIN + SEAT_WIDTH + SEAT_MAT_GAP;
 export const CARD_BACK_W = 56;
 export const CARD_BACK_H = 80;
 export const STACK_OFFSET = 6;
@@ -37,6 +35,31 @@ export const BOTTOM_BAND_FOR_WON_CARDS = MAX_WON_PILE_CARD_H + WON_STACK_GAP + O
 
 /** Vertical offset from top of table surface for the wished-card panel (works at any viewport size) */
 export const WISHED_CARD_PANEL_TOP = 12;
+
+/**
+ * Seat panel size by table tier.
+ * Keep desktop unchanged; compact only on short phone-class landscape viewports.
+ */
+export function getSeatSize(tableW, tableH) {
+  if (!Number.isFinite(tableW) || !Number.isFinite(tableH) || tableW <= 0 || tableH <= 0) {
+    return { w: SEAT_WIDTH, h: SEAT_HEIGHT };
+  }
+  const phoneLandscape = tableW >= 620 && tableW <= 980 && tableH <= 430;
+  if (!phoneLandscape) return { w: SEAT_WIDTH, h: SEAT_HEIGHT };
+  if (tableH <= 375) return { w: 168, h: 44 };
+  if (tableH <= 390) return { w: 176, h: 46 };
+  return { w: 184, h: 48 };
+}
+
+function getTopBand(tableW, tableH) {
+  const seat = getSeatSize(tableW, tableH);
+  return TABLE_HEADER_HEIGHT + TABLE_HEADER_SEAT_GAP + seat.h + SEAT_MAT_GAP;
+}
+
+function getLeftBand(tableW, tableH) {
+  const seat = getSeatSize(tableW, tableH);
+  return OUTER_MARGIN + seat.w + SEAT_MAT_GAP;
+}
 
 // Sidebar behavior: desktop side-by-side, mobile overlay.
 export const SIDEBAR_OVERLAY_BREAKPOINT = 1180;
@@ -55,25 +78,32 @@ export function getSidebarWidth(viewportW) {
 // Dock height: clamp(180px, 22vh, 240px)
 export function getDockHeight() {
   if (typeof window === 'undefined') return 200;
+  const isCompactLandscape = window.innerWidth >= 620 && window.innerHeight <= 430;
+  if (isCompactLandscape) {
+    const vhCompact = window.innerHeight * 0.28;
+    return Math.min(170, Math.max(140, vhCompact));
+  }
   const vh = window.innerHeight * 0.22;
   return Math.min(240, Math.max(180, vh));
 }
 
 // Right band = same as left (space for right seat). Sidebar is in a separate grid column, so we do not subtract its width from the table column.
-export function getRightBand(_drawerWidth) {
-  return LEFT_BAND;
+export function getRightBand(tableW, tableH, _drawerWidth) {
+  return getLeftBand(tableW, tableH);
 }
 
 // Center rect inside table (safe area for play mat).
 // Table column height (tableH) already excludes the hand dock (sibling below .game-main).
 // Reserve bottom band for "my won cards" slot so the play mat does not cover it.
 export function getCenterRect(tableW, tableH, dockH, drawerW) {
-  const rightBand = getRightBand(drawerW);
+  const leftBand = getLeftBand(tableW, tableH);
+  const topBand = getTopBand(tableW, tableH);
+  const rightBand = getRightBand(tableW, tableH, drawerW);
   const bottomBand = BOTTOM_BAND_FOR_WON_CARDS;
-  const x = LEFT_BAND;
-  const y = TOP_BAND;
-  const w = Math.max(0, tableW - LEFT_BAND - rightBand);
-  const h = Math.max(0, tableH - TOP_BAND - bottomBand);
+  const x = leftBand;
+  const y = topBand;
+  const w = Math.max(0, tableW - leftBand - rightBand);
+  const h = Math.max(0, tableH - topBand - bottomBand);
   return { x, y, w, h };
 }
 
@@ -132,10 +162,11 @@ export function getMatPosition(centerRect, matW, matH) {
 // Seat anchor positions (absolute within table). Centered with the play mat.
 // matPosition/matSize are used so top seat aligns with mat horizontal center, left/right with mat vertical center.
 export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition, matSize) {
-  const rightX = tableW - OUTER_MARGIN - SEAT_WIDTH;
+  const seat = getSeatSize(tableW, _tableH);
+  const rightX = tableW - OUTER_MARGIN - seat.w;
   const tableH = _tableH;
   const seatMinY = 0;
-  const seatMaxY = Math.max(0, tableH - SEAT_HEIGHT);
+  const seatMaxY = Math.max(0, tableH - seat.h);
 
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -144,15 +175,15 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
   const matCenterY = matPosition.y + matSize.h / 2;
 
   const seatMinX = OUTER_MARGIN;
-  const seatMaxX = Math.max(0, tableW - OUTER_MARGIN - SEAT_WIDTH);
+  const seatMaxX = Math.max(0, tableW - OUTER_MARGIN - seat.w);
 
   const leftSeatX = clamp(OUTER_MARGIN, seatMinX, seatMaxX);
-  const leftSeatY = clamp(Math.round(matCenterY - SEAT_HEIGHT / 2), seatMinY, seatMaxY);
+  const leftSeatY = clamp(Math.round(matCenterY - seat.h / 2), seatMinY, seatMaxY);
 
-  const topSeatX = clamp(Math.round(matCenterX - SEAT_WIDTH / 2), seatMinX, seatMaxX);
+  const topSeatX = clamp(Math.round(matCenterX - seat.w / 2), seatMinX, seatMaxX);
   const topSeatYClamped = clamp(topSeatY, seatMinY, seatMaxY);
 
-  const rightSeatX = clamp(Math.max(LEFT_BAND + 16, rightX), seatMinX, seatMaxX);
+  const rightSeatX = clamp(Math.max(getLeftBand(tableW, _tableH) + 16, rightX), seatMinX, seatMaxX);
   const rightSeatY = leftSeatY;
 
   return {
@@ -163,34 +194,44 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
 }
 
 // Card dimensions by breakpoint (for play mat / general use)
-export function getCardSize(containerWidth) {
+export function getCardSize(containerWidth, viewportHeight) {
+  const compactPhoneLandscape =
+    Number.isFinite(containerWidth) &&
+    Number.isFinite(viewportHeight) &&
+    containerWidth >= 620 &&
+    containerWidth <= 980 &&
+    viewportHeight <= 430;
+  if (compactPhoneLandscape) {
+    if (viewportHeight <= 375) return { w: 56, h: 80 };
+    return { w: 58, h: 84 };
+  }
   if (containerWidth <= 1280) return { w: 64, h: 92 };
   if (containerWidth >= 1600) return { w: 80, h: 116 };
   return { w: 72, h: 104 };
 }
 
 // Smaller cards for played tricks so multiple fit on the table
-export function getTrickCardSize(containerWidth) {
-  const full = getCardSize(containerWidth);
+export function getTrickCardSize(containerWidth, viewportHeight) {
+  const full = getCardSize(containerWidth, viewportHeight);
   return { w: Math.round(full.w * 0.6), h: Math.round(full.h * 0.6) };
 }
 
 // Slightly smaller cards in the hand dock so rail + actions + hint fit without overflow
-export function getDockCardSize(containerWidth) {
-  const full = getCardSize(containerWidth);
+export function getDockCardSize(containerWidth, viewportHeight) {
+  const full = getCardSize(containerWidth, viewportHeight);
   return { w: Math.round(full.w * 0.88), h: Math.round(full.h * 0.88) };
 }
 
 // Won pile and trick display (same size so won cards match the pile)
-export function getWonPileCardSize(containerWidth) {
-  const full = getCardSize(containerWidth);
+export function getWonPileCardSize(containerWidth, viewportHeight) {
+  const full = getCardSize(containerWidth, viewportHeight);
   const scale = 0.7;
   return { w: Math.round(full.w * scale), h: Math.round(full.h * scale) };
 }
 
 // Tiny cards for exchange/seat display (scale from base so they stay proportional and visible)
-export function getExchangeCardSize(containerWidth) {
-  const full = getCardSize(containerWidth);
+export function getExchangeCardSize(containerWidth, viewportHeight) {
+  const full = getCardSize(containerWidth, viewportHeight);
   const scale = 0.32;
   return { w: Math.round(full.w * scale), h: Math.round(full.h * scale) };
 }

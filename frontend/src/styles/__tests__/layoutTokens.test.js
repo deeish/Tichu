@@ -11,6 +11,7 @@ import {
   getDockCardSize,
   getExchangeCardSize,
   getDockWidthClamp,
+  getSeatSize,
 } from '../layoutTokens';
 
 describe('layoutTokens geometry guards', () => {
@@ -61,12 +62,13 @@ describe('layoutTokens geometry guards', () => {
       const matSize = { w: Math.max(400, tableW * 0.5), h: Math.max(300, tableH * 0.5) };
 
       const seats = getSeatPositions(tableW, tableH, dockH, drawerW, matPosition, matSize);
+      const seat = getSeatSize(tableW, tableH);
       for (const side of Object.keys(seats)) {
         const s = seats[side];
         expect(s.x).toBeGreaterThanOrEqual(0);
         expect(s.y).toBeGreaterThanOrEqual(0);
-        expect(s.x + 200).toBeLessThanOrEqual(tableW + 1); // SEAT_WIDTH = 200
-        expect(s.y + 52).toBeLessThanOrEqual(tableH + 1); // SEAT_HEIGHT = 52
+        expect(s.x + seat.w).toBeLessThanOrEqual(tableW + 1);
+        expect(s.y + seat.h).toBeLessThanOrEqual(tableH + 1);
       }
     }
   });
@@ -148,8 +150,8 @@ describe('layoutTokens geometry guards', () => {
       expect(center.h).toBeGreaterThanOrEqual(0);
 
       const basis = Math.max(320, center.w || tw * 0.5);
-      const dockCard = getDockCardSize(basis);
-      const ex = getExchangeCardSize(basis);
+      const dockCard = getDockCardSize(basis, th);
+      const ex = getExchangeCardSize(basis, th);
       expect(dockCard.w).toBeGreaterThan(16);
       expect(dockCard.h).toBeGreaterThan(24);
       expect(ex.w).toBeGreaterThan(8);
@@ -159,6 +161,24 @@ describe('layoutTokens geometry guards', () => {
       expect(clamp.min).toBeGreaterThan(0);
       expect(clamp.max).toBeGreaterThanOrEqual(clamp.min);
     }
+  });
+
+  it('compact landscape tiers reduce seat and card sizing', () => {
+    const desktopSeat = getSeatSize(1320, 760);
+    expect(desktopSeat).toEqual({ w: 200, h: 52 });
+
+    const compactSeat = getSeatSize(844, 390);
+    expect(compactSeat.w).toBeLessThan(200);
+    expect(compactSeat.h).toBeLessThan(52);
+
+    const shortSeat = getSeatSize(667, 375);
+    expect(shortSeat.w).toBeLessThanOrEqual(compactSeat.w);
+    expect(shortSeat.h).toBeLessThanOrEqual(compactSeat.h);
+
+    const regularCard = getDockCardSize(844, 760);
+    const compactCard = getDockCardSize(844, 390);
+    expect(compactCard.w).toBeLessThan(regularCard.w);
+    expect(compactCard.h).toBeLessThan(regularCard.h);
   });
 });
 

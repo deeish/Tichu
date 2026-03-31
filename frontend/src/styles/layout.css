@@ -108,3 +108,10 @@
   padding: 0 max(var(--s16), var(--safe-left)) var(--safe-bottom) max(var(--s16), var(--safe-right));
   min-width: 0;
 }
+
+@media (orientation: landscape) and (max-height: 430px) {
+  .game-layout .hand-dock-wrapper {
+    min-height: calc(140px + var(--safe-bottom));
+    padding: 0 max(var(--s8), var(--safe-left)) var(--safe-bottom) max(var(--s8), var(--safe-right));
+  }
+}

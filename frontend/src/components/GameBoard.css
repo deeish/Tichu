@@ -146,6 +146,15 @@
   background: rgba(0, 0, 0, 0.7);
 }
 
+@media (orientation: landscape) and (max-height: 430px) {
+  .sidebar-toggle-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+}
+
 /* Exchange complete: cards fly from opponent seats toward the hand dock */
 .exchange-flight-overlay {
   position: fixed;

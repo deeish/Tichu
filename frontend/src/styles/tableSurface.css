@@ -504,6 +504,43 @@
   line-height: 1.3;
 }
 
+@media (orientation: landscape) and (max-height: 430px) {
+  .seat-panel {
+    padding: 4px var(--s8);
+    gap: 6px;
+  }
+
+  .seat-avatar {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    font-size: 9px;
+  }
+
+  .seat-name {
+    font-size: 12px;
+  }
+
+  .seat-meta {
+    font-size: 9px;
+    gap: 5px;
+  }
+
+  .seat-team-pill {
+    font-size: 8px;
+    padding: 1px 4px;
+  }
+
+  .play-mat-zone {
+    min-height: 120px;
+    padding: var(--s4);
+  }
+
+  .play-mat-zone .trick {
+    padding: var(--s8);
+  }
+}
+
 /* Prompt strip */
 .prompt-strip {
   position: fixed;
