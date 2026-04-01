@@ -24,8 +24,8 @@
 
 @media (orientation: landscape) and (max-height: 430px) {
   .sidebar-column.sidebar-overlay {
-    width: min(78vw, 300px);
-    max-width: 300px;
+    width: min(70vw, 270px);
+    max-width: 270px;
   }
 
   .drawer-content {
@@ -52,8 +52,8 @@
 
 @media (orientation: landscape) and (max-height: 375px) {
   .sidebar-column.sidebar-overlay {
-    width: min(76vw, 280px);
-    max-width: 280px;
+    width: min(66vw, 248px);
+    max-width: 248px;
   }
 }
 

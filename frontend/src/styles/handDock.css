@@ -557,3 +557,36 @@
 .dock-hint.success {
   color: #86efac;
 }
+
+@media (orientation: landscape) and (max-height: 430px) {
+  .dock-header {
+    min-height: 34px;
+    padding: 4px var(--s8);
+  }
+
+  .dock-title {
+    font-size: 12px;
+  }
+
+  .dock-sort button {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  .dock-rail {
+    min-height: 78px;
+    padding: 20px 0 var(--s8);
+  }
+
+  .dock-btn {
+    height: 34px;
+    font-size: 12px;
+    min-width: 88px;
+  }
+
+  .dock-btn-secondary {
+    height: 30px;
+    font-size: 11px;
+    min-width: 76px;
+  }
+}

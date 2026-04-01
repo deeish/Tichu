@@ -506,24 +506,24 @@
 
 @media (orientation: landscape) and (max-height: 430px) {
   .seat-panel {
-    padding: 4px var(--s8);
-    gap: 6px;
+    padding: 3px 6px;
+    gap: 5px;
   }
 
   .seat-avatar {
-    width: 26px;
-    height: 26px;
-    min-width: 26px;
-    font-size: 9px;
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    font-size: 8px;
   }
 
   .seat-name {
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .seat-meta {
-    font-size: 9px;
-    gap: 5px;
+    font-size: 8px;
+    gap: 4px;
   }
 
   .seat-team-pill {
@@ -533,11 +533,21 @@
 
   .play-mat-zone {
     min-height: 120px;
-    padding: var(--s4);
+    padding: 2px;
   }
 
   .play-mat-zone .trick {
-    padding: var(--s8);
+    padding: var(--s4);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 390px) {
+  .seat-name {
+    font-size: 10px;
+  }
+
+  .seat-meta {
+    font-size: 8px;
   }
 }
 

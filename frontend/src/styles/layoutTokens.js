@@ -37,23 +37,36 @@ export const BOTTOM_BAND_FOR_WON_CARDS = MAX_WON_PILE_CARD_H + WON_STACK_GAP + O
 export const WISHED_CARD_PANEL_TOP = 12;
 
 /**
+ * Compact tier classifier (single source of truth for phone-landscape sizing).
+ * - regular: desktop/tablet/default
+ * - compact: phone-class landscape with short viewport
+ * - short: extra-short phone landscape
+ */
+export function getCompactTier(viewportW, viewportH) {
+  if (!Number.isFinite(viewportW) || !Number.isFinite(viewportH) || viewportW <= 0 || viewportH <= 0) return 'regular';
+  const isLandscape = viewportW > viewportH;
+  const phoneLandscapeCompact = isLandscape && viewportH <= 430 && viewportW <= 980;
+  if (!phoneLandscapeCompact) return 'regular';
+  if (viewportH <= 390) return 'short';
+  return 'compact';
+}
+
+/**
  * Seat panel size by table tier.
  * Keep desktop unchanged; compact only on short phone-class landscape viewports.
  */
 export function getSeatSize(tableW, tableH) {
-  if (!Number.isFinite(tableW) || !Number.isFinite(tableH) || tableW <= 0 || tableH <= 0) {
-    return { w: SEAT_WIDTH, h: SEAT_HEIGHT };
-  }
-  const phoneLandscape = tableW >= 620 && tableW <= 980 && tableH <= 430;
-  if (!phoneLandscape) return { w: SEAT_WIDTH, h: SEAT_HEIGHT };
-  if (tableH <= 375) return { w: 168, h: 44 };
-  if (tableH <= 390) return { w: 176, h: 46 };
-  return { w: 184, h: 48 };
+  const tier = getCompactTier(tableW, tableH);
+  if (tier === 'short') return { w: 152, h: 40 };
+  if (tier === 'compact') return { w: 160, h: 42 };
+  return { w: SEAT_WIDTH, h: SEAT_HEIGHT };
 }
 
 function getTopBand(tableW, tableH) {
   const seat = getSeatSize(tableW, tableH);
-  return TABLE_HEADER_HEIGHT + TABLE_HEADER_SEAT_GAP + seat.h + SEAT_MAT_GAP;
+  const tier = getCompactTier(tableW, tableH);
+  const compactReduction = tier === 'short' ? 16 : tier === 'compact' ? 10 : 0;
+  return TABLE_HEADER_HEIGHT + TABLE_HEADER_SEAT_GAP + seat.h + SEAT_MAT_GAP - compactReduction;
 }
 
 function getLeftBand(tableW, tableH) {
@@ -78,10 +91,11 @@ export function getSidebarWidth(viewportW) {
 // Dock height: clamp(180px, 22vh, 240px)
 export function getDockHeight() {
   if (typeof window === 'undefined') return 200;
-  const isCompactLandscape = window.innerWidth >= 620 && window.innerHeight <= 430;
-  if (isCompactLandscape) {
-    const vhCompact = window.innerHeight * 0.28;
-    return Math.min(170, Math.max(140, vhCompact));
+  const tier = getCompactTier(window.innerWidth, window.innerHeight);
+  if (tier === 'compact' || tier === 'short') {
+    const vhCompact = window.innerHeight * 0.24;
+    const max = tier === 'short' ? 140 : 148;
+    return Math.min(max, Math.max(120, vhCompact));
   }
   const vh = window.innerHeight * 0.22;
   return Math.min(240, Math.max(180, vh));
@@ -195,16 +209,9 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
 
 // Card dimensions by breakpoint (for play mat / general use)
 export function getCardSize(containerWidth, viewportHeight) {
-  const compactPhoneLandscape =
-    Number.isFinite(containerWidth) &&
-    Number.isFinite(viewportHeight) &&
-    containerWidth >= 620 &&
-    containerWidth <= 980 &&
-    viewportHeight <= 430;
-  if (compactPhoneLandscape) {
-    if (viewportHeight <= 375) return { w: 56, h: 80 };
-    return { w: 58, h: 84 };
-  }
+  const tier = getCompactTier(containerWidth, viewportHeight);
+  if (tier === 'short') return { w: 50, h: 70 };
+  if (tier === 'compact') return { w: 52, h: 74 };
   if (containerWidth <= 1280) return { w: 64, h: 92 };
   if (containerWidth >= 1600) return { w: 80, h: 116 };
   return { w: 72, h: 104 };
@@ -212,12 +219,18 @@ export function getCardSize(containerWidth, viewportHeight) {
 
 // Smaller cards for played tricks so multiple fit on the table
 export function getTrickCardSize(containerWidth, viewportHeight) {
+  const tier = getCompactTier(containerWidth, viewportHeight);
+  if (tier === 'short') return { w: 36, h: 52 };
+  if (tier === 'compact') return { w: 38, h: 56 };
   const full = getCardSize(containerWidth, viewportHeight);
   return { w: Math.round(full.w * 0.6), h: Math.round(full.h * 0.6) };
 }
 
 // Slightly smaller cards in the hand dock so rail + actions + hint fit without overflow
 export function getDockCardSize(containerWidth, viewportHeight) {
+  const tier = getCompactTier(containerWidth, viewportHeight);
+  if (tier === 'short') return { w: 48, h: 68 };
+  if (tier === 'compact') return { w: 50, h: 72 };
   const full = getCardSize(containerWidth, viewportHeight);
   return { w: Math.round(full.w * 0.88), h: Math.round(full.h * 0.88) };
 }

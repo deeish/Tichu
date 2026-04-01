@@ -9,9 +9,11 @@ import {
   getVisibleHandCap,
   getHandRailStep,
   getDockCardSize,
+  getTrickCardSize,
   getExchangeCardSize,
   getDockWidthClamp,
   getSeatSize,
+  getCompactTier,
 } from '../layoutTokens';
 
 describe('layoutTokens geometry guards', () => {
@@ -164,6 +166,10 @@ describe('layoutTokens geometry guards', () => {
   });
 
   it('compact landscape tiers reduce seat and card sizing', () => {
+    expect(getCompactTier(1320, 760)).toBe('regular');
+    expect(getCompactTier(844, 390)).toBe('short');
+    expect(getCompactTier(844, 420)).toBe('compact');
+
     const desktopSeat = getSeatSize(1320, 760);
     expect(desktopSeat).toEqual({ w: 200, h: 52 });
 
@@ -179,6 +185,10 @@ describe('layoutTokens geometry guards', () => {
     const compactCard = getDockCardSize(844, 390);
     expect(compactCard.w).toBeLessThan(regularCard.w);
     expect(compactCard.h).toBeLessThan(regularCard.h);
+    expect(compactCard.h).toBeLessThanOrEqual(68);
+
+    const trickCompact = getTrickCardSize(844, 390);
+    expect(trickCompact.h).toBeLessThanOrEqual(52);
   });
 });
 
