@@ -992,15 +992,19 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       : typeof window !== 'undefined'
         ? window.innerWidth
         : 1440;
+  const effectiveViewportHeight =
+    typeof window !== 'undefined'
+      ? Number.isFinite(window.visualViewport?.height)
+        ? window.visualViewport.height
+        : window.innerHeight
+      : 900;
   // Table/mat card sizing should be based on the measured center rect so the trick/won visuals
   // stay aligned to the playmat geometry (not the full viewport width).
   const tableContainerWidthBasis = centerRect?.w ?? dockContainerWidth;
   const tableContainerHeightBasis =
     tableSize.h > 0
-      ? tableSize.h
-      : typeof window !== 'undefined'
-        ? window.innerHeight
-        : 900;
+      ? Math.min(tableSize.h, effectiveViewportHeight)
+      : effectiveViewportHeight;
   const exchangeCardSize = getExchangeCardSize(tableContainerWidthBasis, tableContainerHeightBasis);
   const wonCardSize = getWonPileCardSize(tableContainerWidthBasis, tableContainerHeightBasis);
   const tableHasSize = tableSize.w >= 10 && tableSize.h >= 10;

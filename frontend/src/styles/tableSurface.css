@@ -505,6 +505,34 @@
 }
 
 @media (orientation: landscape) and (max-height: 430px) {
+  .table-header {
+    gap: 4px;
+    padding: var(--s4) var(--s8);
+  }
+
+  .table-title {
+    font-size: 1.05rem;
+  }
+
+  .table-current-action-box {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+
+  .table-header-declaration-pill {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+
+  .wished-card-panel {
+    gap: var(--s4);
+    padding: var(--s8);
+  }
+
+  .wished-card-label {
+    font-size: 10px;
+  }
+
   .seat-panel {
     padding: 3px 6px;
     gap: 5px;
@@ -526,6 +554,16 @@
     gap: 4px;
   }
 
+  .seat-declaration-pill {
+    font-size: 8px;
+    padding: 1px 5px;
+  }
+
+  .seat-acting-chip {
+    font-size: 8px;
+    padding: 1px 4px;
+  }
+
   .seat-team-pill {
     font-size: 8px;
     padding: 1px 4px;
@@ -538,6 +576,15 @@
 
   .play-mat-zone .trick {
     padding: var(--s4);
+  }
+
+  .play-mat-zone .trick h3 {
+    font-size: 11px;
+    margin-bottom: var(--s4);
+  }
+
+  .play-mat-zone .play-player {
+    font-size: 11px;
   }
 }
 

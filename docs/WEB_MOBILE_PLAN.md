@@ -203,6 +203,7 @@ Real-device preview still looks oversized. The prior pass was not enough. We now
 - Mixed sizing sources (`window`, table rect, center rect) can apply different tiers in one frame.
 - Width-only breakpoints are too weak for mobile landscape with dynamic browser chrome.
 - Too many local caps; no single "phone landscape scale" factor.
+- Browser UI (address bar/toolbars) still consumes vertical space, so compact tiers do not trigger strongly enough on some devices.
 
 ### New approach (how browser game teams usually solve this)
 
@@ -224,6 +225,11 @@ Real-device preview still looks oversized. The prior pass was not enough. We now
    - Introduce a deterministic mode for `landscape && short-height`.
    - In that mode, apply stronger caps regardless of wider device widths.
 
+5. **Fullscreen / browser-chrome strategy**
+   - Treat "visible browser UI" as a first-class constraint in phone landscape.
+   - Prefer app-like standalone display (A2HS/PWA) where possible.
+   - Do not assume mobile browsers can always auto-hide top chrome.
+
 ### Hard mode activation
 
 `phoneLandscapeCompact = (orientation: landscape) && (viewportHeight <= 430)`
@@ -235,19 +241,19 @@ Short tier:
 ### Mandatory hard caps (replace soft guidance)
 
 - **Cards**
-  - dock card max height: `72px` (short tier `68px`)
-  - trick card max height: `56px` (short tier `52px`)
+  - dock card max height: `64px` (short tier `60px`)
+  - trick card max height: `50px` (short tier `46px`)
 - **Seats**
-  - seat box max: `160x42` (short tier `152x40`)
-  - name font max: `12px` (short tier `11px`)
-  - meta font max: `9px`
+  - seat box max: `148x38` (short tier `140x36`)
+  - name font max: `11px` (short tier `10px`)
+  - meta font max: `8px`
 - **Mat / center zone**
-  - reduce top band reserve by `10-16px` in compact mode
-  - reduce mat inner padding by `25-35%`
+  - reduce top band reserve by `16-24px` in compact mode
+  - reduce mat inner padding by `35-45%`
 - **Dock**
-  - dock height in compact mode: `clamp(120px, 24vh, 148px)`
+  - dock height in compact mode: `clamp(104px, 22vh, 132px)`
 - **Drawer**
-  - overlay width cap: `min(70vw, 270px)` (short tier `min(66vw, 248px)`)
+  - overlay width cap: `min(62vw, 236px)` (short tier `min(58vw, 216px)`)
   - tabs/rows compact typography, but interactive controls still >= `40px` height
 - **Show panel toggle**
   - visual shrink allowed; hit area remains at least `44x44`
@@ -259,6 +265,27 @@ Short tier:
 | `844x390` | hand row + center trick + 3 opponent seats all visible at once; no overlap into safe-area cutouts |
 | `780x360` | table still readable; no clipped controls; deck/trick remains usable |
 | `667x375` | compact mode always active; layout feels intentionally "mobile", not desktop scaled down |
+| `844x330` (browser chrome visible) | still playable without clipping; compact tier remains enforced and no critical controls leave viewport |
+
+### Fullscreen mode plan (new)
+
+Goal: remove or reduce browser chrome impact during active play on phones.
+
+1. **PWA-first full-screen**
+   - Ensure manifest `display` is `standalone` (or `fullscreen` if desired), then test via Add-to-Home-Screen launch.
+   - In standalone launch, verify no top address bar appears during gameplay.
+
+2. **In-browser fallback**
+   - Add an in-game "Enter full screen" control for platforms supporting Fullscreen API (mostly Android browsers).
+   - Keep a non-blocking UX when Fullscreen API is unavailable.
+
+3. **iOS Safari expectation**
+   - Do not rely on programmatic full-screen (limited support).
+   - Treat iOS Safari with browser chrome as a required QA case; compact tier must handle reduced effective height.
+
+4. **VisualViewport-driven compact trigger**
+   - Base compact mode on effective viewport height (`visualViewport.height` when present), not just `window.innerHeight`.
+   - This prevents accidental desktop-like scaling when browser bars are visible.
 
 ### Implementation sequence (strict)
 
@@ -266,6 +293,7 @@ Short tier:
    - One `getCompactTier(viewportW, viewportH)` helper.
    - One scale object consumed by seats/cards/mat/dock/drawer.
    - Remove duplicated breakpoint logic scattered across files.
+   - Feed `getCompactTier` from effective viewport metrics (`visualViewport` fallback to `window`).
 
 2. **Apply hard caps**
    - `layoutTokens.js` first (authoritative values).
@@ -277,11 +305,15 @@ Short tier:
 
 4. **Real-device QA gate (required before ship)**
    - iPhone Safari landscape + Chrome Android landscape.
+   - iPhone Safari with browser chrome visible (normal tab) and A2HS standalone launch.
+   - Android Chrome in normal tab + Fullscreen API path.
    - Screenshot before/after for all golden viewports.
 
 ### Definition of done for Phase 6
 
 - Mobile landscape is clearly playable without pinch/zoom or clipped core surfaces.
+- Normal browser-tab mode remains playable even when address bar is visible.
+- Standalone/A2HS mode provides an app-like full-screen path for best experience.
 - Hand cards, center trick area, and seat panels coexist with readable spacing.
 - Drawer no longer dominates phone landscape.
 - No regression on desktop/tablet tiers.

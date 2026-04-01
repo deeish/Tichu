@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { socket } from './socket'
 import { subscribe as subscribeSocketEvents } from './socketEventRegistry'
 import { useVisualViewportInsetCssVar } from './hooks/useVisualViewportInset'
+import { useAutoLandscapeFullscreen } from './hooks/useAutoLandscapeFullscreen'
 import { formatConnectErrorToast, formatConnectErrorSubtitle } from './utils/connectErrorMessage'
 import { getSocketDisplayUrl } from './utils/socketDisplayUrl'
 import GameBoard from './components/GameBoard'
@@ -750,6 +751,7 @@ function App() {
   // Stay in lobby for 'waiting' or any unexpected state so joiners never see the game until host starts.
   const ACTIVE_GAME_STATES = ['grand-tichu', 'exchanging', 'playing', 'round-ending-preview', 'round-ended', 'finished']
   const inActiveGame = gameState && ACTIVE_GAME_STATES.includes(gameState.state)
+  useAutoLandscapeFullscreen(!!inActiveGame)
 
   if (showEndGameTest) {
     return (

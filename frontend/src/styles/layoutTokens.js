@@ -91,13 +91,16 @@ export function getSidebarWidth(viewportW) {
 // Dock height: clamp(180px, 22vh, 240px)
 export function getDockHeight() {
   if (typeof window === 'undefined') return 200;
-  const tier = getCompactTier(window.innerWidth, window.innerHeight);
+  const vv = window.visualViewport;
+  const viewW = Number.isFinite(vv?.width) ? vv.width : window.innerWidth;
+  const viewH = Number.isFinite(vv?.height) ? vv.height : window.innerHeight;
+  const tier = getCompactTier(viewW, viewH);
   if (tier === 'compact' || tier === 'short') {
-    const vhCompact = window.innerHeight * 0.24;
+    const vhCompact = viewH * 0.24;
     const max = tier === 'short' ? 140 : 148;
     return Math.min(max, Math.max(120, vhCompact));
   }
-  const vh = window.innerHeight * 0.22;
+  const vh = viewH * 0.22;
   return Math.min(240, Math.max(180, vh));
 }
 

@@ -153,6 +153,28 @@
     padding: 0 10px;
     font-size: 11px;
   }
+
+  .prompt-strip {
+    bottom: calc(var(--dock-h) + var(--s8));
+    padding: var(--s8) var(--s12);
+    font-size: 12px;
+    max-width: 94vw;
+  }
+
+  .prompt-strip .prompt-select {
+    padding: 4px 8px;
+    font-size: 12px;
+    margin: 0 var(--s4);
+  }
+
+  .exchange-slot-inline {
+    font-size: 11px;
+  }
+
+  .exchange-slot-inline .exchange-slot-empty {
+    width: 42px;
+    height: 56px;
+  }
 }
 
 /* Exchange complete: cards fly from opponent seats toward the hand dock */

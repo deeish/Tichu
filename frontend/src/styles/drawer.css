@@ -41,12 +41,29 @@
     font-size: 11px;
   }
 
+  .sidebar-top-meta {
+    margin-bottom: var(--s8);
+  }
+
+  .sidebar-party-code {
+    font-size: 11px;
+  }
+
   .sidebar-score-chip {
-    height: 42px;
+    height: 38px;
+    padding: 5px 8px;
   }
 
   .sidebar-score-value {
-    font-size: 16px;
+    font-size: 14px;
+  }
+
+  .sidebar-score-label {
+    font-size: 10px;
+  }
+
+  .drawer-panel-inner {
+    font-size: 12px;
   }
 }
 
