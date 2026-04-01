@@ -606,3 +606,50 @@
     padding: 2px 0 4px;
   }
 }
+
+.game-layout--ultra-compact .hand-dock {
+  min-height: 96px;
+}
+
+.game-layout--ultra-compact .dock-header {
+  min-height: 28px;
+  padding: 2px 6px;
+}
+
+.game-layout--ultra-compact .dock-title {
+  font-size: 11px;
+}
+
+.game-layout--ultra-compact .dock-sort button {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.game-layout--ultra-compact .dock-actions-box {
+  width: clamp(70px, 18vw, 88px);
+  min-width: 66px;
+  padding-left: 4px;
+}
+
+.game-layout--ultra-compact .dock-rail {
+  min-height: 62px;
+  padding: 14px 0 4px;
+}
+
+.game-layout--ultra-compact .dock-btn {
+  min-width: 72px;
+  height: 28px;
+  font-size: 10px;
+  padding: 0 8px;
+}
+
+.game-layout--ultra-compact .dock-btn-secondary {
+  min-width: 62px;
+  height: 24px;
+  font-size: 9px;
+  padding: 0 6px;
+}
+
+.game-layout--ultra-compact .dock-hint {
+  display: none;
+}

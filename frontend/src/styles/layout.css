@@ -115,3 +115,8 @@
     padding: 0 max(var(--s8), var(--safe-left)) var(--safe-bottom) max(var(--s8), var(--safe-right));
   }
 }
+
+.game-layout--ultra-compact .hand-dock-wrapper {
+  min-height: calc(96px + var(--safe-bottom));
+  padding: 0 max(4px, var(--safe-left)) var(--safe-bottom) max(4px, var(--safe-right));
+}

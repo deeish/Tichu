@@ -18,6 +18,7 @@ import {
   getMatPosition,
   getSeatPositions,
   getSeatSize,
+  getCompactTier,
   getWonPileCardSize,
   getExchangeCardSize,
   getDockCardSize,
@@ -1005,6 +1006,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     tableSize.h > 0
       ? Math.min(tableSize.h, effectiveViewportHeight)
       : effectiveViewportHeight;
+  const mobileTier = getCompactTier(tableContainerWidthBasis, tableContainerHeightBasis);
+  const ultraCompactGameplay = mobileTier === 'short';
   const exchangeCardSize = getExchangeCardSize(tableContainerWidthBasis, tableContainerHeightBasis);
   const wonCardSize = getWonPileCardSize(tableContainerWidthBasis, tableContainerHeightBasis);
   const tableHasSize = tableSize.w >= 10 && tableSize.h >= 10;
@@ -1129,7 +1132,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
 
   return (
     <div
-      className={`game-layout ${sidebarMode === 'overlay' ? (isSidebarOpen ? 'sidebar-overlay-open' : 'sidebar-overlay-closed') : 'sidebar-side-mode'}`}
+      className={`game-layout ${ultraCompactGameplay ? 'game-layout--ultra-compact' : ''} ${sidebarMode === 'overlay' ? (isSidebarOpen ? 'sidebar-overlay-open' : 'sidebar-overlay-closed') : 'sidebar-side-mode'}`}
       ref={layoutRef}
       data-theme={tableTheme === 'classic' ? undefined : tableTheme}
     >

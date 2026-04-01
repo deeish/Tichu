@@ -177,6 +177,23 @@
   }
 }
 
+.game-layout--ultra-compact .sidebar-toggle-btn {
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+.game-layout--ultra-compact .prompt-strip {
+  bottom: calc(var(--dock-h) + 4px);
+  padding: 6px 10px;
+  font-size: 11px;
+  max-width: 96vw;
+}
+
+.game-layout--ultra-compact .prompt-strip .prompt-select {
+  font-size: 11px;
+  padding: 3px 6px;
+}
+
 /* Exchange complete: cards fly from opponent seats toward the hand dock */
 .exchange-flight-overlay {
   position: fixed;

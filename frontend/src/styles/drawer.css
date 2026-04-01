@@ -74,6 +74,38 @@
   }
 }
 
+.game-layout--ultra-compact .sidebar-column.sidebar-overlay {
+  width: min(58vw, 216px);
+  max-width: 216px;
+}
+
+.game-layout--ultra-compact .drawer-content {
+  padding: 8px;
+}
+
+.game-layout--ultra-compact .sidebar-scores {
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.game-layout--ultra-compact .sidebar-score-chip {
+  height: 34px;
+  padding: 4px 6px;
+}
+
+.game-layout--ultra-compact .sidebar-score-value {
+  font-size: 12px;
+}
+
+.game-layout--ultra-compact .sidebar-score-label {
+  font-size: 9px;
+}
+
+.game-layout--ultra-compact .drawer-tab {
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
 .sidebar-column.sidebar-overlay.is-closed {
   transform: translateX(100%);
   opacity: 0;

@@ -57,8 +57,8 @@ export function getCompactTier(viewportW, viewportH) {
  */
 export function getSeatSize(tableW, tableH) {
   const tier = getCompactTier(tableW, tableH);
-  if (tier === 'short') return { w: 152, h: 40 };
-  if (tier === 'compact') return { w: 160, h: 42 };
+  if (tier === 'short') return { w: 132, h: 34 };
+  if (tier === 'compact') return { w: 148, h: 38 };
   return { w: SEAT_WIDTH, h: SEAT_HEIGHT };
 }
 
@@ -96,9 +96,9 @@ export function getDockHeight() {
   const viewH = Number.isFinite(vv?.height) ? vv.height : window.innerHeight;
   const tier = getCompactTier(viewW, viewH);
   if (tier === 'compact' || tier === 'short') {
-    const vhCompact = viewH * 0.24;
-    const max = tier === 'short' ? 140 : 148;
-    return Math.min(max, Math.max(120, vhCompact));
+    const vhCompact = viewH * 0.21;
+    const max = tier === 'short' ? 114 : 126;
+    return Math.min(max, Math.max(92, vhCompact));
   }
   const vh = viewH * 0.22;
   return Math.min(240, Math.max(180, vh));
@@ -213,8 +213,8 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
 // Card dimensions by breakpoint (for play mat / general use)
 export function getCardSize(containerWidth, viewportHeight) {
   const tier = getCompactTier(containerWidth, viewportHeight);
-  if (tier === 'short') return { w: 50, h: 70 };
-  if (tier === 'compact') return { w: 52, h: 74 };
+  if (tier === 'short') return { w: 42, h: 60 };
+  if (tier === 'compact') return { w: 46, h: 64 };
   if (containerWidth <= 1280) return { w: 64, h: 92 };
   if (containerWidth >= 1600) return { w: 80, h: 116 };
   return { w: 72, h: 104 };
@@ -223,8 +223,8 @@ export function getCardSize(containerWidth, viewportHeight) {
 // Smaller cards for played tricks so multiple fit on the table
 export function getTrickCardSize(containerWidth, viewportHeight) {
   const tier = getCompactTier(containerWidth, viewportHeight);
-  if (tier === 'short') return { w: 36, h: 52 };
-  if (tier === 'compact') return { w: 38, h: 56 };
+  if (tier === 'short') return { w: 28, h: 40 };
+  if (tier === 'compact') return { w: 32, h: 46 };
   const full = getCardSize(containerWidth, viewportHeight);
   return { w: Math.round(full.w * 0.6), h: Math.round(full.h * 0.6) };
 }
@@ -232,8 +232,8 @@ export function getTrickCardSize(containerWidth, viewportHeight) {
 // Slightly smaller cards in the hand dock so rail + actions + hint fit without overflow
 export function getDockCardSize(containerWidth, viewportHeight) {
   const tier = getCompactTier(containerWidth, viewportHeight);
-  if (tier === 'short') return { w: 48, h: 68 };
-  if (tier === 'compact') return { w: 50, h: 72 };
+  if (tier === 'short') return { w: 38, h: 54 };
+  if (tier === 'compact') return { w: 42, h: 60 };
   const full = getCardSize(containerWidth, viewportHeight);
   return { w: Math.round(full.w * 0.88), h: Math.round(full.h * 0.88) };
 }
