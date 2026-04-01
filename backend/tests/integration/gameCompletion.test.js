@@ -157,7 +157,7 @@ describe('Game Completion - Multiple Rounds', () => {
     expect(game.scores.team2).toBe(-70); // 30 - 100 penalty
   });
 
-  test('BUGS.md #3: when all 4 players are out, round ends and next round starts (initializeGame)', () => {
+  test('BUGS.md #3: when all 4 players are out, round enters preview then can initialize next round', () => {
     game.state = 'playing';
     game.playersOut = ['p1', 'p2', 'p3'];
     game.hands = { p1: [], p2: [], p3: [], p4: [] };
@@ -173,6 +173,11 @@ describe('Game Completion - Multiple Rounds', () => {
     game.roundEnded = false;
 
     handlePlayerWin(game, 'p4');
+
+    expect(game.state).toBe('round-ending-preview');
+    expect(game.roundEnded).toBe(true);
+
+    initializeGame(game);
 
     expect(game.state).toBe('grand-tichu');
     expect(game.playersOut).toEqual([]);

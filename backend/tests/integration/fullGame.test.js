@@ -13,6 +13,7 @@ const { revealRemainingCards } = require('../../game/declarations');
 const { exchangeCards, completeExchange } = require('../../game/exchange');
 const { getBotMove, getDragonOpponentChoice } = require('../../game/simpleBot');
 const { handlePlayerWin } = require('../../game/scoring');
+const { initializeGame } = require('../../game/initialization');
 const { WINNING_SCORE } = require('../../config/gameRules');
 
 const MAX_MOVES = 8000;
@@ -188,6 +189,10 @@ describe('Full game (bot play to completion)', () => {
       if (g.state === 'round-ended') {
         throw new Error('Game stuck in round-ended (scoring should transition to grand-tichu or finished)');
       }
+      if (g.state === 'round-ending-preview') {
+        initializeGame(g);
+        continue;
+      }
 
       throw new Error(`Unexpected state: ${g.state}`);
     }
@@ -227,6 +232,10 @@ describe('Full game (bot play to completion)', () => {
       }
       if (g.state === 'round-ended') {
         throw new Error('Game stuck in round-ended');
+      }
+      if (g.state === 'round-ending-preview') {
+        initializeGame(g);
+        continue;
       }
       throw new Error(`Unexpected state: ${g.state}`);
     }
@@ -303,7 +312,7 @@ describe('Full game (bot play to completion)', () => {
       stats.totalMoves++;
     }
 
-    expect(['round-ended', 'grand-tichu', 'finished']).toContain(g.state);
+    expect(['round-ended', 'round-ending-preview', 'grand-tichu', 'finished']).toContain(g.state);
     expect(stats.totalMoves).toBeGreaterThan(0);
   }, 30000);
 
