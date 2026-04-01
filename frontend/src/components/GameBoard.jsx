@@ -121,6 +121,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   const [tableSize, setTableSize] = useState({ w: 0, h: 0 });
   const [dockWrapperSize, setDockWrapperSize] = useState({ w: 0, h: 0 });
   const [sidebarSize, setSidebarSize] = useState({ w: 0, h: 0 });
+  const seatSize = useMemo(() => getSeatSize(tableSize.w, tableSize.h), [tableSize.w, tableSize.h]);
   const [viewport, setViewport] = useState(() => ({
     w: typeof window !== 'undefined' ? window.innerWidth : 1600,
     h: typeof window !== 'undefined' ? window.innerHeight : 900,
@@ -1000,8 +1001,6 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       : typeof window !== 'undefined'
         ? window.innerHeight
         : 900;
-  const seatSize = getSeatSize(tableSize.w, tableSize.h);
-
   const exchangeCardSize = getExchangeCardSize(tableContainerWidthBasis, tableContainerHeightBasis);
   const wonCardSize = getWonPileCardSize(tableContainerWidthBasis, tableContainerHeightBasis);
   const tableHasSize = tableSize.w >= 10 && tableSize.h >= 10;
