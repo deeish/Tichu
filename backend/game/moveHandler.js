@@ -206,7 +206,7 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
         game.passedPlayers.includes(playerId) || 
         game.currentTrick.some(play => play.playerId === playerId)
       );
-    
+
     // CRITICAL FIX: When passing, we need to advance to the NEXT player in turn order
     // who hasn't acted yet, NOT skip players who have passed (they already got their turn)
     // The issue: advanceTurn() skips players who have passed, but we need to give
@@ -214,8 +214,6 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     
     // Advance to next player in turn order (don't skip passed players - they already acted)
     // We need to find the next player who hasn't acted yet
-    const currentIndexBeforeAdvance = game.currentPlayerIndex;
-    
     // Find next player who hasn't acted (not in passedPlayers and not in currentTrick)
     let nextPlayerIndex = (game.currentPlayerIndex + 1) % game.turnOrder.length;
     let attempts = 0;
@@ -257,6 +255,23 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     
     game.currentPlayerIndex = nextPlayerIndex;
     ensureCurrentPlayerCanAct(game);
+
+    // Defensive guard: if turn bounced back to lead on a live trick and no responder remains,
+    // resolve immediately instead of asking lead to beat their own standing play.
+    const currentTurnId = game.turnOrder[game.currentPlayerIndex]?.id;
+    const bouncedToLead = currentTurnId != null && String(currentTurnId) === String(leadPlayerId);
+    if (bouncedToLead && allPlayersHaveActed) {
+      const winningPlay = getCurrentWinningPlay(game.currentTrick);
+      const winnerId = winningPlay ? winningPlay.playerId : leadPlayerId;
+      const result = winTrick(game, winnerId);
+      if (!game.hands[winnerId] || game.hands[winnerId].length === 0) {
+        const winResult = handlePlayerWin(game, winnerId);
+        if (game.roundEnded) return { ...result, ...winResult, newTrick: true };
+        return { ...result, ...winResult, newTrick: true, playerWon: true };
+      }
+      return { ...result, newTrick: true };
+    }
+
     // Not all players have acted yet; it's the next player's turn
     const forcedRoundEnd = enforceTailenderRoundEnd(game, playerId);
     if (forcedRoundEnd) return { ...forcedRoundEnd, success: true, game };

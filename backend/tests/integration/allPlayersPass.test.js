@@ -245,3 +245,79 @@ describe('Pass rule: only non-lead may pass (unless dog or Mah Jong wish)', () =
     expect(game.passedPlayers).toContain('p2');
   });
 });
+
+describe('Pass regression: lead should not be asked to beat own card', () => {
+  test('after three passes, trick resolves and lead starts a fresh trick', () => {
+    const game = createTestGame({
+      state: 'playing',
+      hands: {
+        p1: [createCard('9', 'hearts'), createCard('A', 'hearts')],
+        p2: [createCard('2', 'clubs')],
+        p3: [createCard('3', 'clubs')],
+        p4: [createCard('4', 'clubs')],
+      },
+      currentTrick: [],
+      passedPlayers: [],
+      leadPlayer: 'p1',
+      currentPlayerIndex: 0,
+      playersOut: [],
+    });
+
+    expect(makeMove(game, 'p1', [createCard('9', 'hearts')], 'play').success).toBe(true);
+    expect(makeMove(game, 'p2', [], 'pass').success).toBe(true);
+    expect(makeMove(game, 'p3', [], 'pass').success).toBe(true);
+    const lastPass = makeMove(game, 'p4', [], 'pass');
+
+    expect(lastPass.success).toBe(true);
+    expect(lastPass.newTrick).toBe(true);
+    expect(game.currentTrick.length).toBe(0);
+    expect(game.turnOrder[game.currentPlayerIndex].id).toBe('p1');
+
+    // Lead can play next trick normally (not forced to beat own previous card).
+    const followUp = makeMove(game, 'p1', [createCard('A', 'hearts')], 'play');
+    expect(followUp.success).toBe(true);
+    expect(game.currentTrick.length).toBe(1);
+  });
+
+  test('stays stable across repeated all-pass rounds', () => {
+    const game = createTestGame({
+      state: 'playing',
+      hands: {
+        p1: [
+          createCard('5', 'hearts'),
+          createCard('6', 'hearts'),
+          createCard('7', 'hearts'),
+          createCard('8', 'hearts'),
+        ],
+        p2: [createCard('2', 'clubs'), createCard('3', 'clubs'), createCard('4', 'clubs'), createCard('5', 'clubs')],
+        p3: [createCard('2', 'spades'), createCard('3', 'spades'), createCard('4', 'spades'), createCard('5', 'spades')],
+        p4: [createCard('2', 'diamonds'), createCard('3', 'diamonds'), createCard('4', 'diamonds'), createCard('5', 'diamonds')],
+      },
+      currentTrick: [],
+      passedPlayers: [],
+      leadPlayer: 'p1',
+      currentPlayerIndex: 0,
+      playersOut: [],
+    });
+
+    for (let i = 0; i < 3; i++) {
+      const leadId = game.turnOrder[game.currentPlayerIndex].id;
+      const leadHand = game.hands[leadId];
+      expect(leadHand.length).toBeGreaterThan(0);
+      const leadCard = leadHand[0];
+      expect(makeMove(game, leadId, [leadCard], 'play').success).toBe(true);
+
+      const responders = game.turnOrder
+        .map((p) => p.id)
+        .filter((id) => id !== leadId && game.hands[id] && game.hands[id].length > 0);
+
+      responders.forEach((id) => {
+        const passResult = makeMove(game, id, [], 'pass');
+        expect(passResult.success).toBe(true);
+      });
+
+      expect(game.currentTrick.length).toBe(0);
+      expect(game.turnOrder[game.currentPlayerIndex].id).toBe(leadId);
+    }
+  });
+});
