@@ -98,6 +98,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   // Optimistic glow for Tichu buttons so click/unclick feels instant; cleared when game state updates
   const [optimisticTichu, setOptimisticTichu] = useState(null);
   const [optimisticGrandTichu, setOptimisticGrandTichu] = useState(null);
+  const [grandTichuSubmitting, setGrandTichuSubmitting] = useState(false);
 
   // UI toggle for upcoming auto-pass feature.
   // Gameplay auto-pass uses a conservative server-aligned eligibility check (see effect below).
@@ -144,6 +145,11 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   useEffect(() => {
     if (game?.grandTichuDeclarations?.[playerId] == null) setOptimisticGrandTichu(null);
   }, [game?.grandTichuDeclarations?.[playerId], playerId]);
+  useEffect(() => {
+    if (game?.state !== 'grand-tichu' || game?.cardsRevealed?.[playerId]) {
+      setGrandTichuSubmitting(false);
+    }
+  }, [game?.state, game?.cardsRevealed?.[playerId], playerId]);
 
   // Start each round with auto-pass OFF. Key by roundLog length so it runs once per new round.
   useEffect(() => {
@@ -989,21 +995,17 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           <button
             type="button"
             className={`dock-btn dock-btn-primary ${(optimisticGrandTichu === true || (optimisticGrandTichu !== false && game.grandTichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
+            disabled={grandTichuSubmitting || game?.cardsRevealed?.[playerId]}
             onClick={() => {
-              // Emit based on server truth to avoid stale-optimistic actions.
-              const serverDeclared = game?.grandTichuDeclarations?.[playerId] === true;
-              setOptimisticGrandTichu(!serverDeclared);
-              serverDeclared
-                ? (() => {
-                    const actionId = nextActionId()
-                    setClientCorrelation({ requestId: actionId, actionId })
-                    socket.emit('undeclare-grand-tichu', { requestId: actionId, actionId })
-                  })()
-                : (() => {
-                    const actionId = nextActionId()
-                    setClientCorrelation({ requestId: actionId, actionId })
-                    socket.emit('declare-grand-tichu', { requestId: actionId, actionId })
-                  })();
+              if (grandTichuSubmitting || game?.cardsRevealed?.[playerId]) return;
+              setGrandTichuSubmitting(true);
+              setOptimisticGrandTichu(true);
+              const alreadyDeclared = game?.grandTichuDeclarations?.[playerId] === true;
+              if (!alreadyDeclared) {
+                const actionId = nextActionId()
+                setClientCorrelation({ requestId: actionId, actionId })
+                socket.emit('declare-grand-tichu', { requestId: actionId, actionId })
+              }
             }}
           >
             Grand Tichu (+200)
@@ -1044,6 +1046,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     game?.exchangeSubmitted,
     game?.cardsRevealed?.[playerId],
     game?.grandTichuDeclarations?.[playerId],
+    grandTichuSubmitting,
     game?.firstCardPlayed?.[playerId],
     game?.tichuDeclarations?.[playerId],
     exchangeSubmitted,
