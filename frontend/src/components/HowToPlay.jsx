@@ -284,7 +284,7 @@ function HowToPlay() {
                 <div className="htp-callout htp-callout-warn">
                   <div className="htp-callout-title">Key idea</div>
                   <p className="htp-callout-text">
-                    You are never forced to play—passing is always allowed. If you choose to play, you must beat the current play
+                    You are never forced to play, passing is always allowed. If you choose to play, you must beat the current play
                     with the same type (unless you use a bomb).
                   </p>
                 </div>
@@ -376,7 +376,7 @@ function HowToPlay() {
                       <li>
                         Must be played first (single or in a straight containing 1).
                       </li>
-                      <li>When played, announce a wish for a rank (A–K).</li>
+                      <li>When played, announce a wish for a rank (2–A).</li>
                       <li>The wish stays active until fulfilled.</li>
                     </ul>
                   </div>
@@ -415,11 +415,11 @@ function HowToPlay() {
                   A bomb is either (1) four of a kind, or (2) a straight flush of 5+ cards in the same suit.
                 </p>
                 <ul className="htp-bullets">
-                  <li>Bombs can be played at any time—even out of turn—to take a trick.</li>
+                  <li>Bombs can be played at any time, even out of turn, to take a trick.</li>
                   <li>To compare bombs: first by number of cards (more cards beats fewer), then by rank. A higher bomb beats a lower one, so bombs can be played on bombs.</li>
                 </ul>
                 <p className="htp-muted">
-                  Examples: a straight flush of 6 beats a straight flush of 5; four Kings beats four 7s. A straight flush of 5 beats a four of a kind of Aces.
+                  Examples: a straight flush of 6 beats a straight flush of 5; four Kings beats four 7s; a straight flush of 5 beats a four of a kind of Aces.
                 </p>
               </section>
 
@@ -427,7 +427,7 @@ function HowToPlay() {
                 <h2 className="htp-h2">End of round</h2>
                 <p>The round ends immediately when only one player still has cards.</p>
                 <ul className="htp-bullets">
-                  <li>The last player with cards gives their remaining hand to the opponents.</li>
+                  <li>The last player with cards discards the remainder of their hand.</li>
                   <li>That player also gives the tricks they won to the player who emptied their hand first.</li>
                 </ul>
               </section>
@@ -475,7 +475,7 @@ function HowToPlay() {
                   <div className="htp-callout-title">Double victory</div>
                   <p className="htp-callout-text">
                     If both players on the same team empty their hands first and second, card points are not counted and that team scores{' '}
-                    <strong>200</strong> points.
+                    <strong>200</strong> points +/- any tichu bonuses.
                   </p>
                 </div>
               </section>
