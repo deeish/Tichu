@@ -887,9 +887,14 @@ function App() {
               <Link to="/how-to-play" className="landing-footer-link landing-footer-btn">
                 How to play
               </Link>
-              <button type="button" className="landing-footer-link landing-footer-btn" onClick={() => {}}>
+              <a
+                href="https://forms.gle/zGy4eHoQyhwnfSEt7"
+                className="landing-footer-link landing-footer-btn"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Submit feedback
-              </button>
+              </a>
               <p className="landing-credit">Created by Dylan Salmo</p>
             </footer>
           )}
