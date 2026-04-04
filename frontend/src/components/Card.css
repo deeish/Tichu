@@ -80,16 +80,52 @@
   line-height: 1;
 }
 
-/* When card has no explicit fontSize (scaleContent=false), use fixed sizes for hand/trick */
-.card:not([style*="font-size"]) .card-rank {
+/* Explicit width+height (dock, trick, exchange): root font-size is set inline — keep rank/suit proportional with breathing room */
+.card--sized .card-standard {
+  padding: 0.2em 0.12em;
+  box-sizing: border-box;
+  justify-content: center;
+  gap: 0.08em;
+}
+
+.card--sized .card-rank {
+  font-size: 1.35em;
+  line-height: 1;
+}
+
+.card--sized .card-suit {
+  font-size: 1.75em;
+  line-height: 0.95;
+}
+
+.card--sized {
+  border-width: max(1px, 0.08em);
+  margin: 1px;
+}
+
+.card--sized.special {
+  border-width: max(1px, 0.08em);
+}
+
+.card--sized .card-special {
+  font-size: 0.88em;
+  padding: 0.35em 0.25em;
+  line-height: 1.15;
+}
+
+/*
+ * Default large typography for unsized cards (no width/height props — uses .card default 80×112).
+ * Do not use [style*="font-size"]: React/DOM serialization is unreliable; use .card--sized instead.
+ */
+.card:not(.card--sized) .card-rank {
   font-size: 1.5rem;
 }
 
-.card:not([style*="font-size"]) .card-suit {
+.card:not(.card--sized) .card-suit {
   font-size: 2rem;
 }
 
-.card:not([style*="font-size"]) .card-special {
+.card:not(.card--sized) .card-special {
   font-size: 0.9rem;
   padding: 8px;
 }

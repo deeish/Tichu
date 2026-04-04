@@ -3,14 +3,28 @@ import './Card.css';
 function Card({ card, onClick, selected = false, playable = false, width, height, draggable = false, onDragStart, onDragEnd, compact = false }) {
   if (!card) return null;
 
+  /** When width+height set the shell shrinks but rank/suit used fixed rem without this — inner art must scale with the box. */
+  const wNum = width != null ? Number(width) : NaN;
+  const hNum = height != null ? Number(height) : NaN;
+  const explicitW = Number.isFinite(wNum) && wNum > 0;
+  const explicitH = Number.isFinite(hNum) && hNum > 0;
+  const innerScalePx =
+    explicitW && explicitH
+      ? Math.min(hNum * 0.165, wNum * 0.34)
+      : compact && explicitH
+        ? hNum * 0.18
+        : null;
+
   const sizeStyle =
     width != null || height != null
       ? {
           width: width != null ? `${width}px` : undefined,
           height: height != null ? `${height}px` : undefined,
-          ...(compact && height != null ? { fontSize: `${height * 0.18}px` } : {}),
+          ...(innerScalePx != null ? { fontSize: `${innerScalePx}px` } : {}),
         }
       : undefined;
+
+  const sizedClass = innerScalePx != null ? ' card--sized' : '';
 
   const handleClick = () => {
     if (onClick && playable) {
@@ -60,7 +74,7 @@ function Card({ card, onClick, selected = false, playable = false, width, height
 
   return (
     <div
-      className={`card ${selected ? 'selected' : ''} ${playable ? 'playable' : ''} ${isSpecial ? 'special' : ''} ${draggable ? 'card-draggable' : ''}`}
+      className={`card${sizedClass} ${selected ? 'selected' : ''} ${playable ? 'playable' : ''} ${isSpecial ? 'special' : ''} ${draggable ? 'card-draggable' : ''}`}
       style={sizeStyle}
       onClick={handleClick}
       draggable={draggable ? "true" : "false"}
