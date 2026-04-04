@@ -89,9 +89,10 @@ const CARD_ASPECT_H = 7;
  * @returns {{ maxCardH: number, maxCardW: number }}
  */
 export function getPhoneCardBudgetPx(vvH) {
-  if (!Number.isFinite(vvH) || vvH <= 0) return { maxCardH: 52, maxCardW: 37 };
-  const raw = vvH * 0.1;
-  const maxCardH = Math.round(Math.min(52, Math.max(36, raw)));
+  if (!Number.isFinite(vvH) || vvH <= 0) return { maxCardH: 40, maxCardW: 29 };
+  // ~7.8% of visible height, capped so hand + dock do not dominate landscape phones (see WEB_MOBILE_PLAN).
+  const raw = vvH * 0.078;
+  const maxCardH = Math.round(Math.min(44, Math.max(28, raw)));
   const maxCardW = Math.round((maxCardH * CARD_ASPECT_W) / CARD_ASPECT_H);
   return { maxCardH, maxCardW };
 }
@@ -152,10 +153,10 @@ export function getDockHeight() {
   const { w: viewW, h: viewH } = getVisualViewportSize();
   const tier = getCompactTier(viewW, viewH);
   if (tier === 'compact' || tier === 'short') {
-    const vhCompact = viewH * 0.185;
-    const maxByTier = tier === 'short' ? 102 : 112;
-    const maxByViewport = Math.round(viewH * 0.2);
-    const raw = Math.min(maxByTier, Math.max(84, vhCompact));
+    const vhCompact = viewH * 0.152;
+    const maxByTier = tier === 'short' ? 88 : 96;
+    const maxByViewport = Math.round(viewH * 0.17);
+    const raw = Math.min(maxByTier, Math.max(72, vhCompact));
     return Math.min(raw, maxByViewport);
   }
   const vh = viewH * 0.22;
@@ -307,10 +308,10 @@ export function getTrickCardSize(containerWidth, viewportHeight) {
 export function getDockCardSize(containerWidth, viewportHeight) {
   const tier = getCompactTier(containerWidth, viewportHeight);
   if (tier === 'short') {
-    return clampCardToPhoneBudget(34, 48, viewportHeight);
+    return clampCardToPhoneBudget(30, 42, viewportHeight);
   }
   if (tier === 'compact') {
-    return clampCardToPhoneBudget(38, 54, viewportHeight);
+    return clampCardToPhoneBudget(32, 46, viewportHeight);
   }
   const full = getCardSize(containerWidth, viewportHeight);
   return { w: Math.round(full.w * 0.88), h: Math.round(full.h * 0.88) };
@@ -359,7 +360,7 @@ export function getHandRailStep(railW, cardW, visibleCount) {
   if (visibleCount <= 1) return 0;
   if (!Number.isFinite(railW) || railW <= 0 || !Number.isFinite(cardW) || cardW <= 0) return HAND_RAIL_STEP;
   // Scale preferred overlap with card width so larger cards on wide screens don't look overly stacked.
-  const preferredStep = Math.max(66, Math.min(86, Math.round(cardW * 1.08)));
+  const preferredStep = Math.max(28, Math.min(86, Math.round(cardW * 0.95)));
   const fitStep = (railW - cardW) / (visibleCount - 1);
   // Never exceed preferred spacing. Allow tight spacing on narrow docks so cards stay on-rail.
   return Math.max(0, Math.min(preferredStep, Math.floor(fitStep)));

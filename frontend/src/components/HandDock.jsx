@@ -12,8 +12,9 @@ const MAX_HAND_DISPLAY = 14;
 const MIN_RAIL_STEP = 26;
 const MIN_CARD_W_DESKTOP = 36;
 const MIN_CARD_H_DESKTOP = 52;
-const MIN_CARD_W_PHONE = 30;
-const MIN_CARD_H_PHONE = 44;
+/** Match layoutTokens getPhoneCardBudgetPx floor (20×28 @ 5∶7) so rail fit-scale does not re-inflate height past the viewport budget. */
+const MIN_CARD_W_PHONE = 20;
+const MIN_CARD_H_PHONE = 28;
 const RAIL_SAFETY_PX = 8;
 
 function HandDock({

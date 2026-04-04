@@ -103,7 +103,7 @@ describe('layoutTokens geometry guards', () => {
     const narrow = getHandRailStep(420, 72, 14);
     expect(wide).toBeGreaterThan(0);
     expect(wide).toBeLessThanOrEqual(86);
-    expect(wide).toBeGreaterThanOrEqual(66);
+    expect(wide).toBeGreaterThanOrEqual(28);
     expect(narrow).toBeGreaterThanOrEqual(0);
     expect(narrow).toBeLessThanOrEqual(wide);
   });
@@ -203,13 +203,13 @@ describe('layoutTokens geometry guards', () => {
     expect(compactCard.h).toBeLessThanOrEqual(68);
 
     const trickCompact = getTrickCardSize(844, 390);
-    expect(trickCompact.h).toBeLessThanOrEqual(52);
+    expect(trickCompact.h).toBeLessThanOrEqual(44);
   });
 
   it('getPhoneCardBudgetPx clamps card height from viewport height', () => {
     const b390 = getPhoneCardBudgetPx(390);
-    expect(b390.maxCardH).toBeGreaterThanOrEqual(36);
-    expect(b390.maxCardH).toBeLessThanOrEqual(52);
+    expect(b390.maxCardH).toBeGreaterThanOrEqual(28);
+    expect(b390.maxCardH).toBeLessThanOrEqual(44);
     expect(b390.maxCardW).toBe(Math.round((b390.maxCardH * 5) / 7));
   });
 

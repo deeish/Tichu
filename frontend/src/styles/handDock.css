@@ -620,7 +620,7 @@
 }
 
 .game-layout--ultra-compact .hand-dock {
-  min-height: 96px;
+  min-height: 84px;
 }
 
 .game-layout--ultra-compact .dock-header {
@@ -645,8 +645,8 @@
 
 /* Rail height tracks JS card budget (--card-max-h set on .game-layout for phone tiers). */
 .game-layout--ultra-compact .dock-rail {
-  min-height: max(62px, calc(var(--card-max-h, 0px) * 1.12));
-  padding: max(14px, calc(var(--card-max-h, 0px) * 0.22)) 0 4px;
+  min-height: max(54px, calc(var(--card-max-h, 0px) * 1.1));
+  padding: max(12px, calc(var(--card-max-h, 0px) * 0.2)) 0 4px;
 }
 
 .game-layout--ultra-compact .dock-btn {
