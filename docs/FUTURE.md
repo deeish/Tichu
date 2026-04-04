@@ -1,28 +1,10 @@
 
 *Might need to add*
 -if multiple people leave have them pick which seat to sit at instead of auto join
--when server is loading usually a minute, should i make a loading screen?
 -hard to see if my turn?
 
 
-
-**Visuals**
--change art of cards
--make cards actually move around like real cards(at least when passing out for now)
--Do i want to change the look of passing dragon
--Player card count a bit too small
-
-
-***Fix these in the rules****
--Fix scroll on card definition
--Fix trick and trun flow steps
-
-
-
-
-
-
-
+*Road Map after i get mobile working*:
 *Others to work on eventually*
 
 2. Cards
@@ -31,12 +13,13 @@ Right now cards are rank + suit only. Consider:
 Option A: Keep CSS but improve design (corners, subtle borders, clearer typography, distinct special-card styling for Mah Jong, Phoenix, Dragon, Dog).
 Option B: Use card images (e.g. standard deck + custom art for specials) for a more “real deck” feel.
 Hand layout
-Make the hand feel like a hand: slight fan or arc, and/or a small overlap so cards don’t look like a flat list. Selection can “lift” the card out of the fan.
+-Make the hand feel like a hand: slight fan or arc, and/or a small overlap so cards don’t look like a flat list. Selection can “lift” the card out of the fan.
 Playing a card
-When the user plays, animate the selected card(s) from hand → center (e.g. short move + scale), instead of them disappearing and reappearing in the trick. Same idea when opponents play: cards animate from their area into the center.
+-When the user plays, animate the selected card(s) from hand → center (e.g. short move + scale), instead of them disappearing and reappearing in the trick. Same idea when opponents play: cards animate from their area into the center.
 Trick layout
-Show the current trick as cards in the center of the table (e.g. in a small pile or by position per player), not as a vertical list. Optionally show who led and who followed.
-
+-Show the current trick as cards in the center of the table (e.g. in a small pile or by position per player), not as a vertical list. Optionally show who led and who followed.
+-Do i want to change the look of passing dragon
+-Player card count a bit too small
 3. Feedback & timing
 Sound (optional but high impact)
 Card play (place / slide).
@@ -55,7 +38,6 @@ Then show “Trick won by [Name]” and update scores.
 This makes the trick feel like a real round that “resolves” before the next one.
 Phase transitions
 For Grand Tichu → Exchange → Playing (and round end), use short messages or overlays (“Exchanging cards…”, “New round”) so phases don’t feel abrupt.
-
 4. Clarity & “game feel”
 Errors
 Declarations
