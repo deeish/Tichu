@@ -4,6 +4,8 @@ This doc is a working checklist to take Tichu from “works on my machine” to 
 
 Use phases in order where it still makes sense: production connectivity should be verified before spending time on PWA polish.
 
+**Viewport card budget (next major pass):** For a step-by-step approach to fixing hand/table **proportion** on phones (single `visualViewport`-based card unit, phased rollout, what to avoid, verification), see **`docs/MOBILE_SCALE_EXECUTION_PLAN.md`**. Execute that plan before another round of scattered token/CSS tweaks.
+
 ---
 
 ## Mobile landscape parity checklist (absolute plan)

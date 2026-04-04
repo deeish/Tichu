@@ -643,9 +643,10 @@
   padding-left: 4px;
 }
 
+/* Rail height tracks JS card budget (--card-max-h set on .game-layout for phone tiers). */
 .game-layout--ultra-compact .dock-rail {
-  min-height: 62px;
-  padding: 14px 0 4px;
+  min-height: max(62px, calc(var(--card-max-h, 0px) * 1.12));
+  padding: max(14px, calc(var(--card-max-h, 0px) * 0.22)) 0 4px;
 }
 
 .game-layout--ultra-compact .dock-btn {

@@ -14,6 +14,8 @@ import {
   getDockWidthClamp,
   getSeatSize,
   getCompactTier,
+  getPhoneCardBudgetPx,
+  getBudgetViewportHeight,
 } from '../layoutTokens';
 
 describe('layoutTokens geometry guards', () => {
@@ -47,6 +49,19 @@ describe('layoutTokens geometry guards', () => {
     expect(pos.y).toBeGreaterThanOrEqual(centerRect.y);
     expect(pos.x + matW).toBeLessThanOrEqual(centerRect.x + centerRect.w);
     expect(pos.y + matH).toBeLessThanOrEqual(centerRect.y + centerRect.h);
+  });
+
+  /** Phase D (MOBILE_SCALE_EXECUTION_PLAN): tiered MAT_TOP_OFFSET keeps mat clear of top band on phones. */
+  it('getMatPosition uses smaller top offset on short/compact tiers than desktop', () => {
+    // Tall center zone so desiredY stays below maxY (otherwise tier offsets clamp to the same maxY).
+    const centerRect = { x: 0, y: 100, w: 500, h: 1020 };
+    const matW = 400;
+    const matH = 350;
+    const shortPos = getMatPosition(centerRect, matW, matH, 844, 390);
+    const compactPos = getMatPosition(centerRect, matW, matH, 844, 420);
+    const desktopPos = getMatPosition(centerRect, matW, matH, 1600, 900);
+    expect(shortPos.y).toBeLessThan(compactPos.y);
+    expect(compactPos.y).toBeLessThan(desktopPos.y);
   });
 
   it('getSeatPositions clamps seats within table bounds', () => {
@@ -189,6 +204,17 @@ describe('layoutTokens geometry guards', () => {
 
     const trickCompact = getTrickCardSize(844, 390);
     expect(trickCompact.h).toBeLessThanOrEqual(52);
+  });
+
+  it('getPhoneCardBudgetPx clamps card height from viewport height', () => {
+    const b390 = getPhoneCardBudgetPx(390);
+    expect(b390.maxCardH).toBeGreaterThanOrEqual(36);
+    expect(b390.maxCardH).toBeLessThanOrEqual(52);
+    expect(b390.maxCardW).toBe(Math.round((b390.maxCardH * 5) / 7));
+  });
+
+  it('getBudgetViewportHeight prefers min(vv, hint) when both finite', () => {
+    expect(getBudgetViewportHeight(390)).toBeLessThanOrEqual(390);
   });
 });
 

@@ -22,6 +22,9 @@ import {
   getWonPileCardSize,
   getExchangeCardSize,
   getDockCardSize,
+  getVisualViewportSize,
+  getPhoneCardBudgetPx,
+  getBudgetViewportHeight,
   TABLE_HEADER_HEIGHT,
   HUD_HEIGHT,
   MAT_VERTICAL_BIAS,
@@ -165,20 +168,29 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     autoPassScheduledTurnSigRef.current = null;
   }, [game?.id, game?.state, game?.roundLog]);
 
-  // Sync measured viewport (single source for responsive sidebar mode).
+  // Sync measured viewport: prefer visualViewport (mobile URL bar) + window resize fallback.
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
+    const readSize = () => {
+      const vv = window.visualViewport;
+      const w = vv && Number.isFinite(vv.width) ? vv.width : window.innerWidth;
+      const h = vv && Number.isFinite(vv.height) ? vv.height : window.innerHeight;
+      return { w, h };
+    };
     const onResize = () => {
-      setViewport((prev) => {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        if (prev.w === w && prev.h === h) return prev;
-        return { w, h };
-      });
+      const { w, h } = readSize();
+      setViewport((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
     };
     window.addEventListener('resize', onResize);
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', onResize);
+    vv?.addEventListener('scroll', onResize);
     onResize();
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      vv?.removeEventListener('resize', onResize);
+      vv?.removeEventListener('scroll', onResize);
+    };
   }, []);
 
   // HTML5 drag-for-exchange breaks card taps on many touch browsers; keep drag on mouse-first desktops only.
@@ -198,7 +210,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
 
   const sidebarMode = useMemo(() => getSidebarLayoutMode(viewport.w), [viewport.w]);
   const sidebarW = useMemo(() => (sidebarMode === 'overlay' ? 0 : getSidebarWidth(viewport.w)), [sidebarMode, viewport.w]);
-  const dockH = useMemo(() => getDockHeight(), [viewport.h]);
+  const dockH = useMemo(() => getDockHeight(), [viewport.w, viewport.h]);
 
   // Keep sidebar open on desktop, keep previous user toggle in overlay mode.
   useEffect(() => {
@@ -379,14 +391,36 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     [tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize]
   );
 
-  // Expose computed geometry to CSS (used for trick scroll sizing, etc.).
+  // Expose computed geometry + phone card budget to CSS (Phase C, MOBILE_SCALE_EXECUTION_PLAN).
   // Use layout effect to avoid a "one paint behind" mismatch on fast resizes.
   useLayoutEffect(() => {
     const root = layoutRef.current;
     if (!root) return;
     root.style.setProperty('--mat-w', `${matSize.w}px`);
     root.style.setProperty('--mat-h', `${matSize.h}px`);
-  }, [matSize.w, matSize.h]);
+
+    const vv = getVisualViewportSize();
+    root.style.setProperty('--game-vv-h', `${Math.round(vv.h)}px`);
+    root.style.setProperty('--game-vv-w', `${Math.round(vv.w)}px`);
+
+    const widthBasis =
+      centerRect.w > 10 ? centerRect.w : dockWrapperSize.w > 0 ? dockWrapperSize.w : viewport.w;
+    const vvH =
+      typeof window !== 'undefined' && Number.isFinite(window.visualViewport?.height)
+        ? window.visualViewport.height
+        : viewport.h;
+    const heightBasis = tableSize.h > 10 ? Math.min(tableSize.h, vvH) : vvH;
+    const tier = getCompactTier(widthBasis, heightBasis);
+    if (tier === 'compact' || tier === 'short') {
+      const budgetVh = getBudgetViewportHeight(heightBasis);
+      const b = getPhoneCardBudgetPx(budgetVh);
+      root.style.setProperty('--card-max-h', `${b.maxCardH}px`);
+      root.style.setProperty('--card-max-w', `${b.maxCardW}px`);
+    } else {
+      root.style.removeProperty('--card-max-h');
+      root.style.removeProperty('--card-max-w');
+    }
+  }, [matSize.w, matSize.h, centerRect.w, dockWrapperSize.w, tableSize.h, viewport.w, viewport.h]);
 
   const opponentsByPosition = useMemo(() => {
     const order = game?.turnOrder?.length >= 4 ? game.turnOrder : game?.players ?? [];
@@ -1148,16 +1182,24 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           {isSidebarOpen ? 'Hide panel' : 'Show panel'}
         </button>
       )}
-      {geomDebug && (
+      {geomDebug && (() => {
+        const vv = getVisualViewportSize();
+        const budgetVh = getBudgetViewportHeight(tableContainerHeightBasis);
+        const budget = getPhoneCardBudgetPx(budgetVh);
+        const dockCardDbg = getDockCardSize(dockContainerWidth, tableContainerHeightBasis);
+        return (
         <div className="geom-debug-overlay" aria-hidden="true">
           {`viewport: w=${Math.round(viewport.w)} h=${Math.round(viewport.h)} mode=${sidebarMode} open=${isSidebarOpen}\n`}
+          {`visualViewport: ${Math.round(vv.w)}x${Math.round(vv.h)} budgetVh=${Math.round(budgetVh)} maxCard ${budget.maxCardW}x${budget.maxCardH}\n`}
+          {`dockCard: ${Math.round(dockCardDbg.w)}x${Math.round(dockCardDbg.h)} dockH=${Math.round(dockH)}\n`}
           {`sidebar: cssW=${Math.round(sidebarW)} measuredW=${Math.round(sidebarSize.w)} dockWrapperW=${Math.round(dockWrapperSize.w)}\n`}
           {`centerRect: w=${Math.round(centerRect.w)} h=${Math.round(centerRect.h)} x=${Math.round(centerRect.x)} y=${Math.round(centerRect.y)}\n`}
           {`mat: w=${Math.round(matSize.w)} h=${Math.round(matSize.h)} x=${Math.round(matPosition.x)} y=${Math.round(matPosition.y)}\n`}
           {`seats: top=(${Math.round(seatPositions.top.x)},${Math.round(seatPositions.top.y)}) left=(${Math.round(seatPositions.left.x)},${Math.round(seatPositions.left.y)}) right=(${Math.round(seatPositions.right.x)},${Math.round(seatPositions.right.y)})\n`}
           {`exchangeCard: ${Math.round(exchangeCardSize?.w ?? 0)}x${Math.round(exchangeCardSize?.h ?? 0)} wonCard: ${Math.round(wonCardSize?.w ?? 0)}x${Math.round(wonCardSize?.h ?? 0)}\n`}
         </div>
-      )}
+        );
+      })()}
       <div className="game-left">
         <div className="game-main">
         <div className="table-column" ref={tableRef}>

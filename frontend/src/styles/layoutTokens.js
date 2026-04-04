@@ -52,6 +52,63 @@ export function getCompactTier(viewportW, viewportH) {
 }
 
 /**
+ * Prefer visualViewport; SSR-safe fallback.
+ * @returns {{ w: number, h: number }}
+ */
+export function getVisualViewportSize() {
+  if (typeof window === 'undefined') return { w: 1280, h: 800 };
+  const vv = window.visualViewport;
+  const w = Number.isFinite(vv?.width) ? vv.width : window.innerWidth;
+  const h = Number.isFinite(vv?.height) ? vv.height : window.innerHeight;
+  return { w, h };
+}
+
+/**
+ * Height used for phone card budget: min(visual viewport height, caller hint) so table-basis height
+ * matches what GameBoard passes while respecting address-bar shrink when vv is smaller.
+ * @param {number|undefined} layoutHeightHint — e.g. tableContainerHeightBasis from GameBoard
+ */
+export function getBudgetViewportHeight(layoutHeightHint) {
+  if (typeof window === 'undefined') {
+    return Number.isFinite(layoutHeightHint) && layoutHeightHint > 0 ? layoutHeightHint : 400;
+  }
+  const { h: vvH } = getVisualViewportSize();
+  if (Number.isFinite(layoutHeightHint) && layoutHeightHint > 0) {
+    return Math.min(vvH, layoutHeightHint);
+  }
+  return vvH;
+}
+
+/** Standard playing-card aspect width:height ≈ 5:7 */
+const CARD_ASPECT_W = 5;
+const CARD_ASPECT_H = 7;
+
+/**
+ * Max card dimensions on phone landscape from visible viewport height (see MOBILE_SCALE_EXECUTION_PLAN.md).
+ * @param {number} vvH — effective visible height (px)
+ * @returns {{ maxCardH: number, maxCardW: number }}
+ */
+export function getPhoneCardBudgetPx(vvH) {
+  if (!Number.isFinite(vvH) || vvH <= 0) return { maxCardH: 52, maxCardW: 37 };
+  const raw = vvH * 0.1;
+  const maxCardH = Math.round(Math.min(52, Math.max(36, raw)));
+  const maxCardW = Math.round((maxCardH * CARD_ASPECT_W) / CARD_ASPECT_H);
+  return { maxCardH, maxCardW };
+}
+
+function clampCardToPhoneBudget(w, h, viewportHeightHint) {
+  const vvEff = getBudgetViewportHeight(viewportHeightHint);
+  const { maxCardH, maxCardW } = getPhoneCardBudgetPx(vvEff);
+  let ch = Math.min(h, maxCardH);
+  let cw = Math.round((ch * CARD_ASPECT_W) / CARD_ASPECT_H);
+  if (cw > maxCardW) {
+    cw = maxCardW;
+    ch = Math.round((cw * CARD_ASPECT_H) / CARD_ASPECT_W);
+  }
+  return { w: cw, h: ch };
+}
+
+/**
  * Seat panel size by table tier.
  * Keep desktop unchanged; compact only on short phone-class landscape viewports.
  */
@@ -89,17 +146,17 @@ export function getSidebarWidth(viewportW) {
   return Math.max(280, Math.min(360, dynamic));
 }
 
-// Dock height: clamp(180px, 22vh, 240px)
+// Dock height: clamp(180px, 22vh, 240px); phone tiers also capped vs visual viewport (MOBILE_SCALE_EXECUTION_PLAN)
 export function getDockHeight() {
   if (typeof window === 'undefined') return 200;
-  const vv = window.visualViewport;
-  const viewW = Number.isFinite(vv?.width) ? vv.width : window.innerWidth;
-  const viewH = Number.isFinite(vv?.height) ? vv.height : window.innerHeight;
+  const { w: viewW, h: viewH } = getVisualViewportSize();
   const tier = getCompactTier(viewW, viewH);
   if (tier === 'compact' || tier === 'short') {
     const vhCompact = viewH * 0.185;
-    const max = tier === 'short' ? 102 : 112;
-    return Math.min(max, Math.max(84, vhCompact));
+    const maxByTier = tier === 'short' ? 102 : 112;
+    const maxByViewport = Math.round(viewH * 0.2);
+    const raw = Math.min(maxByTier, Math.max(84, vhCompact));
+    return Math.min(raw, maxByViewport);
   }
   const vh = viewH * 0.22;
   return Math.min(240, Math.max(180, vh));
@@ -217,11 +274,16 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
   };
 }
 
+/** Trick / table vs full card on phone (shared budget from getPhoneCardBudgetPx). */
+const PHONE_TRICK_TO_FULL_RATIO = 0.64;
+
 // Card dimensions by breakpoint (for play mat / general use)
 export function getCardSize(containerWidth, viewportHeight) {
   const tier = getCompactTier(containerWidth, viewportHeight);
-  if (tier === 'short') return { w: 42, h: 60 };
-  if (tier === 'compact') return { w: 46, h: 64 };
+  if (tier === 'short' || tier === 'compact') {
+    const { maxCardW, maxCardH } = getPhoneCardBudgetPx(getBudgetViewportHeight(viewportHeight));
+    return { w: maxCardW, h: maxCardH };
+  }
   if (containerWidth <= 1280) return { w: 64, h: 92 };
   if (containerWidth >= 1600) return { w: 80, h: 116 };
   return { w: 72, h: 104 };
@@ -230,8 +292,13 @@ export function getCardSize(containerWidth, viewportHeight) {
 // Smaller cards for played tricks so multiple fit on the table
 export function getTrickCardSize(containerWidth, viewportHeight) {
   const tier = getCompactTier(containerWidth, viewportHeight);
-  if (tier === 'short') return { w: 28, h: 40 };
-  if (tier === 'compact') return { w: 32, h: 46 };
+  if (tier === 'short' || tier === 'compact') {
+    const full = getCardSize(containerWidth, viewportHeight);
+    return {
+      w: Math.max(22, Math.round(full.w * PHONE_TRICK_TO_FULL_RATIO)),
+      h: Math.max(30, Math.round(full.h * PHONE_TRICK_TO_FULL_RATIO)),
+    };
+  }
   const full = getCardSize(containerWidth, viewportHeight);
   return { w: Math.round(full.w * 0.6), h: Math.round(full.h * 0.6) };
 }
@@ -239,8 +306,12 @@ export function getTrickCardSize(containerWidth, viewportHeight) {
 // Slightly smaller cards in the hand dock so rail + actions + hint fit without overflow
 export function getDockCardSize(containerWidth, viewportHeight) {
   const tier = getCompactTier(containerWidth, viewportHeight);
-  if (tier === 'short') return { w: 34, h: 48 };
-  if (tier === 'compact') return { w: 38, h: 54 };
+  if (tier === 'short') {
+    return clampCardToPhoneBudget(34, 48, viewportHeight);
+  }
+  if (tier === 'compact') {
+    return clampCardToPhoneBudget(38, 54, viewportHeight);
+  }
   const full = getCardSize(containerWidth, viewportHeight);
   return { w: Math.round(full.w * 0.88), h: Math.round(full.h * 0.88) };
 }
@@ -256,7 +327,10 @@ export function getWonPileCardSize(containerWidth, viewportHeight) {
 export function getExchangeCardSize(containerWidth, viewportHeight) {
   const full = getCardSize(containerWidth, viewportHeight);
   const scale = 0.32;
-  return { w: Math.round(full.w * scale), h: Math.round(full.h * scale) };
+  return {
+    w: Math.max(10, Math.round(full.w * scale)),
+    h: Math.max(14, Math.round(full.h * scale)),
+  };
 }
 
 // Max hand size is 14; show all cards (no overflow stack)

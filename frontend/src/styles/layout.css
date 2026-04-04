@@ -32,6 +32,7 @@
   /* Computed (set by JS on .game-layout). Sidebar always visible. */
   --dock-h: 200px;
   --sidebar-w: 320px;
+  /* Optional: --game-vv-w/h, --card-max-w/h (phone landscape budget; GameBoard useLayoutEffect). */
 
   /* Z-index */
   --z-table: 0;
