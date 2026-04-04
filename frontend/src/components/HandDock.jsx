@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Card from './Card';
-import { getHandRailStep, getDockCardSize } from '../styles/layoutTokens';
+import { getHandRailStep, getDockCardSize, getCompactTier } from '../styles/layoutTokens';
 import { cardKey } from '../utils/cardUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
 import { reportClientError } from '../clientErrorReport';
@@ -10,8 +10,10 @@ import '../styles/handDock.css';
 /** Max cards shown in hand; Tichu max hand size is 14. */
 const MAX_HAND_DISPLAY = 14;
 const MIN_RAIL_STEP = 26;
-const MIN_CARD_W = 36;
-const MIN_CARD_H = 52;
+const MIN_CARD_W_DESKTOP = 36;
+const MIN_CARD_H_DESKTOP = 52;
+const MIN_CARD_W_PHONE = 30;
+const MIN_CARD_H_PHONE = 44;
 const RAIL_SAFETY_PX = 8;
 
 function HandDock({
@@ -91,6 +93,13 @@ function HandDock({
     };
   }, []);
 
+  const compactDock = useMemo(
+    () => getCompactTier(containerWidth, containerHeight) !== 'regular' || containerWidth < 760,
+    [containerWidth, containerHeight]
+  );
+  const minCardW = compactDock ? MIN_CARD_W_PHONE : MIN_CARD_W_DESKTOP;
+  const minCardH = compactDock ? MIN_CARD_H_PHONE : MIN_CARD_H_DESKTOP;
+
   const baseCardSize = useMemo(() => getDockCardSize(containerWidth, containerHeight), [containerWidth, containerHeight]);
   const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
   const cardSize = useMemo(() => {
@@ -102,10 +111,10 @@ function HandDock({
     if (baseTotal <= maxAllowed) return baseCardSize;
     const fitScale = baseTotal > 0 ? maxAllowed / baseTotal : 1;
     return {
-      w: Math.max(MIN_CARD_W, Math.floor(baseCardSize.w * fitScale)),
-      h: Math.max(MIN_CARD_H, Math.floor(baseCardSize.h * fitScale)),
+      w: Math.max(minCardW, Math.floor(baseCardSize.w * fitScale)),
+      h: Math.max(minCardH, Math.floor(baseCardSize.h * fitScale)),
     };
-  }, [baseCardSize, railW, visibleCount]);
+  }, [baseCardSize, railW, visibleCount, minCardW, minCardH]);
   const step = useMemo(() => {
     if (visibleCount <= 1) return 0;
     if (!Number.isFinite(railW) || railW <= 0) return MIN_RAIL_STEP;
@@ -115,7 +124,8 @@ function HandDock({
   }, [railW, cardSize.w, visibleCount]);
   const totalCardRowWidth = visibleCount > 0 ? (visibleCount - 1) * step + cardSize.w : 0;
   /* Card has border + margin + box-shadow; reserve space so the last card isn't clipped by overflow */
-  const cardRowExtraRight = railW > 0 && railW < 760 ? 8 : 24;
+  /* Match phone dock mode: wide landscape rails need the tighter margin too (was only railW < 760). */
+  const cardRowExtraRight = railW > 0 && (compactDock || railW < 760) ? 8 : 24;
   const cardRowLeftOffset =
     railW > 0 && totalCardRowWidth > 0
       ? Math.max(0, (railW - totalCardRowWidth - cardRowExtraRight) / 2)
@@ -303,8 +313,6 @@ function HandDock({
       }
     };
   }, []);
-
-  const compactDock = containerWidth < 760;
 
   const receiptLines = Array.isArray(exchangeReceiptLines) ? exchangeReceiptLines : [];
   const showExchangeRecap = receiptLines.length > 0;

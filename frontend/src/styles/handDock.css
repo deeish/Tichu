@@ -58,14 +58,26 @@
   align-items: stretch;
 }
 
+/* Phone landscape often has width >760px; JS sets this class via getCompactTier so rail stays full width. */
 .hand-dock.hand-dock--compact .dock-body {
+  grid-template-columns: 1fr;
   gap: 6px;
 }
 
 .hand-dock.hand-dock--compact .dock-actions-box {
-  width: clamp(88px, 26vw, 116px);
-  min-width: 84px;
-  padding-left: 6px;
+  width: 100%;
+  min-width: 0;
+  border-left: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-left: 0;
+  padding-top: 8px;
+}
+
+.hand-dock.hand-dock--compact .dock-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .hand-dock.hand-dock--compact .dock-hint {
@@ -652,4 +664,14 @@
 
 .game-layout--ultra-compact .dock-hint {
   display: none;
+}
+
+/* Override ultra-compact fixed action column when dock is in stacked phone mode (full-width rail). */
+.game-layout--ultra-compact .hand-dock.hand-dock--compact .dock-actions-box {
+  width: 100%;
+  min-width: 0;
+  border-left: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-left: 0;
+  padding-top: 8px;
 }

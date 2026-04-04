@@ -371,8 +371,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     [centerRect.w, centerRect.h]
   );
   const matPosition = useMemo(
-    () => getMatPosition(centerRect, matSize.w, matSize.h),
-    [centerRect, matSize.w, matSize.h, MAT_VERTICAL_BIAS, MAT_TOP_OFFSET]
+    () => getMatPosition(centerRect, matSize.w, matSize.h, tableSize.w, tableSize.h),
+    [centerRect, matSize.w, matSize.h, tableSize.w, tableSize.h, MAT_VERTICAL_BIAS, MAT_TOP_OFFSET]
   );
   const seatPositions = useMemo(
     () => getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize),
@@ -1007,7 +1007,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       ? Math.min(tableSize.h, effectiveViewportHeight)
       : effectiveViewportHeight;
   const mobileTier = getCompactTier(tableContainerWidthBasis, tableContainerHeightBasis);
-  const ultraCompactGameplay = mobileTier === 'short';
+  /** Phone landscape: both compact and short tiers need stacked dock + tighter chrome (width is often >760). */
+  const ultraCompactGameplay = mobileTier === 'compact' || mobileTier === 'short';
   const exchangeCardSize = getExchangeCardSize(tableContainerWidthBasis, tableContainerHeightBasis);
   const wonCardSize = getWonPileCardSize(tableContainerWidthBasis, tableContainerHeightBasis);
   const tableHasSize = tableSize.w >= 10 && tableSize.h >= 10;

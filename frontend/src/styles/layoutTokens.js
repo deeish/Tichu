@@ -65,8 +65,9 @@ export function getSeatSize(tableW, tableH) {
 function getTopBand(tableW, tableH) {
   const seat = getSeatSize(tableW, tableH);
   const tier = getCompactTier(tableW, tableH);
-  const compactReduction = tier === 'short' ? 16 : tier === 'compact' ? 10 : 0;
-  return TABLE_HEADER_HEIGHT + TABLE_HEADER_SEAT_GAP + seat.h + SEAT_MAT_GAP - compactReduction;
+  // Extra space below the top seat on phone landscape so play mat / trick sit clear of nameplates.
+  const seatMatGapBoost = tier === 'short' ? 16 : tier === 'compact' ? 12 : 0;
+  return TABLE_HEADER_HEIGHT + TABLE_HEADER_SEAT_GAP + seat.h + SEAT_MAT_GAP + seatMatGapBoost;
 }
 
 function getLeftBand(tableW, tableH) {
@@ -96,9 +97,9 @@ export function getDockHeight() {
   const viewH = Number.isFinite(vv?.height) ? vv.height : window.innerHeight;
   const tier = getCompactTier(viewW, viewH);
   if (tier === 'compact' || tier === 'short') {
-    const vhCompact = viewH * 0.21;
-    const max = tier === 'short' ? 114 : 126;
-    return Math.min(max, Math.max(92, vhCompact));
+    const vhCompact = viewH * 0.185;
+    const max = tier === 'short' ? 102 : 112;
+    return Math.min(max, Math.max(84, vhCompact));
   }
   const vh = viewH * 0.22;
   return Math.min(240, Math.max(180, vh));
@@ -157,12 +158,18 @@ export const MAT_VERTICAL_BIAS = 0.90;
 // Extra pixels added to the playmat div's "top" (CSS). Increase this to lower the mat and give more room for the top seat.
 export const MAT_TOP_OFFSET = 65;
 
-export function getMatPosition(centerRect, matW, matH) {
+export function getMatPosition(centerRect, matW, matH, layoutW, layoutH) {
   // Clamp mat position so the mat never visually spills outside the measured center rect.
   const epsilon = 2;
 
+  const tw = layoutW != null && Number.isFinite(layoutW) ? layoutW : 1600;
+  const th = layoutH != null && Number.isFinite(layoutH) ? layoutH : 900;
+  const tier = getCompactTier(tw, th);
+  const topOffset =
+    tier === 'short' ? 24 : tier === 'compact' ? 34 : MAT_TOP_OFFSET;
+
   const desiredX = centerRect.x + (centerRect.w - matW) / 2;
-  const desiredY = centerRect.y + (centerRect.h - matH) * MAT_VERTICAL_BIAS + MAT_TOP_OFFSET;
+  const desiredY = centerRect.y + (centerRect.h - matH) * MAT_VERTICAL_BIAS + topOffset;
 
   const minX = centerRect.x + epsilon;
   const maxX = centerRect.x + centerRect.w - matW - epsilon;
@@ -232,8 +239,8 @@ export function getTrickCardSize(containerWidth, viewportHeight) {
 // Slightly smaller cards in the hand dock so rail + actions + hint fit without overflow
 export function getDockCardSize(containerWidth, viewportHeight) {
   const tier = getCompactTier(containerWidth, viewportHeight);
-  if (tier === 'short') return { w: 38, h: 54 };
-  if (tier === 'compact') return { w: 42, h: 60 };
+  if (tier === 'short') return { w: 34, h: 48 };
+  if (tier === 'compact') return { w: 38, h: 54 };
   const full = getCardSize(containerWidth, viewportHeight);
   return { w: Math.round(full.w * 0.88), h: Math.round(full.h * 0.88) };
 }
