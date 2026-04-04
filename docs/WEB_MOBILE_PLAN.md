@@ -6,6 +6,61 @@ Use phases in order where it still makes sense: production connectivity should b
 
 ---
 
+## Mobile landscape parity checklist (absolute plan)
+
+**Goal:** Phone landscape should feel as intentional as laptop: full-width play surface, no dead “whitening” gutters, readable seats and hand, and no overlapping stacks in the center. Work this list in order where dependencies apply; **implementation detail and caps** live in **Phase 6 — Mobile sizing calibration**.
+
+Legend: `[x]` done · `[ ]` not done
+
+### Shell & gutters (side whitening)
+
+- [x] **Trace letterboxing** — Repo investigation complete (see **Letterboxing trace** below). **Not a `max-width` on the game shell** — `.game-layout` is a full-width CSS grid (`1fr` + sidebar). True **white** gutters are most likely **unpainted browser canvas** (`html`/`body` default) around transparent ancestors, or horizontal overflow / device chrome; confirm on hardware with width + `scrollWidth` checks.
+- [x] **Full-bleed game surface (canvas baseline)** — `html`, `body`, `#root`, and `.game-fade-in` use `--layout-bg`-default `#1a1a2e` (`index.css`, `App.css`) so the UA canvas matches the game shell; **device QA** still needed for safe-area / overflow edge cases.
+- [ ] **Minimize horizontal dead space** — On landscape phones, avoid arbitrary side padding that mimics a desktop “card” layout unless required for notches.
+
+#### Letterboxing trace
+
+**What we ruled out (layout intent is full width)**
+
+- **`.game-layout`** (`frontend/src/styles/layout.css`) — `display: grid`; `grid-template-columns: 1fr minmax(0, var(--sidebar-w))` or `1fr 0` in overlay mode; **no `max-width`**. Background `var(--layout-bg, #1a1a2e)` covers the grid.
+- **`.game-left` / `.table-column` / `.table-surface`** — `width: 100%` / fill; green felt is `--table-bg` on `.table-surface` (full cell).
+- **Landing-only `max-width: 420px`** (`.landing-content` in `App.css`) does **not** wrap active play — in-game shell is `App.jsx` → `.game-fade-in` → `GameBoard` → `.game-layout`.
+- **`GameHud` / `.hud-inner { max-width: 1600px }`** — `GameHud.jsx` is **not mounted** anywhere in the app today; irrelevant to live game chrome.
+
+**Why the screenshot can still show bright side gutters**
+
+1. **Default page background** — `body` in `App.css` sets `color` but **no `background-color`**; `index.css` `body` also has no background. **`#root` and `.game-fade-in`** have **no background**. The UA typically paints **`html` / the canvas white**, so any strip where the dark `.game-layout` does not paint (or the user overscrolls past content) reads as **white**.
+2. **Inner vs outer “letterbox”** — The **play mat** (`.play-mat`, positioned/sized from `getMatSize` / `getMatPosition` in `frontend/src/styles/layoutTokens.js`) is a **smaller rounded rect** *inside* full-width felt; that can look like a centered “card” but should still sit on **green** felt, not white. If the sides are **actually white**, look at (1) or browser chrome, not mat math alone.
+3. **Device follow-ups** — On a phone: compare `document.documentElement.clientWidth` / `window.innerWidth` to **`getBoundingClientRect()` width** on `.game-layout`. If `scrollWidth > innerWidth`, horizontal scroll can expose white at the edges — add `overflow-x: hidden` on `html, body` only after confirming overflow source.
+
+**Likely fix direction (when implementing “Full-bleed”)** — Paint the same base as the game shell on **`html, body, #root`** (e.g. `#1a1a2e` or `theme-color` / `--layout-bg`), optionally `min-height: 100dvh`, and re-test safe-area + `viewport-fit=cover`. See checklist item **Full-bleed game surface**.
+
+### Density & overlap (center “bunched up”)
+
+- [ ] **Center stack order** — Instruction / tutorial copy, seat badges, exchange placeholders, and trick area have a defined **z-index and spacing** so they do not sit on top of each other at phone scale (shorter hint copy or relocate hints to dock/HUD on compact tier if needed).
+- [ ] **Seat panels** — Opponent nameplates have predictable positions with enough gap from edges and from the mat center; **Grand / Tichu** chips are not clipped or flush against container edges.
+- [ ] **Exchange phase** — Dashed placeholder + seat highlights + instructions read as one flow without covering active player info.
+
+### Hand dock & sorting
+
+- [ ] **Card width & spacing** — Hand rail uses a tier that keeps cards tappable (no ultra-thin slices); align with Phase 6 dock card caps and `getHandRailStep` / visible cap behavior.
+- [ ] **Sort controls** — None / Low→High / High→Low remain easy to tap (≥44px hit height on coarse pointers) and do not collide with cards.
+- [ ] **Dock height vs table** — Balance `22vh`-class dock with table so neither half feels crushed; verify against Phase 6 golden viewports.
+
+### Chrome & HUD
+
+- [ ] **Phase strip** — “Exchanging” (or similar) banner scales down without dominating or colliding with seat corners.
+- [ ] **Show panel / sidebar toggle** — Remains reachable and meets minimum touch target; position stable in compact mode.
+- [ ] **Floating menu / overflow** — Any FAB or overflow control has a clear slot so it does not float over unreadable areas.
+
+### Verification (must match laptop quality bar)
+
+- [ ] **Real device pass** — iPhone Safari + Android Chrome, **landscape**, normal tab (address bar visible) and **Add to Home Screen** / standalone where possible.
+- [ ] **Screenshot gate** — Before/after for at least `844×390` and one shorter chrome scenario (e.g. `844×330`); no white side gutters; center readable; hand usable.
+- [ ] **Regression** — Desktop and wide tablet layouts unchanged (`npm test` / e2e as usual).
+
+---
+
 ## Progress checklist (keep updated)
 
 Legend: `[x]` done · `[ ]` not done  

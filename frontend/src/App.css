@@ -16,6 +16,8 @@
 .game-fade-in {
   animation: gameFadeIn 0.4s ease-out forwards;
   min-height: 100vh;
+  min-height: 100dvh;
+  background-color: #1a1a2e;
 }
 
 .toast-stack {
@@ -141,6 +143,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  min-height: 100dvh;
+  background-color: #1a1a2e;
   color: #333;
 }
 
