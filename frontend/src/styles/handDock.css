@@ -47,6 +47,8 @@
 }
 
 .dock-actions-box {
+  position: relative;
+  z-index: 6;
   width: clamp(132px, 18vw, 182px);
   min-width: 110px;
   flex-shrink: 0;
@@ -276,6 +278,7 @@
 /* Hand rail: extra top padding so hover/selected lift isn't clipped; overflow visible so last card isn't cut off */
 .dock-rail {
   position: relative;
+  z-index: 1;
   overflow: visible;
   flex: 1;
   min-height: 100px;
@@ -302,7 +305,8 @@
 }
 
 .dock-card-wrap.selected {
-  z-index: 10;
+  /* Stay below .dock-actions-box (z-index 6) so Play/Pass stay clickable when layouts overlap. */
+  z-index: 4;
 }
 
 .dock-card-wrap.disabled {
@@ -322,9 +326,9 @@
   pointer-events: none;
 }
 
-/* Touch exchange: card chosen, waiting for seat tap */
+/* Touch exchange: card chosen, waiting for seat tap (below action buttons z-index 6) */
 .dock-card-wrap--exchange-pick {
-  z-index: 12;
+  z-index: 5;
 }
 
 .dock-card-wrap--exchange-pick .card {

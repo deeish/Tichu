@@ -356,13 +356,21 @@ export function getDockWidthClamp(containerWidth) {
 // Hand rail: horizontal distance between cards (px); 60 so 14 cards fit in the rail without clipping
 export const HAND_RAIL_STEP = 65;
 
-export function getHandRailStep(railW, cardW, visibleCount) {
+/**
+ * Horizontal offset between consecutive hand cards (px). Capped by fitStep so the row fits the rail.
+ * @param {'desktop' | 'phone'} layout — phone uses a tighter fan so step never exceeds ~70% of card width (avoids gaps).
+ */
+export function getHandRailStep(railW, cardW, visibleCount, layout = 'desktop') {
   if (visibleCount <= 1) return 0;
   if (!Number.isFinite(railW) || railW <= 0 || !Number.isFinite(cardW) || cardW <= 0) return HAND_RAIL_STEP;
-  // Scale preferred overlap with card width so larger cards on wide screens don't look overly stacked.
-  const preferredStep = Math.max(28, Math.min(86, Math.round(cardW * 0.95)));
   const fitStep = (railW - cardW) / (visibleCount - 1);
-  // Never exceed preferred spacing. Allow tight spacing on narrow docks so cards stay on-rail.
+  let preferredStep;
+  if (layout === 'phone') {
+    const maxStep = Math.max(20, Math.floor(cardW * 0.68));
+    preferredStep = Math.min(maxStep, Math.min(72, Math.round(cardW * 0.92)));
+  } else {
+    preferredStep = Math.max(66, Math.min(86, Math.round(cardW * 1.08)));
+  }
   return Math.max(0, Math.min(preferredStep, Math.floor(fitStep)));
 }
 

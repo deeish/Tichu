@@ -98,6 +98,12 @@ function HandDock({
     () => getCompactTier(containerWidth, containerHeight) !== 'regular' || containerWidth < 760,
     [containerWidth, containerHeight]
   );
+  /** Phone landscape tiers only — used for rail overlap + Card glyph scale (keep laptop/desktop hand looking like main). */
+  const phoneHandTier = useMemo(() => {
+    const t = getCompactTier(containerWidth, containerHeight);
+    return t === 'compact' || t === 'short';
+  }, [containerWidth, containerHeight]);
+  const railLayout = phoneHandTier ? 'phone' : 'desktop';
   const minCardW = compactDock ? MIN_CARD_W_PHONE : MIN_CARD_W_DESKTOP;
   const minCardH = compactDock ? MIN_CARD_H_PHONE : MIN_CARD_H_DESKTOP;
 
@@ -106,7 +112,7 @@ function HandDock({
   const cardSize = useMemo(() => {
     if (visibleCount <= 0) return baseCardSize;
     if (!Number.isFinite(railW) || railW <= 0) return baseCardSize;
-    const baseStep = getHandRailStep(railW, baseCardSize.w, visibleCount);
+    const baseStep = getHandRailStep(railW, baseCardSize.w, visibleCount, railLayout);
     const baseTotal = baseCardSize.w + (visibleCount - 1) * baseStep;
     const maxAllowed = Math.max(0, railW - RAIL_SAFETY_PX);
     if (baseTotal <= maxAllowed) return baseCardSize;
@@ -115,14 +121,14 @@ function HandDock({
       w: Math.max(minCardW, Math.floor(baseCardSize.w * fitScale)),
       h: Math.max(minCardH, Math.floor(baseCardSize.h * fitScale)),
     };
-  }, [baseCardSize, railW, visibleCount, minCardW, minCardH]);
+  }, [baseCardSize, railW, visibleCount, minCardW, minCardH, railLayout]);
   const step = useMemo(() => {
     if (visibleCount <= 1) return 0;
     if (!Number.isFinite(railW) || railW <= 0) return MIN_RAIL_STEP;
-    const preferred = getHandRailStep(railW, cardSize.w, visibleCount);
+    const preferred = getHandRailStep(railW, cardSize.w, visibleCount, railLayout);
     const fitStep = Math.floor((railW - cardSize.w - RAIL_SAFETY_PX) / (visibleCount - 1));
     return Math.max(0, Math.min(preferred, fitStep));
-  }, [railW, cardSize.w, visibleCount]);
+  }, [railW, cardSize.w, visibleCount, railLayout]);
   const totalCardRowWidth = visibleCount > 0 ? (visibleCount - 1) * step + cardSize.w : 0;
   /* Card has border + margin + box-shadow; reserve space so the last card isn't clipped by overflow */
   /* Match phone dock mode: wide landscape rails need the tighter margin too (was only railW < 760). */
@@ -415,6 +421,7 @@ function HandDock({
                   >
                     <Card
                       card={card}
+                      compact={phoneHandTier}
                       onClick={
                         typeof onCardClick !== 'function'
                           ? undefined
@@ -518,7 +525,7 @@ function HandDock({
             }}
             aria-hidden
           >
-            <Card card={reorderDrag.card} width={cardSize.w} height={cardSize.h} draggable={false} />
+            <Card card={reorderDrag.card} width={cardSize.w} height={cardSize.h} draggable={false} compact={phoneHandTier} />
           </div>,
           document.body
         )}

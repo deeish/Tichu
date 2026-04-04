@@ -10,7 +10,9 @@ function Card({ card, onClick, selected = false, playable = false, width, height
   const explicitH = Number.isFinite(hNum) && hNum > 0;
   const innerScalePx =
     explicitW && explicitH
-      ? Math.min(hNum * 0.132, wNum * 0.265)
+      ? compact
+        ? Math.min(hNum * 0.132, wNum * 0.265)
+        : Math.min(hNum * 0.165, wNum * 0.34)
       : compact && explicitH
         ? hNum * 0.15
         : null;

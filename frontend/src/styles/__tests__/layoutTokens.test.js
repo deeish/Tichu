@@ -98,14 +98,18 @@ describe('layoutTokens geometry guards', () => {
     expect(getSidebarWidth(1600)).toBeLessThanOrEqual(360);
   });
 
-  it('getHandRailStep shrinks spacing to fit narrow rails', () => {
-    const wide = getHandRailStep(1200, 72, 14);
-    const narrow = getHandRailStep(420, 72, 14);
-    expect(wide).toBeGreaterThan(0);
-    expect(wide).toBeLessThanOrEqual(86);
-    expect(wide).toBeGreaterThanOrEqual(28);
-    expect(narrow).toBeGreaterThanOrEqual(0);
-    expect(narrow).toBeLessThanOrEqual(wide);
+  it('getHandRailStep: desktop prefers stacked fan; phone caps step vs card width', () => {
+    const wideDesktop = getHandRailStep(1200, 72, 14);
+    const narrowDesktop = getHandRailStep(420, 72, 14);
+    expect(wideDesktop).toBeGreaterThan(0);
+    expect(wideDesktop).toBeLessThanOrEqual(86);
+    expect(wideDesktop).toBeGreaterThanOrEqual(66);
+    expect(narrowDesktop).toBeGreaterThanOrEqual(0);
+    expect(narrowDesktop).toBeLessThanOrEqual(wideDesktop);
+
+    const phoneStep = getHandRailStep(1200, 36, 14, 'phone');
+    expect(phoneStep).toBeLessThanOrEqual(Math.floor(36 * 0.68));
+    expect(phoneStep).toBeGreaterThan(0);
   });
 
   it('getVisibleHandCap decreases on narrow widths', () => {
