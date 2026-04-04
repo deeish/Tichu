@@ -3,7 +3,7 @@ import Card from './Card';
 import { getWonPileCardSize } from '../styles/layoutTokens';
 import './Trick.css';
 
-function Trick({ trick, players, containerWidth = 1440 }) {
+function Trick({ trick, players, containerWidth = 1440, containerHeight }) {
   const playsScrollRef = useRef(null);
   const userNearBottomRef = useRef(true);
   const [moreBelow, setMoreBelow] = useState(false);
@@ -16,7 +16,7 @@ function Trick({ trick, players, containerWidth = 1440 }) {
     );
   }
 
-  const cardSize = getWonPileCardSize(containerWidth);
+  const cardSize = getWonPileCardSize(containerWidth, containerHeight);
   const getPlayerName = (playerId) => {
     const player = players?.find(p => p.id === playerId);
     return player ? player.name : 'Unknown';

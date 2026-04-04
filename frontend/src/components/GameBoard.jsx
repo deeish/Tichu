@@ -1368,6 +1368,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
                     trick={Array.isArray(game.currentTrick) ? game.currentTrick : []}
                     players={Array.isArray(game.players) ? game.players : []}
                     containerWidth={tableContainerWidthBasis}
+                    containerHeight={tableContainerHeightBasis}
                   />
                 ) : game?.state === 'exchanging' && !game.exchangeCards?.[playerId] ? (
                   <span className="play-mat-empty-msg play-mat-empty-msg--instruction">
