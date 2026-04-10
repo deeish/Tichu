@@ -515,6 +515,35 @@
 }
 
 /* Tichu / Grand Tichu declared: glow so user sees it was clicked */
+/* Grand Tichu: press-and-hold fill (progress via --grand-hold-progress, 0–1) */
+.dock-btn-grand-hold {
+  position: relative;
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.dock-btn-grand-hold__fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--grand-hold-progress, 0));
+  background: linear-gradient(
+    90deg,
+    rgba(250, 204, 21, 0.5),
+    rgba(253, 224, 71, 0.35)
+  );
+  pointer-events: none;
+  will-change: transform;
+}
+
+.dock-btn-grand-hold__label {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
 .dock-btn--declared {
   box-shadow: 0 0 12px 2px rgba(250, 204, 21, 0.6), 0 0 24px 4px rgba(250, 204, 21, 0.25);
   border-color: rgba(250, 204, 21, 0.5);

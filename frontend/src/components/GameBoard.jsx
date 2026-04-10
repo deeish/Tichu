@@ -4,6 +4,7 @@ import Card from './Card';
 import CardBack from './CardBack';
 import Drawer from './Drawer';
 import HandDock from './HandDock';
+import { GrandTichuHoldButton } from './GrandTichuHoldButton';
 import HandErrorBoundary from './HandErrorBoundary';
 import { sortCardsByRank, cardKey, isValidCard } from '../utils/cardUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
@@ -943,6 +944,24 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   const wonCardSize = getWonPileCardSize(tableContainerWidthBasis);
   const tableHasSize = tableSize.w >= 10 && tableSize.h >= 10;
 
+  const commitGrandTichu = useCallback(() => {
+    if (grandTichuSubmitting || game?.cardsRevealed?.[playerId]) return;
+    setGrandTichuSubmitting(true);
+    setOptimisticGrandTichu(true);
+    const alreadyDeclared = game?.grandTichuDeclarations?.[playerId] === true;
+    if (!alreadyDeclared) {
+      const actionId = nextActionId();
+      setClientCorrelation({ requestId: actionId, actionId });
+      socket.emit('declare-grand-tichu', { requestId: actionId, actionId });
+    }
+  }, [
+    grandTichuSubmitting,
+    game?.cardsRevealed?.[playerId],
+    game?.grandTichuDeclarations?.[playerId],
+    playerId,
+    socket,
+  ]);
+
   const getStateMessage = () => {
     if (!game) return '';
     const getPlayerName = (pid) => game.players?.find(p => p.id === pid)?.name ?? 'Unknown';
@@ -992,24 +1011,13 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
               Reveal cards
             </button>
           )}
-          <button
-            type="button"
-            className={`dock-btn dock-btn-primary ${(optimisticGrandTichu === true || (optimisticGrandTichu !== false && game.grandTichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
+          <GrandTichuHoldButton
+            className={`dock-btn dock-btn-primary dock-btn-grand-hold ${(optimisticGrandTichu === true || (optimisticGrandTichu !== false && game.grandTichuDeclarations?.[playerId])) ? 'dock-btn--declared' : ''}`}
             disabled={grandTichuSubmitting || game?.cardsRevealed?.[playerId]}
-            onClick={() => {
-              if (grandTichuSubmitting || game?.cardsRevealed?.[playerId]) return;
-              setGrandTichuSubmitting(true);
-              setOptimisticGrandTichu(true);
-              const alreadyDeclared = game?.grandTichuDeclarations?.[playerId] === true;
-              if (!alreadyDeclared) {
-                const actionId = nextActionId()
-                setClientCorrelation({ requestId: actionId, actionId })
-                socket.emit('declare-grand-tichu', { requestId: actionId, actionId })
-              }
-            }}
+            onCommit={commitGrandTichu}
           >
             Grand Tichu (+200)
-          </button>
+          </GrandTichuHoldButton>
         </>
       )}
       {game?.state === 'playing' && isMyTurn && !game.firstCardPlayed?.[playerId] && !game.grandTichuDeclarations?.[playerId] && (
@@ -1055,6 +1063,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     optimisticTichu,
     isMyTurn,
     playerId,
+    commitGrandTichu,
+    socket,
   ]);
 
   return (
