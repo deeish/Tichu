@@ -7,6 +7,12 @@ import GameErrorBoundary from './components/GameErrorBoundary'
 import StatsPopup from './components/StatsPopup'
 import { reportClientError, setClientCorrelation, showGlobalCrashOverlay } from './clientErrorReport'
 import { normalizeGameState } from './utils/normalizeGameState'
+import {
+  LANDING_UPDATE_DAYS,
+  getLastUpdatedDisplayDate,
+  formatUpdateDayHeading,
+  landingUpdateKindLabel,
+} from './data/landingUpdates'
 import './App.css'
 
 const REJOIN_GAME_KEY = 'tichu_rejoin_gameId'
@@ -159,6 +165,20 @@ function App() {
   // Lobby: editing own name (show input + save)
   const [editingMyName, setEditingMyName] = useState(false)
   const [lobbyNameDraft, setLobbyNameDraft] = useState('')
+  const [showLandingUpdates, setShowLandingUpdates] = useState(false)
+
+  useEffect(() => {
+    if (gameState) setShowLandingUpdates(false)
+  }, [gameState])
+
+  useEffect(() => {
+    if (!showLandingUpdates) return
+    const onKey = (e) => {
+      if (e.key === 'Escape') setShowLandingUpdates(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showLandingUpdates])
 
   const dismissToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -803,6 +823,8 @@ function App() {
     );
   }
 
+  const landingLastUpdatedLabel = getLastUpdatedDisplayDate()
+
   return (
     <div className="landing">
       {!gameState ? (
@@ -895,6 +917,16 @@ function App() {
               >
                 Submit feedback
               </a>
+              {LANDING_UPDATE_DAYS.length > 0 && landingLastUpdatedLabel && (
+                <button
+                  type="button"
+                  className="landing-updates-trigger"
+                  onClick={() => setShowLandingUpdates(true)}
+                  aria-haspopup="dialog"
+                >
+                  Last updated {landingLastUpdatedLabel}
+                </button>
+              )}
               <p className="landing-credit">Created by Dylan Salmo</p>
             </footer>
           )}
@@ -1019,6 +1051,60 @@ function App() {
           </button>
         </div>
       ) : null}
+      {showLandingUpdates && !gameState && (
+        <div
+          className="landing-updates-overlay"
+          onClick={() => setShowLandingUpdates(false)}
+          role="presentation"
+        >
+          <div
+            className="landing-updates-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="landing-updates-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="landing-updates-header">
+              <h2 id="landing-updates-title" className="landing-updates-title">
+                Updates
+              </h2>
+              <button
+                type="button"
+                className="landing-updates-close"
+                onClick={() => setShowLandingUpdates(false)}
+                aria-label="Close updates"
+              >
+                ×
+              </button>
+            </div>
+            <div className="landing-updates-body">
+              {LANDING_UPDATE_DAYS.map((day) => (
+                <section key={day.date} className="landing-updates-day">
+                  <h3 className="landing-updates-day-title">{formatUpdateDayHeading(day.date)}</h3>
+                  <ul className="landing-updates-list">
+                    {(day.items || []).map((item, i) => {
+                      const kindLabel = landingUpdateKindLabel(item.kind)
+                      const kindClass =
+                        item.kind &&
+                        `landing-updates-kind--${String(item.kind).replace(/[^a-z0-9-]/gi, '').toLowerCase()}`
+                      return (
+                        <li key={`${day.date}-${i}`} className="landing-updates-item">
+                          {kindLabel && (
+                            <span className={kindClass ? `landing-updates-kind ${kindClass}` : 'landing-updates-kind'}>
+                              {kindLabel}
+                            </span>
+                          )}
+                          <span className="landing-updates-item-text">{item.text}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {renderToasts()}
     </div>
   )
