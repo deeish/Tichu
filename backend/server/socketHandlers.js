@@ -363,7 +363,7 @@ function setupSocketHandlers(io, games, players) {
       notifyGamePersist(game);
     });
 
-    safeOn('start-game', () => {
+    safeOn('start-game', (payload) => {
       const playerInfo = players.get(socket.id);
       if (!playerInfo) {
         socket.emit('error', { message: 'Not in a game' });
@@ -396,7 +396,11 @@ function setupSocketHandlers(io, games, players) {
       }
       // Use lobby team choices; do not overwrite with assignRandomTeamsToGame
       const broadcastFn = (g) => broadcastGameUpdate(io, g, games);
-      startGame(playerInfo.gameId, games, broadcastFn);
+      const startingScores =
+        payload && typeof payload === 'object' && payload.startingScores != null
+          ? payload.startingScores
+          : undefined;
+      startGame(playerInfo.gameId, games, broadcastFn, { startingScores });
       // Explicitly send game-update to the host (their own view, not players[0] which may have changed after seating)
       const gameAfter = games.get(playerInfo.gameId);
       if (gameAfter) {

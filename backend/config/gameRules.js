@@ -3,11 +3,33 @@
  * Centralized configuration for game constants
  */
 
+const WINNING_SCORE = 1000;
+
+/**
+ * Optional team scores when the host starts a game. Defaults to 0–0.
+ * Clamped to [0, WINNING_SCORE - 1] so the game does not begin already finished.
+ */
+function parseStartingScores(raw) {
+  const max = WINNING_SCORE - 1;
+  const def = { team1: 0, team2: 0 };
+  if (!raw || typeof raw !== 'object') return def;
+  return {
+    team1: clampIntTeamScore(raw.team1, max),
+    team2: clampIntTeamScore(raw.team2, max),
+  };
+}
+
+function clampIntTeamScore(v, max) {
+  const n = parseInt(String(v), 10);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(max, n));
+}
+
 module.exports = {
   // Scoring constants
   TICHU_POINTS: 100,
   GRAND_TICHU_POINTS: 200,
-  WINNING_SCORE: 1000, // First team to reach 1000 wins. If both hit 1000 in same round, higher score wins.
+  WINNING_SCORE, // First team to reach 1000 wins. If both hit 1000 in same round, higher score wins.
   DOUBLE_VICTORY_POINTS: 200,
   
   // Card point values
@@ -41,5 +63,7 @@ module.exports = {
     PLAYING: 'playing',
     ROUND_ENDED: 'round-ended',
     FINISHED: 'finished'
-  }
+  },
+
+  parseStartingScores,
 };

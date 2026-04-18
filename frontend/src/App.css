@@ -806,6 +806,75 @@ body {
   color: #fff;
 }
 
+.lobby-starting-score-card {
+  margin-bottom: 0.75rem;
+}
+
+.lobby-starting-score-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: left;
+}
+
+.lobby-starting-score-hint strong {
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 600;
+}
+
+.lobby-starting-score-row {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: stretch;
+}
+
+.lobby-starting-score-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: left;
+}
+
+.lobby-starting-score-label-text {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.lobby-starting-score-input {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.lobby-starting-score-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.lobby-starting-score-input:focus {
+  outline: none;
+  border-color: rgba(129, 140, 248, 0.65);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Hide number spinners (cleaner for score entry) */
+.lobby-starting-score-input::-webkit-outer-spin-button,
+.lobby-starting-score-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.lobby-starting-score-input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
 .lobby-start-wrap {
   width: 100%;
   margin-top: 0.25rem;

@@ -165,7 +165,14 @@ function App() {
   // Lobby: editing own name (show input + save)
   const [editingMyName, setEditingMyName] = useState(false)
   const [lobbyNameDraft, setLobbyNameDraft] = useState('')
+  const [lobbyStartingTeam1, setLobbyStartingTeam1] = useState('')
+  const [lobbyStartingTeam2, setLobbyStartingTeam2] = useState('')
   const [showLandingUpdates, setShowLandingUpdates] = useState(false)
+
+  useEffect(() => {
+    setLobbyStartingTeam1('')
+    setLobbyStartingTeam2('')
+  }, [gameState?.id])
 
   useEffect(() => {
     if (gameState) setShowLandingUpdates(false)
@@ -595,7 +602,19 @@ function App() {
   const handleStartGame = () => {
     const requestId = nextRequestId()
     setClientCorrelation({ requestId })
-    socket.emit('start-game', { requestId })
+    const parseStarting = (s) => {
+      const t = String(s ?? '').trim()
+      if (t === '') return 0
+      const n = parseInt(t, 10)
+      return Number.isFinite(n) ? n : 0
+    }
+    socket.emit('start-game', {
+      requestId,
+      startingScores: {
+        team1: parseStarting(lobbyStartingTeam1),
+        team2: parseStarting(lobbyStartingTeam2),
+      },
+    })
   }
 
   const myId = playerId ?? socket?.id
@@ -1022,28 +1041,68 @@ function App() {
           </section>
 
           {isMe(gameState.players[0]) && (
-            <div className="lobby-start-wrap">
-              {gameState.players.length === 4 && (
+            <>
+              <section className="lobby-card lobby-starting-score-card" aria-labelledby="lobby-starting-score-heading">
+                <h2 id="lobby-starting-score-heading" className="lobby-card-title">
+                  Starting score
+                </h2>
+                <p className="lobby-starting-score-hint">
+                  Optional — leave blank for <strong>0–0</strong>. Each team 0–999 (below 1000 to win).
+                </p>
+                <div className="lobby-starting-score-row">
+                  <label className="lobby-starting-score-label">
+                    <span className="lobby-starting-score-label-text">Team 1</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={999}
+                      className="lobby-starting-score-input"
+                      value={lobbyStartingTeam1}
+                      onChange={(e) => setLobbyStartingTeam1(e.target.value)}
+                      placeholder="0"
+                      aria-label="Team 1 starting score"
+                    />
+                  </label>
+                  <label className="lobby-starting-score-label">
+                    <span className="lobby-starting-score-label-text">Team 2</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={999}
+                      className="lobby-starting-score-input"
+                      value={lobbyStartingTeam2}
+                      onChange={(e) => setLobbyStartingTeam2(e.target.value)}
+                      placeholder="0"
+                      aria-label="Team 2 starting score"
+                    />
+                  </label>
+                </div>
+              </section>
+              <div className="lobby-start-wrap">
+                {gameState.players.length === 4 && (
+                  <button
+                    type="button"
+                    className="lobby-randomize"
+                    onClick={handleRandomizeTeams}
+                  >
+                    Randomize teams
+                  </button>
+                )}
                 <button
                   type="button"
-                  className="lobby-randomize"
-                  onClick={handleRandomizeTeams}
+                  className="lobby-start"
+                  onClick={handleStartGame}
+                  disabled={gameState.players.length !== 4}
                 >
-                  Randomize teams
+                  Start game
                 </button>
-              )}
-              <button
-                type="button"
-                className="lobby-start"
-                onClick={handleStartGame}
-                disabled={gameState.players.length !== 4}
-              >
-                Start game
-              </button>
-              {gameState.players.length !== 4 && (
-                <p className="lobby-start-hint">Need 4 players to start</p>
-              )}
-            </div>
+                {gameState.players.length !== 4 && (
+                  <p className="lobby-start-hint">Need 4 players to start</p>
+                )}
+              </div>
+            </>
           )}
 
           <button type="button" className="lobby-leave" onClick={handleLeaveParty}>

@@ -4,6 +4,7 @@
  */
 
 const { initializeGame, revealRemainingCards } = require('../game/gameState');
+const { parseStartingScores } = require('../config/gameRules');
 
 /**
  * Fisher–Yates shuffle (in-place). Used to randomize team assignment.
@@ -79,7 +80,7 @@ function seatPlayersByTeam(game) {
   console.log('Seating (partners across):', game.players.map((p, i) => `${p.name}(T${p.team})@${i}`).join(', '));
 }
 
-function startGame(gameId, games, broadcastGameUpdate) {
+function startGame(gameId, games, broadcastGameUpdate, options = {}) {
   const game = games.get(gameId);
   if (!game) return;
   if (game.state !== 'waiting') {
@@ -90,6 +91,9 @@ function startGame(gameId, games, broadcastGameUpdate) {
   console.log('Starting game', gameId, '(host clicked Start game)');
   // Seat players so partners sit across (positions 0&2 and 1&3)
   seatPlayersByTeam(game);
+
+  const starting = parseStartingScores(options.startingScores);
+  game.scores = { team1: starting.team1, team2: starting.team2 };
   // Clear round log at start of each new game (so Log tab is empty until rounds complete).
   // Keep log for test games so the Log tab can still show mock/previous data for testing.
   const isTestGame = game.players.some((p) => p.isTestPlayer);
