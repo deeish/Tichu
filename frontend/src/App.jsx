@@ -165,11 +165,13 @@ function App() {
   // Lobby: editing own name (show input + save)
   const [editingMyName, setEditingMyName] = useState(false)
   const [lobbyNameDraft, setLobbyNameDraft] = useState('')
+  const [lobbyCustomScoreOpen, setLobbyCustomScoreOpen] = useState(false)
   const [lobbyStartingTeam1, setLobbyStartingTeam1] = useState('')
   const [lobbyStartingTeam2, setLobbyStartingTeam2] = useState('')
   const [showLandingUpdates, setShowLandingUpdates] = useState(false)
 
   useEffect(() => {
+    setLobbyCustomScoreOpen(false)
     setLobbyStartingTeam1('')
     setLobbyStartingTeam2('')
   }, [gameState?.id])
@@ -602,18 +604,22 @@ function App() {
   const handleStartGame = () => {
     const requestId = nextRequestId()
     setClientCorrelation({ requestId })
-    const parseStarting = (s) => {
+    /** Match server: 0–999, then nearest multiple of 5; 1000 → 995 */
+    const snapStartingScore = (s) => {
       const t = String(s ?? '').trim()
       if (t === '') return 0
       const n = parseInt(t, 10)
-      return Number.isFinite(n) ? n : 0
+      if (!Number.isFinite(n)) return 0
+      let x = Math.max(0, Math.min(999, n))
+      x = Math.round(x / 5) * 5
+      if (x >= 1000) x = 995
+      return x
     }
+    const team1 = lobbyCustomScoreOpen ? snapStartingScore(lobbyStartingTeam1) : 0
+    const team2 = lobbyCustomScoreOpen ? snapStartingScore(lobbyStartingTeam2) : 0
     socket.emit('start-game', {
       requestId,
-      startingScores: {
-        team1: parseStarting(lobbyStartingTeam1),
-        team2: parseStarting(lobbyStartingTeam2),
-      },
+      startingScores: { team1, team2 },
     })
   }
 
@@ -1042,44 +1048,99 @@ function App() {
 
           {isMe(gameState.players[0]) && (
             <>
-              <section className="lobby-card lobby-starting-score-card" aria-labelledby="lobby-starting-score-heading">
-                <h2 id="lobby-starting-score-heading" className="lobby-card-title">
-                  Starting score
-                </h2>
-                <p className="lobby-starting-score-hint">
-                  Optional — leave blank for <strong>0–0</strong>. Each team 0–999 (below 1000 to win).
-                </p>
-                <div className="lobby-starting-score-row">
-                  <label className="lobby-starting-score-label">
-                    <span className="lobby-starting-score-label-text">Team 1</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      max={999}
-                      className="lobby-starting-score-input"
-                      value={lobbyStartingTeam1}
-                      onChange={(e) => setLobbyStartingTeam1(e.target.value)}
-                      placeholder="0"
-                      aria-label="Team 1 starting score"
-                    />
-                  </label>
-                  <label className="lobby-starting-score-label">
-                    <span className="lobby-starting-score-label-text">Team 2</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      max={999}
-                      className="lobby-starting-score-input"
-                      value={lobbyStartingTeam2}
-                      onChange={(e) => setLobbyStartingTeam2(e.target.value)}
-                      placeholder="0"
-                      aria-label="Team 2 starting score"
-                    />
-                  </label>
-                </div>
-              </section>
+              <div className="lobby-custom-score">
+                {!lobbyCustomScoreOpen ? (
+                  <button
+                    type="button"
+                    className="lobby-custom-score-trigger"
+                    onClick={() => setLobbyCustomScoreOpen(true)}
+                  >
+                    Custom score
+                  </button>
+                ) : (
+                  <div className="lobby-custom-score-panel">
+                    <div className="lobby-custom-score-panel-head">
+                      <span className="lobby-custom-score-panel-title">Starting scores</span>
+                      <button
+                        type="button"
+                        className="lobby-custom-score-close"
+                        onClick={() => {
+                          setLobbyCustomScoreOpen(false)
+                          setLobbyStartingTeam1('')
+                          setLobbyStartingTeam2('')
+                        }}
+                        aria-label="Close and use 0–0"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <p className="lobby-custom-score-lead">Multiples of 5 · max 995 each</p>
+                    <div className="lobby-starting-score-row">
+                      <label className="lobby-starting-score-label">
+                        <span className="lobby-starting-score-label-text">Team 1</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={995}
+                          step={5}
+                          className="lobby-starting-score-input"
+                          value={lobbyStartingTeam1}
+                          onChange={(e) => setLobbyStartingTeam1(e.target.value)}
+                          onBlur={(e) => {
+                            const t = e.target.value.trim()
+                            if (t === '') return
+                            const n = parseInt(t, 10)
+                            if (!Number.isFinite(n)) return
+                            let x = Math.max(0, Math.min(999, n))
+                            x = Math.round(x / 5) * 5
+                            if (x >= 1000) x = 995
+                            setLobbyStartingTeam1(String(x))
+                          }}
+                          placeholder="0"
+                          aria-label="Team 1 starting score"
+                        />
+                      </label>
+                      <label className="lobby-starting-score-label">
+                        <span className="lobby-starting-score-label-text">Team 2</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={995}
+                          step={5}
+                          className="lobby-starting-score-input"
+                          value={lobbyStartingTeam2}
+                          onChange={(e) => setLobbyStartingTeam2(e.target.value)}
+                          onBlur={(e) => {
+                            const t = e.target.value.trim()
+                            if (t === '') return
+                            const n = parseInt(t, 10)
+                            if (!Number.isFinite(n)) return
+                            let x = Math.max(0, Math.min(999, n))
+                            x = Math.round(x / 5) * 5
+                            if (x >= 1000) x = 995
+                            setLobbyStartingTeam2(String(x))
+                          }}
+                          placeholder="0"
+                          aria-label="Team 2 starting score"
+                        />
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      className="lobby-custom-score-dismiss"
+                      onClick={() => {
+                        setLobbyCustomScoreOpen(false)
+                        setLobbyStartingTeam1('')
+                        setLobbyStartingTeam2('')
+                      }}
+                    >
+                      Use default (0–0)
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="lobby-start-wrap">
                 {gameState.players.length === 4 && (
                   <button

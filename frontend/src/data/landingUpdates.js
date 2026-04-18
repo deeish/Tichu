@@ -33,6 +33,10 @@ export const LANDING_UPDATE_DAYS = [
     items: [
       {
         kind: 'feature',
+        text: 'Lobby: optional custom starting scores for the host.',
+      },
+      {
+        kind: 'feature',
         text: 'Added “Last updated” on the home page with a date-grouped list of updates.',
       },
     ],

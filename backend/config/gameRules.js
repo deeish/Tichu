@@ -7,22 +7,31 @@ const WINNING_SCORE = 1000;
 
 /**
  * Optional team scores when the host starts a game. Defaults to 0–0.
- * Clamped to [0, WINNING_SCORE - 1] so the game does not begin already finished.
+ * Clamped below WINNING_SCORE and snapped to multiples of 5 (Tichu totals move in 5s).
  */
 function parseStartingScores(raw) {
-  const max = WINNING_SCORE - 1;
   const def = { team1: 0, team2: 0 };
   if (!raw || typeof raw !== 'object') return def;
+  // Arrays are objects; without this, raw.team1/raw.team2 are undefined and both become 0.
+  if (Array.isArray(raw)) {
+    return raw.length >= 2
+      ? { team1: snapStartingTeamScore(raw[0]), team2: snapStartingTeamScore(raw[1]) }
+      : def;
+  }
   return {
-    team1: clampIntTeamScore(raw.team1, max),
-    team2: clampIntTeamScore(raw.team2, max),
+    team1: snapStartingTeamScore(raw.team1),
+    team2: snapStartingTeamScore(raw.team2),
   };
 }
 
-function clampIntTeamScore(v, max) {
+function snapStartingTeamScore(v) {
   const n = parseInt(String(v), 10);
   if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(max, n));
+  const maxBelowWin = WINNING_SCORE - 1; // 999
+  let x = Math.max(0, Math.min(maxBelowWin, n));
+  x = Math.round(x / 5) * 5;
+  if (x >= WINNING_SCORE) x = WINNING_SCORE - 5;
+  return x;
 }
 
 module.exports = {
