@@ -35,6 +35,7 @@ import '../styles/tableSurface.css';
 import './GameBoard.css';
 
 const THEME_STORAGE_KEY = 'tichu-table-theme';
+const TURN_ALERTS_STORAGE_KEY = 'tichu-turn-alerts-enabled';
 const THEMES = ['classic', 'velvet', 'midnight', 'ember', 'forest', 'ocean', 'sunset', 'royal', 'slate', 'autumn', 'jade', 'noir'];
 
 /** Exchange-receipt card flight timing (cards only; labels are in the dock summary strip). */
@@ -91,6 +92,15 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch (_) {}
   }, []);
+  const [turnAlertsEnabled, setTurnAlertsEnabled] = useState(() => {
+    try {
+      const raw = localStorage.getItem(TURN_ALERTS_STORAGE_KEY);
+      if (raw == null) return true;
+      return raw !== '0' && raw !== 'false';
+    } catch {
+      return true;
+    }
+  });
   const [selectedCards, setSelectedCards] = useState([]);
   const [sortMode, setSortMode] = useState('desc');
   const [mahJongWish, setMahJongWish] = useState('');
@@ -137,13 +147,103 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   /** Incoming exchange cards flying from seats → hand (client-only animation). */
   const [exchangeFlights, setExchangeFlights] = useState(null);
   const [exchangeReceiptSummaryDismissed, setExchangeReceiptSummaryDismissed] = useState(false);
+  const [turnAlertLevel, setTurnAlertLevel] = useState(0);
   const exchangeReceiptSummarySigRef = useRef(null);
+  const turnAlertTimerRef = useRef(null);
+  const turnLastInteractionAtRef = useRef(0);
+  const turnPrevLevelRef = useRef(0);
+  const wasMyTurnRef = useRef(false);
 
   const isMyTurn = useMemo(() => {
     if (!game?.turnOrder) return false;
     const current = game.turnOrder[game.currentPlayerIndex];
     return current?.id === playerId;
   }, [game?.turnOrder, game?.currentPlayerIndex, playerId]);
+  const turnAlertActive = game?.state === 'playing' && isMyTurn && turnAlertsEnabled;
+
+  const noteTurnInteraction = useCallback(() => {
+    if (!turnAlertActive) return;
+    turnLastInteractionAtRef.current = Date.now();
+    if (turnPrevLevelRef.current !== 0) {
+      turnPrevLevelRef.current = 0;
+      setTurnAlertLevel(0);
+    }
+  }, [turnAlertActive]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TURN_ALERTS_STORAGE_KEY, turnAlertsEnabled ? '1' : '0');
+    } catch (_) {}
+  }, [turnAlertsEnabled]);
+
+  useEffect(() => {
+    const becameMyTurn = turnAlertActive && !wasMyTurnRef.current;
+    wasMyTurnRef.current = turnAlertActive;
+    if (!becameMyTurn) return;
+    // Turn transition hook kept for future turn-start cues.
+  }, [turnAlertActive]);
+
+  useEffect(() => {
+    // Escalation phases (no interaction): 6s -> level 1, 11s -> level 2.
+    // Cap at 2 reminders/turn and immediately cool down when user interacts.
+    if (!turnAlertActive) {
+      if (turnAlertTimerRef.current) {
+        clearInterval(turnAlertTimerRef.current);
+        turnAlertTimerRef.current = null;
+      }
+      turnPrevLevelRef.current = 0;
+      setTurnAlertLevel(0);
+      return;
+    }
+    turnLastInteractionAtRef.current = Date.now();
+    turnPrevLevelRef.current = 0;
+    setTurnAlertLevel(0);
+    if (turnAlertTimerRef.current) clearInterval(turnAlertTimerRef.current);
+    turnAlertTimerRef.current = setInterval(() => {
+      // If user is actively evaluating cards, stay subtle and do not escalate.
+      if (selectedCards.length > 0) {
+        turnLastInteractionAtRef.current = Date.now();
+        if (turnPrevLevelRef.current !== 0) {
+          turnPrevLevelRef.current = 0;
+          setTurnAlertLevel(0);
+        }
+        return;
+      }
+      const idleMs = Date.now() - turnLastInteractionAtRef.current;
+      const nextLevel = idleMs >= 11000 ? 2 : idleMs >= 6000 ? 1 : 0;
+      if (nextLevel !== turnPrevLevelRef.current) {
+        turnPrevLevelRef.current = nextLevel;
+        setTurnAlertLevel(nextLevel);
+      }
+    }, 1000);
+    return () => {
+      if (turnAlertTimerRef.current) {
+        clearInterval(turnAlertTimerRef.current);
+        turnAlertTimerRef.current = null;
+      }
+    };
+  }, [turnAlertActive, selectedCards.length]);
+
+  useEffect(() => {
+    if (!turnAlertActive) return undefined;
+    const onPointerDown = () => noteTurnInteraction();
+    const onKeyDown = () => noteTurnInteraction();
+    window.addEventListener('pointerdown', onPointerDown, { passive: true });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [turnAlertActive, noteTurnInteraction]);
+
+  useEffect(() => {
+    return () => {
+      if (turnAlertTimerRef.current) {
+        clearInterval(turnAlertTimerRef.current);
+        turnAlertTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Clear optimistic state only when server confirms undeclared (falsy). Avoid clearing on
   // every update so a stale game-update (e.g. from a bot move) doesn’t bring the glow back after unclick.
@@ -620,18 +720,20 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   }, [displayHand, handOrderPreferenceKeys]);
 
   const handleSortModeChange = useCallback((mode) => {
+    noteTurnInteraction();
     setSortMode(mode);
     setHandOrderPreferenceKeys(null);
-  }, []);
+  }, [noteTurnInteraction]);
 
   const handleHandReorder = useCallback((newOrderedCards) => {
+    noteTurnInteraction();
     if (!Array.isArray(newOrderedCards) || newOrderedCards.length === 0) {
       setHandOrderPreferenceKeys(null);
       return;
     }
     // Store a stable key sequence so we can remap it after plays/resyncs.
     setHandOrderPreferenceKeys(newOrderedCards.map((c) => cardKey(c)));
-  }, [displayHand]);
+  }, [noteTurnInteraction]);
 
   // When Dragon selection is pending, the dragon player is still "acting" until they choose; show their turn.
   const turnOrderCurrent = game?.turnOrder?.[game?.currentPlayerIndex];
@@ -663,6 +765,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
 
   const handleCardClick = (card) => {
     try {
+      noteTurnInteraction();
       if (!card || typeof card !== 'object') return;
       const validCard =
         (card.type === 'standard' && card.suit && card.rank) ||
@@ -785,6 +888,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   };
 
   const handlePlayCards = () => {
+    noteTurnInteraction();
     if (selectedCards.length === 0) return;
     const myHandArr = Array.isArray(myHand) ? myHand : [];
     const allInHand = selectedCards.every((sc) => myHandArr.some((h) => cardMatches(h, sc)));
@@ -815,6 +919,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   };
 
   const handlePass = () => {
+    noteTurnInteraction();
     // Cancel any scheduled auto-pass since the user (or prior scheduling) is now passing.
     if (autoPassTimerRef.current) {
       clearTimeout(autoPassTimerRef.current);
@@ -1110,7 +1215,15 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
             {/* Table header: title + current action (above top seat) */}
             <div className="table-header" style={{ height: TABLE_HEADER_HEIGHT }}>
               <h1 className="table-title">Tichu</h1>
-              <div className="table-current-action-box">
+              <div
+                className={`table-current-action-box${
+                  turnAlertActive
+                    ? ` table-current-action-box--turn-alert${
+                        turnAlertLevel > 0 ? ` table-current-action-box--turn-alert-${turnAlertLevel}` : ''
+                      }`
+                    : ''
+                }`}
+              >
                 {getStateMessage()}
                 {currentPlayer?.id === playerId && (game.grandTichuDeclarations?.[playerId] || game.tichuDeclarations?.[playerId]) && (
                   <span className={`table-header-declaration-pill ${game.grandTichuDeclarations?.[playerId] ? 'table-header-declaration-pill--grand' : ''}`}>
@@ -1374,6 +1487,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           onPass={handlePass}
           autoPassEnabled={autoPassUIEnabled}
           onAutoPassToggle={setAutoPassUIEnabled}
+          turnAlertActive={turnAlertActive}
+          turnAlertLevel={turnAlertActive ? turnAlertLevel : 0}
           hintText={hintText}
           containerWidth={dockContainerWidth}
           primaryLabel={selectedIsBomb ? 'Play bomb' : `Play (${selectedCards.length})`}
@@ -1403,6 +1518,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           socket={socket}
           tableTheme={tableTheme}
           onTableThemeChange={handleTableThemeChange}
+          turnAlertsEnabled={turnAlertsEnabled}
+          onTurnAlertsEnabledChange={setTurnAlertsEnabled}
           onBackToLobby={onBackToLobby}
           className={sidebarMode === 'overlay' ? `sidebar-overlay ${isSidebarOpen ? 'is-open' : 'is-closed'}` : ''}
           containerRef={sidebarRef}

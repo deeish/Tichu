@@ -210,6 +210,12 @@
   overflow: auto;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.75);
+  scrollbar-width: none; /* Firefox: hide scrollbar, keep scroll */
+}
+
+.drawer-panel-inner::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 /* ----- Chat tab ----- */
@@ -229,6 +235,12 @@
   background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-panel);
   margin-bottom: var(--s12);
+  scrollbar-width: none; /* Firefox */
+}
+
+.drawer-chat-messages::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .drawer-chat-messages-inner {
@@ -385,6 +397,12 @@
   min-height: 0;
   overflow-y: auto;
   padding-right: 2px;
+  scrollbar-width: none; /* Firefox */
+}
+
+.drawer-log-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .drawer-log-heading {
@@ -675,4 +693,40 @@
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.25);
   color: #fff;
+}
+
+.drawer-setting-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.drawer-setting-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drawer-setting-toggle input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: rgba(96, 165, 250, 0.95);
+}
+
+.drawer-setting-toggle-label {
+  user-select: none;
+}
+
+.drawer-setting-help {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.58);
 }

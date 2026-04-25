@@ -39,6 +39,8 @@ function HandDock({
   onReorder,
   onAutoPassToggle = () => {},
   autoPassEnabled = false,
+  turnAlertActive = false,
+  turnAlertLevel = 0,
   /** While playing: compact “who passed you what” (private to this client). */
   exchangeReceiptLines = null,
   onExchangeReceiptDismiss,
@@ -315,7 +317,13 @@ function HandDock({
     : '';
 
   return (
-    <div className={`hand-dock ${compactDock ? 'hand-dock--compact' : ''}`}>
+    <div
+      className={`hand-dock ${compactDock ? 'hand-dock--compact' : ''} ${
+        turnAlertActive
+          ? `hand-dock--turn-alert${turnAlertLevel > 0 ? ` hand-dock--turn-alert-${turnAlertLevel}` : ''}`
+          : ''
+      }`}
+    >
       <div className="dock-header">
         <h2 className="dock-title">Your Hand</h2>
         {showExchangeRecap && (
@@ -455,7 +463,11 @@ function HandDock({
                 <>
                   <button
                     type="button"
-                    className="dock-btn dock-btn-primary"
+                    className={`dock-btn dock-btn-primary ${
+                      turnAlertActive
+                        ? `dock-btn--turn-alert${turnAlertLevel > 0 ? ` dock-btn--turn-alert-${turnAlertLevel}` : ''}`
+                        : ''
+                    }`}
                     disabled={!canPlay}
                     onClick={onPlay}
                   >
@@ -464,7 +476,11 @@ function HandDock({
                   <div className="dock-pass-row">
                     <button
                       type="button"
-                      className="dock-btn dock-btn-secondary dock-pass-btn"
+                      className={`dock-btn dock-btn-secondary dock-pass-btn ${
+                        turnAlertActive
+                          ? `dock-btn--turn-alert${turnAlertLevel > 0 ? ` dock-btn--turn-alert-${turnAlertLevel}` : ''}`
+                          : ''
+                      }`}
                       disabled={!canPass}
                       onClick={onPass}
                     >

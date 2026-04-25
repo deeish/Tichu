@@ -35,6 +35,10 @@ export const LANDING_UPDATE_DAYS = [
         kind: 'improvement',
         text: 'Playing UI: the “Received” cards section is now cleaner and easier to read.',
       },
+      {
+        kind: 'improvement',
+        text: 'Added clearer turn alerts with stronger highlight cues.',
+      },
     ],
   },
   {
