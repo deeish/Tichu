@@ -33,7 +33,7 @@ export const LANDING_UPDATE_DAYS = [
     items: [
       {
         kind: 'improvement',
-        text: 'Playing UI: cleaned up the “Received” pass recap with compact chips, left-partner-right order, and clearer partner/opponent color accents.',
+        text: 'Playing UI: the “Received” cards section is now cleaner and easier to read.',
       },
     ],
   },
