@@ -305,6 +305,9 @@ function HandDock({
 
   const receiptLines = Array.isArray(exchangeReceiptLines) ? exchangeReceiptLines : [];
   const showExchangeRecap = receiptLines.length > 0;
+  const receiptSourcesLabel = showExchangeRecap
+    ? receiptLines.map((line) => line.role).join(' • ')
+    : '';
   const exchangeRecapTitle = showExchangeRecap
     ? receiptLines
         .map((line) => `${line.cardLabel} from ${line.name} (${line.role})`)
@@ -322,19 +325,22 @@ function HandDock({
             aria-label="Exchange: cards you received"
           >
             <span className="dock-exchange-recap-inner" title={exchangeRecapTitle}>
-              <span className="dock-exchange-recap-label">Received:</span>
-              {receiptLines.map((line, i) => (
-                <span key={line.key} className="dock-exchange-recap-item">
-                  {i > 0 ? <span className="dock-exchange-recap-sep"> · </span> : null}
-                  <span className="dock-exchange-recap-card">{line.cardLabel}</span>
-                  <span className="dock-exchange-recap-meta">
-                    {' '}
-                    <span className="dock-exchange-recap-from">from</span>{' '}
-                    <strong className="dock-exchange-recap-name">{line.name}</strong>{' '}
-                    <span className="dock-exchange-recap-role">({line.role})</span>
-                  </span>
+              <span className="dock-exchange-recap-pill">
+                <span className="dock-exchange-recap-label">Received:</span>
+                <span className="dock-exchange-recap-chips" aria-hidden="true">
+                  {receiptLines.map((line) => (
+                    <span
+                      key={line.key}
+                      className={`dock-exchange-recap-chip ${
+                        /[♥♦]/.test(line.cardLabel) ? 'dock-exchange-recap-chip--red' : ''
+                      } ${line.role === 'Partner' ? 'dock-exchange-recap-chip--partner' : 'dock-exchange-recap-chip--opponent'}`}
+                    >
+                      {line.cardLabel}
+                    </span>
+                  ))}
                 </span>
-              ))}
+                <span className="dock-exchange-recap-sources">{receiptSourcesLabel}</span>
+              </span>
             </span>
             {typeof onExchangeReceiptDismiss === 'function' && (
               <button

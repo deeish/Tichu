@@ -29,6 +29,15 @@ export function landingUpdateKindLabel(kind) {
  */
 export const LANDING_UPDATE_DAYS = [
   {
+    date: '2026-04-25',
+    items: [
+      {
+        kind: 'improvement',
+        text: 'Playing UI: cleaned up the “Received” pass recap with compact chips, left-partner-right order, and clearer partner/opponent color accents.',
+      },
+    ],
+  },
+  {
     date: '2026-04-18',
     items: [
       {

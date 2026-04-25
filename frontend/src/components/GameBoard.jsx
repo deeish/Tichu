@@ -68,6 +68,13 @@ function exchangeFlightLabels(entry, seatKey) {
   return { role, name };
 }
 
+function exchangeSeatSortWeight(seatKey) {
+  if (seatKey === 'left') return 0;
+  if (seatKey === 'top') return 1; // Partner/across (middle in recap)
+  if (seatKey === 'right') return 2;
+  return 3;
+}
+
 function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, onBackToLobby = null }) {
   // ----- UI state (do not reset on game update unless invalidated) -----
   const [tableTheme, setTableTheme] = useState(() => {
@@ -407,11 +414,13 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       const { role, name } = exchangeFlightLabels(entry, seatKey);
       return {
         key: `${String(fromId)}-${idx}-${formatExchangeCardShort(entry.card)}`,
+        seatKey,
+        seatSortWeight: exchangeSeatSortWeight(seatKey),
         role,
         name,
         cardLabel: formatExchangeCardShort(entry.card),
       };
-    });
+    }).sort((a, b) => a.seatSortWeight - b.seatSortWeight);
   }, [game?.state, game?.exchangeReceipt, opponentsByPosition]);
 
   useEffect(() => {
