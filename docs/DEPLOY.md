@@ -77,6 +77,30 @@ For security, you can limit the backend to only accept requests from your fronte
 
 ---
 
+## 5. Production hardening quick wins
+
+These are now wired into this repo by default:
+
+1. **Backend security headers** in `backend/server.js`:
+   - `X-Content-Type-Options: nosniff`
+   - `X-Frame-Options: DENY`
+   - `Referrer-Policy: strict-origin-when-cross-origin`
+   - `Permissions-Policy` (camera/microphone/geolocation disabled)
+   - `Strict-Transport-Security` when behind HTTPS/proxy
+2. **HTTP abuse guard** on `POST /api/client-error`:
+   - fixed-window per-IP limiter (prevents log-flood abuse)
+3. **Frontend Vercel headers and asset caching** in `frontend/vercel.json`.
+4. **SEO bootstrap**:
+   - `frontend/public/robots.txt`
+   - `frontend/public/sitemap.xml`
+
+After deploy, verify:
+- `https://calltichu.com/robots.txt`
+- `https://calltichu.com/sitemap.xml`
+- Response headers include the security header set above.
+
+---
+
 ## Local development after deployment
 
 - **Frontend:** `cd frontend && npm run dev` — uses `http://localhost:3001` if `VITE_SOCKET_URL` is not set (see `frontend/.env.example`).

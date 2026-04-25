@@ -13,6 +13,7 @@ const {
   syncStateVersionCountersFromGames,
 } = require('./server/socketHandlers');
 const { createGameplayPersistence } = require('./server/gamePersistence');
+const { createFixedWindowRateLimiter } = require('./server/simpleRateLimiter');
 
 const corsOrigin = process.env.FRONTEND_ORIGIN || '*';
 
@@ -40,6 +41,7 @@ async function main() {
 
   const app = express();
   const server = http.createServer(app);
+  app.set('trust proxy', 1);
 
   /** P2b: bound slow HTTP phases (slow-loris / stalled body) without touching long-lived Socket.IO traffic after upgrade. */
   const httpRequestTimeoutMs = envPositiveMs('HTTP_REQUEST_TIMEOUT_MS', 30_000);
@@ -63,8 +65,31 @@ async function main() {
     res.status(200).json({ ok: true, persistRedis: persistence.isEnabled === true });
   });
 
+  // Baseline browser hardening headers (safe defaults for SPA + API responses).
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
+
   app.use(cors({ origin: corsOrigin }));
   app.use(express.json({ limit: '48kb' }));
+
+  const clientErrorLimiter = createFixedWindowRateLimiter({ windowMs: 60_000, max: 30, maxEntries: 20_000 });
+  app.use('/api/client-error', (req, res, next) => {
+    const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown')
+      .split(',')[0]
+      .trim();
+    if (!clientErrorLimiter.allow(`client-error:${ip}`)) {
+      return res.status(429).json({ error: 'Too many client-error reports. Please retry later.' });
+    }
+    next();
+  });
 
   process.on('uncaughtException', (err) => {
     console.error('[uncaughtException]', err?.stack || err?.message || err);

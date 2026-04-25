@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://calltichu.com/sitemap.xml
