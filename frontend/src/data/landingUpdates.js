@@ -39,6 +39,10 @@ export const LANDING_UPDATE_DAYS = [
         kind: 'improvement',
         text: 'Added clearer turn alerts with stronger highlight cues.',
       },
+      {
+        kind: 'improvement',
+        text: 'Dragon pass now animates to the receiving player with a clear notice.',
+      },
     ],
   },
   {

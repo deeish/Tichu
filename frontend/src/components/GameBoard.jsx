@@ -146,9 +146,16 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   );
   /** Incoming exchange cards flying from seats → hand (client-only animation). */
   const [exchangeFlights, setExchangeFlights] = useState(null);
+  /** Dragon pass-out visual: center mat -> selected opponent won stack. */
+  const [dragonPassFlight, setDragonPassFlight] = useState(null);
   const [exchangeReceiptSummaryDismissed, setExchangeReceiptSummaryDismissed] = useState(false);
+  const [dragonPassNotice, setDragonPassNotice] = useState(null);
+  const [dragonPassNoticeDismissed, setDragonPassNoticeDismissed] = useState(false);
   const [turnAlertLevel, setTurnAlertLevel] = useState(0);
   const exchangeReceiptSummarySigRef = useRef(null);
+  const dragonSelectionPrevRef = useRef(null);
+  const prevStackSnapshotRef = useRef({});
+  const dragonPassSigRef = useRef(null);
   const turnAlertTimerRef = useRef(null);
   const turnLastInteractionAtRef = useRef(0);
   const turnPrevLevelRef = useRef(0);
@@ -528,6 +535,15 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   }, [game?.id]);
 
   useEffect(() => {
+    // New game -> clear dragon pass notice + tracking snapshots.
+    setDragonPassNotice(null);
+    setDragonPassNoticeDismissed(false);
+    dragonSelectionPrevRef.current = null;
+    prevStackSnapshotRef.current = {};
+    dragonPassSigRef.current = null;
+  }, [game?.id]);
+
+  useEffect(() => {
     const sig =
       game?.state !== 'playing' || !Array.isArray(game?.exchangeReceipt) || game.exchangeReceipt.length === 0
         ? null
@@ -537,6 +553,142 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       setExchangeReceiptSummaryDismissed(false);
     }
   }, [game?.state, game?.exchangeReceipt]);
+
+  useEffect(() => {
+    const players = Array.isArray(game?.players) ? game.players : [];
+    const currStacks = game?.playerStacks && typeof game.playerStacks === 'object' ? game.playerStacks : {};
+    const currSnapshot = {};
+    for (const p of players) {
+      const s = currStacks?.[p.id];
+      currSnapshot[p.id] = {
+        cards: Array.isArray(s?.cards) ? s.cards.length : 0,
+        points: Number.isFinite(Number(s?.points)) ? Number(s.points) : 0,
+      };
+    }
+    const prevSelection = dragonSelectionPrevRef.current;
+    const currSelection = game?.dragonOpponentSelection ?? null;
+
+    // Dragon selection just resolved -> infer selected recipient from stack delta and animate.
+    if (prevSelection && !currSelection && game?.state === 'playing') {
+      const prevSnapshot = prevStackSnapshotRef.current || {};
+      const trickCards = Array.isArray(prevSelection?.trickCards) ? prevSelection.trickCards : [];
+      const trickCardCount = trickCards.length;
+      const trickPoints = Number.isFinite(Number(prevSelection?.trickPoints)) ? Number(prevSelection.trickPoints) : null;
+
+      let recipientId = null;
+      let bestCardDelta = -1;
+      for (const p of players) {
+        const before = prevSnapshot[p.id]?.cards ?? 0;
+        const after = currSnapshot[p.id]?.cards ?? 0;
+        const cardDelta = after - before;
+        if (cardDelta > bestCardDelta) {
+          bestCardDelta = cardDelta;
+          recipientId = p.id;
+        }
+      }
+
+      // Fallback by points if card-delta signal is weak.
+      if (!recipientId || (trickCardCount > 0 && bestCardDelta < trickCardCount)) {
+        let bestPointDelta = Number.NEGATIVE_INFINITY;
+        for (const p of players) {
+          const beforePts = prevSnapshot[p.id]?.points ?? 0;
+          const afterPts = currSnapshot[p.id]?.points ?? 0;
+          const pointDelta = afterPts - beforePts;
+          if (pointDelta > bestPointDelta) {
+            bestPointDelta = pointDelta;
+            recipientId = p.id;
+          }
+        }
+      }
+
+      if (recipientId) {
+        const recipient = players.find((p) => p.id === recipientId);
+        const role =
+          recipientId === playerId
+            ? 'You'
+            : opponentsByPosition.left?.id === recipientId
+              ? 'Left'
+              : opponentsByPosition.right?.id === recipientId
+                ? 'Right'
+                : 'Partner';
+        const recipientName = recipient?.name || 'Player';
+        const sig = `${game?.id ?? 'game'}:${prevSelection.playerId}:${recipientId}:${trickCardCount}:${trickPoints ?? 'np'}`;
+        if (dragonPassSigRef.current !== sig) {
+          dragonPassSigRef.current = sig;
+          setDragonPassNotice({
+            key: sig,
+            text: `Dragon trick passed to ${recipientName} (${role}).`,
+          });
+          setDragonPassNoticeDismissed(false);
+
+          const reduced =
+            typeof window !== 'undefined' &&
+            window.matchMedia &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (!reduced && tableSurfaceRef.current) {
+            const sRect = tableSurfaceRef.current.getBoundingClientRect();
+            const dragonWonCardSize = getWonPileCardSize(centerRect?.w ?? tableSize.w ?? 1200);
+            const fromX = sRect.left + matPosition.x + matSize.w / 2;
+            const fromY = sRect.top + matPosition.y + matSize.h / 2;
+            let toX = fromX;
+            let toY = fromY;
+            if (recipientId === playerId) {
+              const myWonLeft = (tableSize.w - dragonWonCardSize.w) / 2;
+              const myWonTop = tableSize.h - dragonWonCardSize.h - WON_STACK_GAP;
+              toX = sRect.left + myWonLeft + dragonWonCardSize.w / 2;
+              toY = sRect.top + myWonTop + dragonWonCardSize.h / 2;
+            } else {
+              let seatKey = null;
+              if (opponentsByPosition.top?.id === recipientId) seatKey = 'top';
+              if (opponentsByPosition.left?.id === recipientId) seatKey = 'left';
+              if (opponentsByPosition.right?.id === recipientId) seatKey = 'right';
+              if (seatKey && seatPositions[seatKey]) {
+                const posObj = seatPositions[seatKey];
+                const isTop = seatKey === 'top';
+                const wonStackLeft = isTop
+                  ? posObj.x + SEAT_WIDTH + WON_STACK_GAP
+                  : posObj.x + (SEAT_WIDTH - dragonWonCardSize.w) / 2;
+                const wonStackTop = isTop
+                  ? posObj.y + (SEAT_HEIGHT - dragonWonCardSize.h) / 2
+                  : posObj.y + SEAT_HEIGHT + WON_STACK_GAP;
+                toX = sRect.left + wonStackLeft + dragonWonCardSize.w / 2;
+                toY = sRect.top + wonStackTop + dragonWonCardSize.h / 2;
+              }
+            }
+            setDragonPassFlight({
+              id: Date.now(),
+              fromX,
+              fromY,
+              dx: toX - fromX,
+              dy: toY - fromY,
+              w: dragonWonCardSize.w,
+              h: dragonWonCardSize.h,
+              arrived: false,
+            });
+          }
+        }
+      }
+    }
+
+    dragonSelectionPrevRef.current = currSelection ? { ...currSelection } : null;
+    prevStackSnapshotRef.current = currSnapshot;
+  }, [
+    game?.id,
+    game?.state,
+    game?.dragonOpponentSelection,
+    game?.playerStacks,
+    game?.players,
+    playerId,
+    opponentsByPosition,
+    seatPositions,
+    tableSize.w,
+    tableSize.h,
+    centerRect?.w,
+    matPosition.x,
+    matPosition.y,
+    matSize.w,
+    matSize.h,
+  ]);
 
   useLayoutEffect(() => {
     const receipt = game?.exchangeReceipt;
@@ -622,12 +774,37 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     };
   }, [exchangeFlights?.id]);
 
+  useLayoutEffect(() => {
+    if (!dragonPassFlight) return;
+    const id = dragonPassFlight.id;
+    let cancelled = false;
+    const r1 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setDragonPassFlight((prev) => {
+          if (!prev || prev.id !== id) return prev;
+          return { ...prev, arrived: true };
+        });
+      });
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(r1);
+    };
+  }, [dragonPassFlight?.id]);
+
   useEffect(() => {
     if (!exchangeFlights?.items?.length) return;
     const maxD = Math.max(0, ...exchangeFlights.items.map((i) => i.delay));
     const t = window.setTimeout(() => setExchangeFlights(null), maxD + EXCHANGE_FLIGHT_DURATION_MS + 120);
     return () => clearTimeout(t);
   }, [exchangeFlights?.id]);
+
+  useEffect(() => {
+    if (!dragonPassFlight) return;
+    const t = window.setTimeout(() => setDragonPassFlight(null), 1020);
+    return () => clearTimeout(t);
+  }, [dragonPassFlight?.id]);
 
   const exchangeRecipients = game?.exchangeRecipients ?? [];
   const cardMatches = (a, b) =>
@@ -1499,11 +1676,22 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           exchangeDraggingIndex={game.state === 'exchanging' ? exchangeDraggingIndex : null}
           onReorder={game.state === 'playing' ? handleHandReorder : undefined}
           exchangeReceiptLines={
-            game.state === 'playing' && !exchangeReceiptSummaryDismissed
+            game.state === 'playing' && !dragonPassNotice && !exchangeReceiptSummaryDismissed
               ? exchangeReceiptSummaryLines
               : null
           }
-          onExchangeReceiptDismiss={() => setExchangeReceiptSummaryDismissed(true)}
+          exchangeReceiptNotice={
+            game.state === 'playing' && dragonPassNotice && !dragonPassNoticeDismissed
+              ? dragonPassNotice.text
+              : ''
+          }
+          onExchangeReceiptDismiss={() => {
+            if (dragonPassNotice && !dragonPassNoticeDismissed) {
+              setDragonPassNoticeDismissed(true);
+              return;
+            }
+            setExchangeReceiptSummaryDismissed(true);
+          }}
         >
           {handDockChildren}
         </HandDock>
@@ -1546,6 +1734,23 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
               </div>
             ) : null
           )}
+        </div>
+      )}
+      {dragonPassFlight && (
+        <div className="exchange-flight-overlay" aria-hidden>
+          <div
+            className="exchange-flight-card-wrap dragon-pass-flight-card-wrap"
+            style={{
+              left: `${dragonPassFlight.fromX}px`,
+              top: `${dragonPassFlight.fromY}px`,
+              transform: dragonPassFlight.arrived
+                ? `translate(calc(-50% + ${dragonPassFlight.dx}px), calc(-50% + ${dragonPassFlight.dy}px)) scale(0.96)`
+                : 'translate(-50%, -50%) scale(1)',
+              transition: 'transform 900ms cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+          >
+            <CardBack size="stack" width={dragonPassFlight.w} height={dragonPassFlight.h} neutral />
+          </div>
         </div>
       )}
     </div>
