@@ -6,6 +6,9 @@ yarn.lock
 # Build outputs
 dist/
 build/
+coverage/
+backend/coverage/
+frontend/coverage/
 *.log
 
 # Environment variables (keep .env.example committed)
