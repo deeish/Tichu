@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import '../styles/drawer.css';
 import { setClientCorrelation } from '../clientErrorReport';
 
-const TABS = ['Chat', 'Players', 'Log', 'Theme'];
+const TABS = ['Chat', 'Players', 'Log', 'Theme', 'Settings'];
 
 const THEME_OPTIONS = [
   { value: 'classic', label: 'Classic' },
@@ -303,6 +303,8 @@ function Drawer({
   socket,
   tableTheme = 'velvet',
   onTableThemeChange = () => {},
+  turnAlertsEnabled = true,
+  onTurnAlertsEnabledChange = () => {},
   onBackToLobby = null,
   className = '',
   containerRef = null,
@@ -437,6 +439,31 @@ function Drawer({
                       {label}
                     </button>
                   ))}
+                </div>
+              </section>
+            </div>
+          </div>
+          <div
+            className={`drawer-tab-panel ${activeTab === 'Settings' ? 'drawer-tab-panel--active' : ''}`}
+            role="tabpanel"
+            id="drawer-panel-settings"
+            aria-labelledby="drawer-tab-settings"
+          >
+            <div className="drawer-panel-inner">
+              <section className="drawer-settings-section" aria-labelledby="turn-alerts-label">
+                <h3 id="turn-alerts-label" className="drawer-settings-heading">Turn alerts</h3>
+                <div className="drawer-setting-card">
+                  <label className="drawer-setting-toggle">
+                    <input
+                      type="checkbox"
+                      checked={turnAlertsEnabled}
+                      onChange={(e) => onTurnAlertsEnabledChange(e.target.checked)}
+                    />
+                    <span className="drawer-setting-toggle-label">Highlight when it is my turn</span>
+                  </label>
+                  <p className="drawer-setting-help">
+                    Adds a stronger header + hand glow when your turn starts.
+                  </p>
                 </div>
               </section>
             </div>

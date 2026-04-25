@@ -29,6 +29,23 @@ export function landingUpdateKindLabel(kind) {
  */
 export const LANDING_UPDATE_DAYS = [
   {
+    date: '2026-04-25',
+    items: [
+      {
+        kind: 'improvement',
+        text: 'Playing UI: the “Received” cards section is now cleaner and easier to read.',
+      },
+      {
+        kind: 'improvement',
+        text: 'Added clearer turn alerts with stronger highlight cues.',
+      },
+      {
+        kind: 'improvement',
+        text: 'Dragon pass now animates to the receiving player with a clear notice.',
+      },
+    ],
+  },
+  {
     date: '2026-04-18',
     items: [
       {

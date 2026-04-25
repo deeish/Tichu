@@ -21,6 +21,74 @@
   overflow: visible;
 }
 
+@keyframes dockTurnPulse {
+  0%, 100% {
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.15);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    box-shadow: 0 -2px 14px rgba(96, 165, 250, 0.35);
+    border-color: rgba(96, 165, 250, 0.45);
+  }
+}
+
+.hand-dock.hand-dock--turn-alert {
+  animation: dockTurnPulse 1.35s ease-in-out infinite;
+}
+
+.hand-dock.hand-dock--turn-alert-1 {
+  animation-name: dockTurnPulseLevel1;
+}
+
+.hand-dock.hand-dock--turn-alert-2 {
+  animation-name: dockTurnPulseLevel2;
+  animation-duration: 0.9s;
+}
+
+@keyframes dockTurnPulseLevel1 {
+  0%, 100% {
+    box-shadow: 0 -2px 10px rgba(245, 158, 11, 0.22);
+    border-color: rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    box-shadow: 0 -2px 18px rgba(245, 158, 11, 0.42);
+    border-color: rgba(245, 158, 11, 0.72);
+  }
+}
+
+@keyframes dockTurnPulseLevel2 {
+  0%, 100% {
+    box-shadow: 0 -2px 12px rgba(239, 68, 68, 0.28);
+    border-color: rgba(239, 68, 68, 0.5);
+  }
+  50% {
+    box-shadow: 0 -2px 22px rgba(239, 68, 68, 0.55);
+    border-color: rgba(239, 68, 68, 0.9);
+  }
+}
+
+@keyframes dockTurnButtonPulse {
+  0%, 100% {
+    box-shadow: none;
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
+  }
+}
+
+.dock-btn--turn-alert:not(:disabled) {
+  animation: dockTurnButtonPulse 1.1s ease-in-out infinite;
+}
+
+.dock-btn--turn-alert-1:not(:disabled) {
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.45);
+}
+
+.dock-btn--turn-alert-2:not(:disabled) {
+  animation-duration: 0.78s;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.6);
+}
+
 .dock-body {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -169,21 +237,90 @@
 .dock-exchange-recap-inner {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
-  line-height: 1.35;
-  color: rgba(255, 255, 255, 0.82);
+}
+
+.dock-exchange-recap-pill {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(12, 18, 36, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08);
+}
+
+.dock-exchange-recap-label {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.dock-exchange-recap-chips {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.dock-exchange-recap-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.dock-exchange-recap-chip--partner {
+  border-color: rgba(96, 165, 250, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.2);
+}
+
+.dock-exchange-recap-chip--opponent {
+  border-color: rgba(248, 113, 113, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.16);
+}
+
+.dock-exchange-recap-chip--red {
+  color: rgba(252, 165, 165, 0.98);
+  background: rgba(127, 29, 29, 0.28);
+}
+
+.dock-exchange-recap-sources {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: rgba(191, 219, 254, 0.86);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.dock-exchange-recap-label {
-  font-weight: 700;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
-  margin-right: 6px;
+.dock-exchange-recap-notice {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dock-exchange-recap-card {
@@ -227,11 +364,20 @@
 }
 
 .hand-dock.hand-dock--compact .dock-exchange-recap-label {
-  display: none;
+  font-size: 10px;
 }
 
 .hand-dock.hand-dock--compact .dock-exchange-recap-inner {
   font-size: 11px;
+}
+
+.hand-dock.hand-dock--compact .dock-exchange-recap-pill {
+  gap: 5px;
+  padding: 3px 6px;
+}
+
+.hand-dock.hand-dock--compact .dock-exchange-recap-sources {
+  display: none;
 }
 
 .dock-sort {

@@ -155,3 +155,7 @@
   filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.55));
   will-change: transform;
 }
+
+.dragon-pass-flight-card-wrap {
+  filter: drop-shadow(0 10px 24px rgba(251, 146, 60, 0.34));
+}
