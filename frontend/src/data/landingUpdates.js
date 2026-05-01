@@ -32,6 +32,10 @@ export const LANDING_UPDATE_DAYS = [
     date: '2026-05-01',
     items: [
       {
+        kind: 'improvement',
+        text: 'Increased hand dock glow intensity when it\'s your turn.',
+      },
+      {
         kind: 'bugfix',
         text: 'Fixed dragon pass notice blocking the card exchange recap in later rounds.',
       },
