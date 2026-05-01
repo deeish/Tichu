@@ -408,6 +408,10 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       setExchangeDraggingIndex(null);
       setExchangeSubmitted(false);
     }
+    if (game?.state === 'exchanging' || game?.state === 'grand-tichu') {
+      setDragonPassNotice(null);
+      setDragonPassNoticeDismissed(false);
+    }
   }, [game?.state]);
 
   // Clear manual hand ordering only on real phase transitions that swap out the hand set.
@@ -1676,7 +1680,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           exchangeDraggingIndex={game.state === 'exchanging' ? exchangeDraggingIndex : null}
           onReorder={game.state === 'playing' ? handleHandReorder : undefined}
           exchangeReceiptLines={
-            game.state === 'playing' && !dragonPassNotice && !exchangeReceiptSummaryDismissed
+            game.state === 'playing' && (!dragonPassNotice || dragonPassNoticeDismissed) && !exchangeReceiptSummaryDismissed
               ? exchangeReceiptSummaryLines
               : null
           }

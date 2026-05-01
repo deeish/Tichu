@@ -29,6 +29,15 @@ export function landingUpdateKindLabel(kind) {
  */
 export const LANDING_UPDATE_DAYS = [
   {
+    date: '2026-05-01',
+    items: [
+      {
+        kind: 'bugfix',
+        text: 'Fixed dragon pass notice blocking the card exchange recap in later rounds.',
+      },
+    ],
+  },
+  {
     date: '2026-04-25',
     items: [
       {
