@@ -337,7 +337,18 @@ function handlePlayerWin(game, playerId) {
       
       game.roundEnded = true;
       game.state = 'round-ended';
-      updatePlayerStatsForRoundEnd(game);
+      updatePlayerStatsForRoundEnd(game, { doubleVictory: true });
+      // Mirror the normal-path Tichu/Grand stats update (lines below are unreachable in DV path)
+      for (const p of game.players) {
+        const pid = p.id != null ? String(p.id) : null;
+        const gotFirst = firstPlaceIdDouble !== null && pid !== null && firstPlaceIdDouble === pid;
+        if (tichuDec[p.id] && game.playerStats?.[pid]) {
+          game.playerStats[pid].points = (game.playerStats[pid].points || 0) + (gotFirst ? 100 : -100);
+        }
+        if (grandTichuDec[p.id] && game.playerStats?.[pid]) {
+          game.playerStats[pid].points = (game.playerStats[pid].points || 0) + (gotFirst ? 200 : -200);
+        }
+      }
       if (game.scores) {
         game.scores.team1 = (game.scores.team1 || 0) + game.roundScores.team1;
         game.scores.team2 = (game.scores.team2 || 0) + game.roundScores.team2;
@@ -469,12 +480,21 @@ function handlePlayerWin(game, playerId) {
   // Round ended - finalize scoring
   // Finish order: playersOut[0] = 1st, playersOut[1] = 2nd, playersOut[2] = 3rd, playersOut[3] = 4th (last)
 
-  function updatePlayerStatsForRoundEnd(game) {
+  function updatePlayerStatsForRoundEnd(game, opts = {}) {
     if (!game.playerStats || !game.playersOut || game.playersOut.length !== 4) return;
+    const doubleVictory = !!opts.doubleVictory;
     for (const player of game.players) {
-      const stack = getStack(game, player.id);
-      if (stack && game.playerStats[player.id]) {
-        game.playerStats[player.id].points = (game.playerStats[player.id].points || 0) + (stack.points || 0);
+      if (game.playerStats[player.id]) {
+        let contribution;
+        if (doubleVictory) {
+          // mirrors buildRoundLogEntry: 100 per winning player (placements 1-2), 0 for losers
+          const placement = game.playersOut.findIndex(id => String(id) === String(player.id)) + 1;
+          contribution = placement <= 2 ? 100 : 0;
+        } else {
+          const stack = getStack(game, player.id);
+          contribution = stack ? (stack.points || 0) : 0;
+        }
+        game.playerStats[player.id].points = (game.playerStats[player.id].points || 0) + contribution;
       }
     }
     const firstId = game.playersOut[0];

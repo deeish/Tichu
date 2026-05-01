@@ -35,6 +35,10 @@ export const LANDING_UPDATE_DAYS = [
         kind: 'bugfix',
         text: 'Fixed dragon pass notice blocking the card exchange recap in later rounds.',
       },
+      {
+        kind: 'bugfix',
+        text: 'Fixed "Points (team)" stat in end-game stats being wrong after double victory rounds — feedback welcome to confirm.',
+      },
     ],
   },
   {

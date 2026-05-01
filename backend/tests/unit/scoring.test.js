@@ -164,6 +164,56 @@ describe('Scoring Logic', () => {
     expect(mockGame.roundEnded).toBe(true);
   });
 
+  describe('double victory playerStats', () => {
+    test('winning players each get 100 pts, losers get 0 — matches roundScores invariant', () => {
+      mockGame.playersOut = ['p1'];
+      mockGame.playerStacks.p1.points = 50;
+      mockGame.playerStacks.p2.points = 30;
+      mockGame.playerStacks.p3.points = 20;
+      mockGame.playerStacks.p4.points = 10;
+      handlePlayerWin(mockGame, 'p2');
+
+      expect(mockGame.playerStats.p1.points).toBe(100);
+      expect(mockGame.playerStats.p2.points).toBe(100);
+      expect(mockGame.playerStats.p3.points).toBe(0);
+      expect(mockGame.playerStats.p4.points).toBe(0);
+
+      // Invariant: team stats sum equals team round score
+      expect(mockGame.playerStats.p1.points + mockGame.playerStats.p2.points).toBe(mockGame.roundScores.team1);
+      expect(mockGame.playerStats.p3.points + mockGame.playerStats.p4.points).toBe(mockGame.roundScores.team2);
+    });
+
+    test('Tichu win by first place adds +100 to that player stats in DV', () => {
+      mockGame.playersOut = ['p1'];
+      mockGame.playerStacks.p1.points = 50;
+      mockGame.playerStacks.p2.points = 30;
+      mockGame.playerStacks.p3.points = 20;
+      mockGame.playerStacks.p4.points = 10;
+      mockGame.tichuDeclarations = { p1: true };
+      handlePlayerWin(mockGame, 'p2');
+
+      // p1 gets 100 (DV) + 100 (Tichu win) = 200
+      expect(mockGame.playerStats.p1.points).toBe(200);
+      // roundScores.team1 = 200 + 100 Tichu = 300
+      expect(mockGame.playerStats.p1.points + mockGame.playerStats.p2.points).toBe(mockGame.roundScores.team1);
+    });
+
+    test('failed Tichu on losing team subtracts from that player stats in DV', () => {
+      mockGame.playersOut = ['p1'];
+      mockGame.playerStacks.p1.points = 50;
+      mockGame.playerStacks.p2.points = 30;
+      mockGame.playerStacks.p3.points = 20;
+      mockGame.playerStacks.p4.points = 10;
+      mockGame.tichuDeclarations = { p3: true }; // p3 declared but finished 3rd (not first)
+      handlePlayerWin(mockGame, 'p2');
+
+      // p3 gets 0 (DV loser) - 100 (failed Tichu) = -100
+      expect(mockGame.playerStats.p3.points).toBe(-100);
+      // team2 roundScores = 0 - 100 = -100; stats sum must match
+      expect(mockGame.playerStats.p3.points + mockGame.playerStats.p4.points).toBe(mockGame.roundScores.team2);
+    });
+  });
+
   describe('playerStats: points (team), first place, last place', () => {
     function triggerTailenderRoundEnd(game) {
       game.playerStacks.p1.points = 25;
