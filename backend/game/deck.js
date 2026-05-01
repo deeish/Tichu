@@ -123,28 +123,9 @@ function dealInitialCards(deck, playersCount = 4) {
   };
 }
 
-/**
- * Deals cards to players (legacy function, kept for compatibility)
- * @param {Array} deck - The shuffled deck
- * @param {number} playersCount - Number of players (should be 4)
- * @returns {Object} { hands: Array, remainingDeck: Array }
- */
-function dealCards(deck, playersCount = 4) {
-  const result = dealInitialCards(deck, playersCount);
-  // Combine initial and remaining cards for full hands
-  const hands = result.initialHands.map((initial, index) => 
-    [...initial, ...result.remainingCards[index]]
-  );
-  return {
-    hands,
-    remainingDeck: result.remainingDeck
-  };
-}
-
 module.exports = {
   createTichuDeck,
   shuffleDeck,
-  dealCards,
   dealInitialCards,
   getCardValue,
   getCardPoints,

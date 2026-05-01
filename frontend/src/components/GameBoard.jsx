@@ -1175,7 +1175,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     !isTrickEmpty &&
     !hasDragonPendingSelection &&
     !hasWishedCard &&
-    !mustPlayAfterTichu;
+    !mustPlayAfterTichu &&
+    !game?.hasPlayableMove;
 
   const autoPassTurnSig = `${game?.state ?? ''}:${game?.currentPlayerIndex ?? ''}:${game?.leadPlayer ?? ''}:${game?.dogPriorityPlayer ?? ''}:${(game?.currentTrick?.length ?? 0)}:${mahJongWishMustPlay ? mahJongWishRank : 'none'}`;
 

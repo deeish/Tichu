@@ -32,3 +32,6 @@ Thumbs.db
 # Playwright (frontend)
 frontend/playwright-report/
 frontend/test-results/
+
+# Claude Code
+CLAUDE.md
