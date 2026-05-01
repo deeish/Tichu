@@ -117,6 +117,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   const [optimisticTichu, setOptimisticTichu] = useState(null);
   const [optimisticGrandTichu, setOptimisticGrandTichu] = useState(null);
   const [grandTichuSubmitting, setGrandTichuSubmitting] = useState(false);
+  const [showTichuWarning, setShowTichuWarning] = useState(null); // null | 'teammate' | 'finished'
 
   // UI toggle for upcoming auto-pass feature.
   // Gameplay auto-pass uses a conservative server-aligned eligibility check (see effect below).
@@ -166,6 +167,19 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     const current = game.turnOrder[game.currentPlayerIndex];
     return current?.id === playerId;
   }, [game?.turnOrder, game?.currentPlayerIndex, playerId]);
+
+  const teammateCalledTichu = useMemo(() => {
+    if (!game?.players) return false;
+    const myTeam = game.players.find(p => p.id === playerId)?.team;
+    const teammate = game.players.find(p => p.team === myTeam && p.id !== playerId);
+    return game.tichuDeclarations?.[teammate?.id] === true || game.grandTichuDeclarations?.[teammate?.id] === true;
+  }, [game?.players, game?.tichuDeclarations, game?.grandTichuDeclarations, playerId]);
+
+  const someoneElseFinished = useMemo(
+    () => Array.isArray(game?.playersOut) && game.playersOut.some(id => id !== playerId),
+    [game?.playersOut, playerId]
+  );
+
   const turnAlertActive = game?.state === 'playing' && isMyTurn && turnAlertsEnabled;
 
   const noteTurnInteraction = useCallback(() => {
@@ -1323,6 +1337,10 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
             try {
               // Emit based on server truth to avoid stale-optimistic actions.
               const serverDeclared = game?.tichuDeclarations?.[playerId] === true;
+              if (!serverDeclared) {
+                if (teammateCalledTichu) { setShowTichuWarning('teammate'); return; }
+                if (someoneElseFinished) { setShowTichuWarning('finished'); return; }
+              }
               setOptimisticTichu(!serverDeclared);
               if (serverDeclared) {
                 const actionId = nextActionId()
@@ -1360,6 +1378,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     playerId,
     commitGrandTichu,
     socket,
+    teammateCalledTichu,
+    someoneElseFinished,
   ]);
 
   return (
@@ -1648,6 +1668,38 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
                   Give to {opp.name}
                 </button>
               ))}
+          </div>
+        </div>
+      )}
+
+      {showTichuWarning && (
+        <div className="prompt-strip">
+          <p>
+            {showTichuWarning === 'teammate'
+              ? 'Your teammate already called Tichu, calling it will waste the bonus.'
+              : 'Someone already finished their hand — calling Tichu now will lose you points.'}
+          </p>
+          <div className="prompt-actions">
+            <button
+              type="button"
+              className="dock-btn dock-btn-secondary"
+              onClick={() => {
+                setShowTichuWarning(null);
+                setOptimisticTichu(true);
+                const actionId = nextActionId();
+                setClientCorrelation({ requestId: actionId, actionId });
+                socket.emit('declare-tichu', { requestId: actionId, actionId });
+              }}
+            >
+              Call Tichu anyway
+            </button>
+            <button
+              type="button"
+              className="dock-btn dock-btn-primary"
+              onClick={() => setShowTichuWarning(null)}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

@@ -33,6 +33,10 @@ export const LANDING_UPDATE_DAYS = [
     items: [
       {
         kind: 'improvement',
+        text: 'Added warnings when calling Tichu after your teammate already called it, or after someone has finished their hand.',
+      },
+      {
+        kind: 'improvement',
         text: 'Increased hand dock glow intensity when it\'s your turn.',
       },
       {
