@@ -89,3 +89,14 @@
 .game-info--hud .hud-score-chips {
   display: none;
 }
+
+@media (max-width: 480px) {
+  .game-hud {
+    padding: max(8px, env(safe-area-inset-top)) var(--s16) 8px;
+    min-height: auto;
+  }
+  .hud-inner {
+    min-height: 40px;
+    gap: var(--s12);
+  }
+}

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import Card from './Card';
 import { getHandRailStep, getDockCardSize } from '../styles/layoutTokens';
 import { cardKey } from '../utils/cardUtils';
+import { isTouchDevice } from '../utils/touchUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
 import { reportClientError } from '../clientErrorReport';
 import '../styles/handDock.css';
@@ -36,6 +37,7 @@ function HandDock({
   onCardDragStart,
   onCardDragEnd,
   exchangeDraggingIndex = null,
+  exchangePendingCard = null,
   onReorder,
   onAutoPassToggle = () => {},
   autoPassEnabled = false,
@@ -190,7 +192,7 @@ function HandDock({
     };
   }, []);
 
-  const DRAG_THRESHOLD_PX = 8;
+  const DRAG_THRESHOLD_PX = isTouchDevice() ? 18 : 8;
 
   const handleReorderPointerDown = useCallback(
     (e, card, i) => {
@@ -401,10 +403,11 @@ function HandDock({
                 const key = `card-${i}-${cardKey(card)}`;
                 const isDraggingThis = reorderDrag && i === reorderDrag.currentDropIndex;
                 const isExchangeDraggingThis = exchangeDraggingIndex === i;
+                const isExchangePending = exchangePendingCard != null && cardKey(card) === cardKey(exchangePendingCard);
                 return (
                   <div
                     key={key}
-                    className={`dock-card-wrap ${isSelected ? 'selected' : ''} ${!playable ? 'disabled' : ''} ${isDraggingThis ? 'dock-card-wrap--reorder-dragging' : ''} ${isExchangeDraggingThis ? 'dock-card-wrap--exchange-dragging' : ''}`}
+                    className={`dock-card-wrap ${isSelected ? 'selected' : ''} ${!playable ? 'disabled' : ''} ${isDraggingThis ? 'dock-card-wrap--reorder-dragging' : ''} ${isExchangeDraggingThis ? 'dock-card-wrap--exchange-dragging' : ''} ${isExchangePending ? 'dock-card-wrap--exchange-pending' : ''}`}
                     style={{
                       left: `${cardRowLeftOffset}px`,
                       transform: `translateX(${i * step}px)${isSelected ? ' translateY(-12px)' : ''}`,

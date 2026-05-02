@@ -44,7 +44,9 @@
   grid-template-columns: 1fr minmax(0, var(--sidebar-w));
   grid-template-rows: 1fr;
   height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
   background: var(--layout-bg, #1a1a2e);
   color: #fff;
@@ -99,4 +101,25 @@
   padding: 0 var(--s16);
   padding-bottom: 0;
   min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .game-layout .hand-dock-wrapper {
+    min-height: 130px;
+    padding: 0 var(--s8);
+  }
+}
+
+@media (max-height: 480px) and (orientation: landscape) {
+  .game-layout .hand-dock-wrapper {
+    min-height: 100px;
+    height: 100px;
+  }
+  .game-hud {
+    padding: 4px var(--s16);
+    min-height: 36px;
+  }
+  .hud-inner {
+    min-height: 32px;
+  }
 }

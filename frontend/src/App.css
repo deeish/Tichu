@@ -30,6 +30,14 @@
   pointer-events: none;
 }
 
+@media (max-width: 480px) {
+  .toast-stack {
+    right: 12px;
+    bottom: calc(140px + env(safe-area-inset-bottom));
+    width: min(80vw, 280px);
+  }
+}
+
 .toast {
   display: flex;
   align-items: flex-start;

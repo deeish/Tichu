@@ -669,3 +669,16 @@
   --seat-bg: linear-gradient(145deg, rgba(28, 28, 32, 0.9) 0%, rgba(18, 18, 22, 0.94) 100%);
 }
 
+@media (pointer: coarse) {
+  .seat-panel {
+    backdrop-filter: none;
+  }
+  .seat-panel.seat--exchange-drop {
+    cursor: pointer;
+  }
+  .seat-panel.seat--exchange-touch-target {
+    border-color: rgba(96, 165, 250, 0.55);
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25), 0 2px 12px rgba(0, 0, 0, 0.25);
+  }
+}
+
