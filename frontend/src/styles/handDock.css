@@ -724,7 +724,14 @@
 
 @media (max-width: 480px) {
   .hand-dock {
-    min-height: 130px;
+    min-height: 160px;
+  }
+  .dock-rail {
+    padding: 12px 0 6px;
+    min-height: 68px;
+  }
+  .dock-body {
+    gap: 4px;
   }
   .dock-actions-box {
     width: 100%;
@@ -732,7 +739,7 @@
     border-left: none;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     padding-left: 0;
-    padding-top: 6px;
+    padding-top: 4px;
   }
   .dock-actions {
     flex-direction: row;
@@ -741,13 +748,26 @@
     gap: 6px;
   }
   .dock-btn {
-    height: 44px;
+    height: 36px;
     min-width: 0;
-    font-size: 13px;
+    font-size: 12px;
+  }
+  .dock-btn-secondary {
+    height: 32px;
+    font-size: 11px;
+  }
+  .dock-hint {
+    font-size: 11px;
+    padding: 2px 0 4px;
+    min-height: 14px;
   }
   .dock-header {
     padding: 4px var(--s8);
-    min-height: 34px;
+    min-height: 30px;
+  }
+  .dock-sort button {
+    padding: 3px 6px;
+    font-size: 10px;
   }
 }
 

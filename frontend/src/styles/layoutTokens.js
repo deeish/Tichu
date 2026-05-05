@@ -52,12 +52,12 @@ export function getSidebarWidth(viewportW) {
   return Math.max(280, Math.min(360, dynamic));
 }
 
-// Dock height: clamp(180px, 22vh, 240px); compressed on narrow mobile
+// Dock height: mobile min raised to fit stacked button layout (cards + actions column)
 export function getDockHeight() {
   if (typeof window === 'undefined') return 200;
   const vh = window.innerHeight * 0.22;
-  const minH = window.innerWidth < 480 ? 130 : 180;
-  const maxH = window.innerWidth < 480 ? 180 : 240;
+  const minH = window.innerWidth < 480 ? 210 : 180;
+  const maxH = window.innerWidth < 480 ? 260 : 240;
   return Math.min(maxH, Math.max(minH, vh));
 }
 
@@ -176,6 +176,7 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
 
 // Card dimensions by breakpoint (for play mat / general use)
 export function getCardSize(containerWidth) {
+  if (containerWidth < 480) return { w: 46, h: 66 };
   if (containerWidth <= 1280) return { w: 64, h: 92 };
   if (containerWidth >= 1600) return { w: 80, h: 116 };
   return { w: 72, h: 104 };
