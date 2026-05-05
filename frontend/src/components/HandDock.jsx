@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Card from './Card';
-import { getHandRailStep, getDockCardSize, getVisibleHandCap } from '../styles/layoutTokens';
+import { getHandRailStep, getDockCardSize } from '../styles/layoutTokens';
 import { cardKey } from '../utils/cardUtils';
 import { isTouchDevice } from '../utils/touchUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
@@ -94,9 +94,7 @@ function HandDock({
   }, []);
 
   const baseCardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
-  const cap = getVisibleHandCap(containerWidth);
-  const visibleCount = Math.min(Math.max(0, cards.length), cap);
-  const overflowCount = Math.max(0, cards.length - visibleCount);
+  const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
   const cardSize = useMemo(() => {
     if (visibleCount <= 0) return baseCardSize;
     if (!Number.isFinite(railW) || railW <= 0) return baseCardSize;
@@ -468,11 +466,7 @@ function HandDock({
                 );
               })}
             </div>
-            {overflowCount > 0 && (
-              <div className="dock-overflow">
-                <span className="dock-overflow-badge">+{overflowCount}</span>
-              </div>
-            )}
+
           </div>
           {showDockActions && (
             <div className={`dock-hint ${hintError ? 'error' : ''}`}>
