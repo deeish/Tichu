@@ -453,6 +453,7 @@ function HandDock({
                       playable={playable}
                       width={cardSize.w}
                       height={cardSize.h}
+                      compact={true}
                       draggable={isExchangeDrag}
                       onDragStart={isExchangeDrag && onCardDragStart ? (e) => onCardDragStart(e, card, i) : undefined}
                       onDragEnd={isExchangeDrag && onCardDragEnd ? onCardDragEnd : undefined}
@@ -528,7 +529,7 @@ function HandDock({
             }}
             aria-hidden
           >
-            <Card card={reorderDrag.card} width={cardSize.w} height={cardSize.h} draggable={false} />
+            <Card card={reorderDrag.card} width={cardSize.w} height={cardSize.h} compact={true} draggable={false} />
           </div>,
           document.body
         )}

@@ -93,3 +93,29 @@
   color: #666;
   margin-left: 4px;
 }
+
+@media (max-width: 640px) {
+  .trick {
+    padding: 8px;
+    margin: 4px 0;
+  }
+  .trick h3 {
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+  }
+  .trick-plays {
+    gap: 6px;
+  }
+  .trick-play {
+    gap: 4px;
+    padding: 4px 6px;
+  }
+  .play-player {
+    min-width: 0;
+    max-width: 60px;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}

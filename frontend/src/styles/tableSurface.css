@@ -553,6 +553,50 @@
   line-height: 1.3;
 }
 
+@media (max-width: 480px) {
+  .seat-panel {
+    padding: 3px 8px;
+    gap: 6px;
+  }
+  .seat-avatar {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    font-size: 8px;
+  }
+  .seat-name {
+    font-size: 11px;
+  }
+  .seat-meta {
+    font-size: 9px;
+    gap: 3px;
+  }
+  .seat-team-pill {
+    font-size: 8px;
+    padding: 1px 3px;
+  }
+  .play-mat {
+    padding: 4px;
+  }
+  .play-mat-zone {
+    min-height: 80px;
+    padding: 4px;
+  }
+  .play-mat-zone .trick {
+    padding: 6px;
+  }
+  .play-mat-zone .trick h3 {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+  .play-mat-zone .play-player {
+    font-size: 11px;
+  }
+  .play-mat-zone .trick-play {
+    padding: 4px 6px;
+  }
+}
+
 /* Prompt strip */
 .prompt-strip {
   position: fixed;

@@ -769,6 +769,9 @@
     padding: 3px 6px;
     font-size: 10px;
   }
+  .dock-rail .card {
+    margin: 0 1px;
+  }
 }
 
 @media (pointer: coarse) {
