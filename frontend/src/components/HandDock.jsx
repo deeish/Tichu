@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Card from './Card';
-import { getHandRailStep, getDockCardSize } from '../styles/layoutTokens';
+import { getHandRailStep, getDockCardSize, getVisibleHandCap } from '../styles/layoutTokens';
 import { cardKey } from '../utils/cardUtils';
 import { isTouchDevice } from '../utils/touchUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
@@ -11,8 +11,8 @@ import '../styles/handDock.css';
 /** Max cards shown in hand; Tichu max hand size is 14. */
 const MAX_HAND_DISPLAY = 14;
 const MIN_RAIL_STEP = 26;
-const MIN_CARD_W = 36;
-const MIN_CARD_H = 52;
+const MIN_CARD_W = 28;
+const MIN_CARD_H = 38;
 const RAIL_SAFETY_PX = 8;
 
 function HandDock({
@@ -94,7 +94,9 @@ function HandDock({
   }, []);
 
   const baseCardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
-  const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
+  const cap = getVisibleHandCap(containerWidth);
+  const visibleCount = Math.min(Math.max(0, cards.length), cap);
+  const overflowCount = Math.max(0, cards.length - visibleCount);
   const cardSize = useMemo(() => {
     if (visibleCount <= 0) return baseCardSize;
     if (!Number.isFinite(railW) || railW <= 0) return baseCardSize;
@@ -382,7 +384,11 @@ function HandDock({
               onClick={() => onSortModeChange(mode)}
               title={mode === 'none' ? 'Original order' : mode === 'asc' ? 'Sort by rank (low to high)' : 'Sort by rank (high to low)'}
             >
-              {mode === 'none' ? 'None' : mode === 'asc' ? 'Low→High' : 'High→Low'}
+              {mode === 'none'
+                ? (containerWidth < 480 ? '—' : 'None')
+                : mode === 'asc'
+                  ? (containerWidth < 480 ? '↑' : 'Low→High')
+                  : (containerWidth < 480 ? '↓' : 'High→Low')}
             </button>
           ))}
         </div>
@@ -462,6 +468,11 @@ function HandDock({
                 );
               })}
             </div>
+            {overflowCount > 0 && (
+              <div className="dock-overflow">
+                <span className="dock-overflow-badge">+{overflowCount}</span>
+              </div>
+            )}
           </div>
           {showDockActions && (
             <div className={`dock-hint ${hintError ? 'error' : ''}`}>
