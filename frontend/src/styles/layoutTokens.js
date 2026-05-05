@@ -176,7 +176,7 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
 
 // Card dimensions by breakpoint (for play mat / general use)
 export function getCardSize(containerWidth) {
-  if (containerWidth < 480) return { w: 46, h: 66 };
+  if (containerWidth < 480) return { w: 38, h: 54 };
   if (containerWidth <= 1280) return { w: 64, h: 92 };
   if (containerWidth >= 1600) return { w: 80, h: 116 };
   return { w: 72, h: 104 };

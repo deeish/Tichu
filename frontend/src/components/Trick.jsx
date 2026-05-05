@@ -88,7 +88,7 @@ function Trick({ trick, players, containerWidth = 1440 }) {
             <div className="play-player">{getPlayerName(play.playerId)}</div>
             <div className="play-cards">
               {play.cards.map((card, cardIndex) => (
-                <Card key={cardIndex} card={card} width={cardSize.w} height={cardSize.h} />
+                <Card key={cardIndex} card={card} width={cardSize.w} height={cardSize.h} compact={true} />
               ))}
               {play._omitted > 0 && <span className="trick-play-omitted">+{play._omitted}</span>}
             </div>
