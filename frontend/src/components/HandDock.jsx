@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Card from './Card';
-import { getHandRailStep, getDockCardSize, getCardSize, isHandRailScrollable } from '../styles/layoutTokens';
+import { getHandRailStep, getDockCardSize, isHandRailScrollable } from '../styles/layoutTokens';
 import { cardKey } from '../utils/cardUtils';
 import { isTouchDevice } from '../utils/touchUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
@@ -97,8 +97,7 @@ function HandDock({
   const baseCardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
   const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
   const cardSize = useMemo(() => {
-    // Scrollable mode: use full card size (not dock-scaled) so cards are more readable.
-    if (scrollable) return getCardSize(containerWidth);
+    if (scrollable) return baseCardSize;
     if (visibleCount <= 0) return baseCardSize;
     if (!Number.isFinite(railW) || railW <= 0) return baseCardSize;
     const baseStep = getHandRailStep(railW, baseCardSize.w, visibleCount);
@@ -110,7 +109,7 @@ function HandDock({
       w: Math.max(MIN_CARD_W, Math.floor(baseCardSize.w * fitScale)),
       h: Math.max(MIN_CARD_H, Math.floor(baseCardSize.h * fitScale)),
     };
-  }, [scrollable, baseCardSize, railW, visibleCount, containerWidth]);
+  }, [scrollable, baseCardSize, railW, visibleCount]);
   const step = useMemo(() => {
     if (visibleCount <= 1) return 0;
     if (!Number.isFinite(railW) || railW <= 0) return MIN_RAIL_STEP;
