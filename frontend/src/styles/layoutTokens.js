@@ -232,7 +232,7 @@ export const HAND_RAIL_STEP = 65;
 
 // Two-row mode: on narrow mobile viewports show cards in two rows of 7 so all fit without scrolling.
 export function isHandTwoRow(viewportW, cardCount) {
-  return Number.isFinite(viewportW) && viewportW < 640 && cardCount > 7;
+  return Number.isFinite(viewportW) && viewportW < 640 && cardCount > 8;
 }
 
 export function getHandRailStep(railW, cardW, visibleCount) {

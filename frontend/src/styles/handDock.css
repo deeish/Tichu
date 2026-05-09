@@ -735,6 +735,9 @@
     padding: 12px 0 6px;
     min-height: 68px;
   }
+  .dock-rail--two-row {
+    min-height: 120px;
+  }
   .dock-body {
     gap: 4px;
   }

@@ -49,6 +49,8 @@ function HandDock({
   onExchangeReceiptDismiss,
 }) {
   const cards = Array.isArray(cardsProp) ? cardsProp.slice(0, MAX_HAND_DISPLAY) : [];
+  const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
+  const twoRow = isHandTwoRow(containerWidth, visibleCount);
   const railRef = useRef(null);
   const lastRailWRef = useRef(0);
   const [railW, setRailW] = useState(0);
@@ -95,8 +97,6 @@ function HandDock({
 
   const ROW_GAP = 6;
   const baseCardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
-  const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
-  const twoRow = isHandTwoRow(containerWidth, visibleCount);
   const rowCount = twoRow ? Math.ceil(visibleCount / 2) : visibleCount;
   const cardSize = useMemo(() => {
     if (visibleCount <= 0) return baseCardSize;
