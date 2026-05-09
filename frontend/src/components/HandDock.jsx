@@ -403,9 +403,9 @@ function HandDock({
           </div>
           <div className={`dock-rail${twoRow ? ' dock-rail--two-row' : ''}`} ref={railRef}>
             <div className="dock-rail-inner">
-              {/* Row 1 (bottom row, or only row in single-row mode) */}
+              {/* Row 1 (top row when two-row, or only row in single-row mode) */}
               {visibleCards.slice(0, rowCount).map((card, i) => {
-                if (card == null) return <div key={`card-r0-placeholder-${i}`} className="dock-card-wrap" style={{ left: `${cardRowLeftOffset}px`, transform: `translateX(${i * step}px)`, width: cardSize.w, height: cardSize.h }} aria-hidden="true" />;
+                if (card == null) return <div key={`card-r0-placeholder-${i}`} className="dock-card-wrap" style={{ left: `${cardRowLeftOffset}px`, bottom: twoRow ? `${cardSize.h + ROW_GAP}px` : undefined, transform: `translateX(${i * step}px)`, width: cardSize.w, height: cardSize.h }} aria-hidden="true" />;
                 const isSelected = isCardSelected(card);
                 const key = `card-r0-${i}-${cardKey(card)}`;
                 const isDraggingThis = reorderDrag && i === reorderDrag.currentDropIndex;
@@ -417,6 +417,7 @@ function HandDock({
                     className={`dock-card-wrap ${isSelected ? 'selected' : ''} ${!playable ? 'disabled' : ''} ${isDraggingThis ? 'dock-card-wrap--reorder-dragging' : ''} ${isExchangeDraggingThis ? 'dock-card-wrap--exchange-dragging' : ''} ${isExchangePending ? 'dock-card-wrap--exchange-pending' : ''}`}
                     style={{
                       left: `${cardRowLeftOffset}px`,
+                      ...(twoRow ? { bottom: `${cardSize.h + ROW_GAP}px` } : {}),
                       transform: `translateX(${i * step}px)${isSelected ? ' translateY(-12px)' : ''}`,
                       ...(isReorderDrag ? { touchAction: 'none' } : {}),
                     }}
@@ -468,10 +469,10 @@ function HandDock({
                   </div>
                 );
               })}
-              {/* Row 2 (top row, two-row mode only) — same x layout, positioned above row 1 */}
+              {/* Row 2 (bottom row, two-row mode only) — same x layout, sits at bottom */}
               {twoRow && visibleCards.slice(rowCount).map((card, i) => {
                 const absIdx = rowCount + i;
-                if (card == null) return <div key={`card-r1-placeholder-${i}`} className="dock-card-wrap" style={{ left: `${cardRowLeftOffset}px`, bottom: `${cardSize.h + ROW_GAP}px`, transform: `translateX(${i * step}px)`, width: cardSize.w, height: cardSize.h }} aria-hidden="true" />;
+                if (card == null) return <div key={`card-r1-placeholder-${i}`} className="dock-card-wrap" style={{ left: `${cardRowLeftOffset}px`, transform: `translateX(${i * step}px)`, width: cardSize.w, height: cardSize.h }} aria-hidden="true" />;
                 const isSelected = isCardSelected(card);
                 const key = `card-r1-${i}-${cardKey(card)}`;
                 const isExchangeDraggingThis = exchangeDraggingIndex === absIdx;
@@ -482,7 +483,6 @@ function HandDock({
                     className={`dock-card-wrap ${isSelected ? 'selected' : ''} ${!playable ? 'disabled' : ''} ${isExchangeDraggingThis ? 'dock-card-wrap--exchange-dragging' : ''} ${isExchangePending ? 'dock-card-wrap--exchange-pending' : ''}`}
                     style={{
                       left: `${cardRowLeftOffset}px`,
-                      bottom: `${cardSize.h + ROW_GAP}px`,
                       transform: `translateX(${i * step}px)${isSelected ? ' translateY(-12px)' : ''}`,
                     }}
                   >
