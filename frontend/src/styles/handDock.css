@@ -729,7 +729,7 @@
 
 @media (max-width: 480px) {
   .hand-dock {
-    min-height: 200px;
+    min-height: 160px;
   }
   .dock-rail {
     padding: 12px 0 6px;
@@ -755,6 +755,7 @@
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     padding-left: 0;
     padding-top: 4px;
+    padding-bottom: 10px;
   }
   .dock-actions {
     flex-direction: row;
