@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Card from './Card';
-import { getHandRailStep, getDockCardSize, isHandRailScrollable } from '../styles/layoutTokens';
+import { getHandRailStep, getDockCardSize, isHandTwoRow } from '../styles/layoutTokens';
 import { cardKey } from '../utils/cardUtils';
 import { isTouchDevice } from '../utils/touchUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
@@ -69,7 +69,7 @@ function HandDock({
   cardsRef.current = cards;
 
   const isExchangeDrag = draggable && onCardDragStart;
-  const isReorderDrag = onReorder && !draggable && !scrollable;
+  const isReorderDrag = onReorder && !draggable && !twoRow;
 
   useEffect(() => {
     const el = railRef.current;
@@ -93,15 +93,17 @@ function HandDock({
     };
   }, []);
 
-  const scrollable = isHandRailScrollable(containerWidth);
+  const TWO_ROW_SIZE = 7;
+  const ROW_GAP = 6;
   const baseCardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
   const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
+  const twoRow = isHandTwoRow(containerWidth, visibleCount);
+  const rowCount = twoRow ? Math.min(TWO_ROW_SIZE, visibleCount) : visibleCount;
   const cardSize = useMemo(() => {
-    if (scrollable) return baseCardSize;
     if (visibleCount <= 0) return baseCardSize;
     if (!Number.isFinite(railW) || railW <= 0) return baseCardSize;
-    const baseStep = getHandRailStep(railW, baseCardSize.w, visibleCount);
-    const baseTotal = baseCardSize.w + (visibleCount - 1) * baseStep;
+    const baseStep = getHandRailStep(railW, baseCardSize.w, rowCount);
+    const baseTotal = baseCardSize.w + (rowCount - 1) * baseStep;
     const maxAllowed = Math.max(0, railW - RAIL_SAFETY_PX);
     if (baseTotal <= maxAllowed) return baseCardSize;
     const fitScale = baseTotal > 0 ? maxAllowed / baseTotal : 1;
@@ -109,21 +111,19 @@ function HandDock({
       w: Math.max(MIN_CARD_W, Math.floor(baseCardSize.w * fitScale)),
       h: Math.max(MIN_CARD_H, Math.floor(baseCardSize.h * fitScale)),
     };
-  }, [scrollable, baseCardSize, railW, visibleCount]);
+  }, [baseCardSize, railW, rowCount, visibleCount]);
   const step = useMemo(() => {
-    if (visibleCount <= 1) return 0;
+    if (rowCount <= 1) return 0;
     if (!Number.isFinite(railW) || railW <= 0) return MIN_RAIL_STEP;
-    const preferred = getHandRailStep(railW, cardSize.w, visibleCount, scrollable);
-    if (scrollable) return preferred;
-    const fitStep = Math.floor((railW - cardSize.w - RAIL_SAFETY_PX) / (visibleCount - 1));
+    const preferred = getHandRailStep(railW, cardSize.w, rowCount);
+    const fitStep = Math.floor((railW - cardSize.w - RAIL_SAFETY_PX) / (rowCount - 1));
     return Math.max(0, Math.min(preferred, fitStep));
-  }, [scrollable, railW, cardSize.w, visibleCount]);
-  const totalCardRowWidth = visibleCount > 0 ? (visibleCount - 1) * step + cardSize.w : 0;
+  }, [railW, cardSize.w, rowCount]);
+  const totalCardRowWidth = rowCount > 0 ? (rowCount - 1) * step + cardSize.w : 0;
   /* Card has border + margin + box-shadow; reserve space so the last card isn't clipped by overflow */
   const cardRowExtraRight = railW > 0 && railW < 760 ? 8 : 24;
-  const cardRowLeftOffset = scrollable
-    ? 8
-    : railW > 0 && totalCardRowWidth > 0
+  const cardRowLeftOffset =
+    railW > 0 && totalCardRowWidth > 0
       ? Math.max(0, (railW - totalCardRowWidth - cardRowExtraRight) / 2)
       : 0;
 
@@ -401,17 +401,13 @@ function HandDock({
           <div className="dock-won" aria-hidden="true">
             {/* Placeholder: won cards from round will go here */}
           </div>
-          <div className={`dock-rail${scrollable ? ' dock-rail--scrollable' : ''}`} ref={railRef}>
-            <div
-              className="dock-rail-inner"
-              style={scrollable && totalCardRowWidth > 0 ? { width: totalCardRowWidth + cardRowExtraRight + cardRowLeftOffset } : {}}
-            >
-              {visibleCards.map((card, i) => {
-                if (card == null) return <div key={`card-placeholder-${i}`} className="dock-card-wrap" style={{ left: `${cardRowLeftOffset}px`, transform: `translateX(${i * step}px)`, width: cardSize.w, height: cardSize.h }} aria-hidden="true" />;
+          <div className={`dock-rail${twoRow ? ' dock-rail--two-row' : ''}`} ref={railRef}>
+            <div className="dock-rail-inner">
+              {/* Row 1 (bottom row, or only row in single-row mode) */}
+              {visibleCards.slice(0, rowCount).map((card, i) => {
+                if (card == null) return <div key={`card-r0-placeholder-${i}`} className="dock-card-wrap" style={{ left: `${cardRowLeftOffset}px`, transform: `translateX(${i * step}px)`, width: cardSize.w, height: cardSize.h }} aria-hidden="true" />;
                 const isSelected = isCardSelected(card);
-                // Use index in key so duplicate cards (e.g. two 7♥) get unique keys; otherwise
-                // React reuses one DOM node and the other can render invisible but keep layout.
-                const key = `card-${i}-${cardKey(card)}`;
+                const key = `card-r0-${i}-${cardKey(card)}`;
                 const isDraggingThis = reorderDrag && i === reorderDrag.currentDropIndex;
                 const isExchangeDraggingThis = exchangeDraggingIndex === i;
                 const isExchangePending = exchangePendingCard != null && cardKey(card) === cardKey(exchangePendingCard);
@@ -467,6 +463,55 @@ function HandDock({
                       compact={true}
                       draggable={isExchangeDrag}
                       onDragStart={isExchangeDrag && onCardDragStart ? (e) => onCardDragStart(e, card, i) : undefined}
+                      onDragEnd={isExchangeDrag && onCardDragEnd ? onCardDragEnd : undefined}
+                    />
+                  </div>
+                );
+              })}
+              {/* Row 2 (top row, two-row mode only) — same x layout, positioned above row 1 */}
+              {twoRow && visibleCards.slice(rowCount).map((card, i) => {
+                const absIdx = rowCount + i;
+                if (card == null) return <div key={`card-r1-placeholder-${i}`} className="dock-card-wrap" style={{ left: `${cardRowLeftOffset}px`, bottom: `${cardSize.h + ROW_GAP}px`, transform: `translateX(${i * step}px)`, width: cardSize.w, height: cardSize.h }} aria-hidden="true" />;
+                const isSelected = isCardSelected(card);
+                const key = `card-r1-${i}-${cardKey(card)}`;
+                const isExchangeDraggingThis = exchangeDraggingIndex === absIdx;
+                const isExchangePending = exchangePendingCard != null && cardKey(card) === cardKey(exchangePendingCard);
+                return (
+                  <div
+                    key={key}
+                    className={`dock-card-wrap ${isSelected ? 'selected' : ''} ${!playable ? 'disabled' : ''} ${isExchangeDraggingThis ? 'dock-card-wrap--exchange-dragging' : ''} ${isExchangePending ? 'dock-card-wrap--exchange-pending' : ''}`}
+                    style={{
+                      left: `${cardRowLeftOffset}px`,
+                      bottom: `${cardSize.h + ROW_GAP}px`,
+                      transform: `translateX(${i * step}px)${isSelected ? ' translateY(-12px)' : ''}`,
+                    }}
+                  >
+                    <Card
+                      card={card}
+                      onClick={
+                        typeof onCardClick !== 'function'
+                          ? undefined
+                          : (c) => {
+                              try {
+                                onCardClick(c);
+                              } catch (err) {
+                                console.error('[HandDock] onCardClick', err);
+                                reportClientError({
+                                  source: 'HandDock',
+                                  message: err?.message ?? String(err),
+                                  stack: err?.stack,
+                                  context: 'onCardClick (row2)',
+                                });
+                              }
+                            }
+                      }
+                      selected={isSelected}
+                      playable={playable}
+                      width={cardSize.w}
+                      height={cardSize.h}
+                      compact={true}
+                      draggable={isExchangeDrag}
+                      onDragStart={isExchangeDrag && onCardDragStart ? (e) => onCardDragStart(e, card, absIdx) : undefined}
                       onDragEnd={isExchangeDrag && onCardDragEnd ? onCardDragEnd : undefined}
                     />
                   </div>

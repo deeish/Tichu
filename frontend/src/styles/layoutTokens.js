@@ -52,12 +52,12 @@ export function getSidebarWidth(viewportW) {
   return Math.max(280, Math.min(360, dynamic));
 }
 
-// Dock height: mobile min raised to fit stacked button layout (cards + actions column)
+// Dock height: mobile min raised to fit two-row card layout (cards × 2 + actions)
 export function getDockHeight() {
   if (typeof window === 'undefined') return 200;
   const vh = window.innerHeight * 0.22;
-  const minH = window.innerWidth < 480 ? 210 : 180;
-  const maxH = window.innerWidth < 480 ? 260 : 240;
+  const minH = window.innerWidth < 480 ? 240 : 180;
+  const maxH = window.innerWidth < 480 ? 300 : 240;
   return Math.min(maxH, Math.max(minH, vh));
 }
 
@@ -230,18 +230,14 @@ export function getDockWidthClamp(containerWidth) {
 // Hand rail: horizontal distance between cards (px); 60 so 14 cards fit in the rail without clipping
 export const HAND_RAIL_STEP = 65;
 
-// Activate horizontal-scroll mode on narrow viewports so cards get comfortable spacing.
-export function isHandRailScrollable(viewportW) {
-  return Number.isFinite(viewportW) && viewportW < 640;
+// Two-row mode: on narrow mobile viewports show cards in two rows of 7 so all fit without scrolling.
+export function isHandTwoRow(viewportW, cardCount) {
+  return Number.isFinite(viewportW) && viewportW < 640 && cardCount > 7;
 }
 
-export function getHandRailStep(railW, cardW, visibleCount, scrollable = false) {
+export function getHandRailStep(railW, cardW, visibleCount) {
   if (visibleCount <= 1) return 0;
   if (!Number.isFinite(railW) || railW <= 0 || !Number.isFinite(cardW) || cardW <= 0) return HAND_RAIL_STEP;
-  if (scrollable) {
-    // Scrollable mode: comfortable step so cards are clearly distinct; rail scrolls to show all.
-    return Math.max(36, Math.round(cardW * 1.1));
-  }
   // Scale preferred overlap with card width so larger cards on wide screens don't look overly stacked.
   const preferredStep = Math.max(66, Math.min(86, Math.round(cardW * 1.08)));
   const fitStep = (railW - cardW) / (visibleCount - 1);
