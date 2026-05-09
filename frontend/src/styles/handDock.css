@@ -739,9 +739,16 @@
     min-height: 120px;
   }
   .dock-body {
+    display: flex;
+    flex-direction: column;
     gap: 4px;
   }
+  .dock-main {
+    flex: 1;
+    min-height: 0;
+  }
   .dock-actions-box {
+    flex-shrink: 0;
     width: 100%;
     min-width: 0;
     border-left: none;
@@ -751,9 +758,13 @@
   }
   .dock-actions {
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
-    gap: 6px;
+    align-items: center;
+    gap: 4px;
+  }
+  .dock-pass-row {
+    display: contents;
   }
   .dock-btn {
     height: 36px;
