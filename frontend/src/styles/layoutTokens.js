@@ -56,8 +56,8 @@ export function getSidebarWidth(viewportW) {
 export function getDockHeight() {
   if (typeof window === 'undefined') return 200;
   const vh = window.innerHeight * 0.22;
-  const minH = window.innerWidth < 480 ? 240 : 180;
-  const maxH = window.innerWidth < 480 ? 300 : 240;
+  const minH = window.innerWidth < 480 ? 280 : 180;
+  const maxH = window.innerWidth < 480 ? 380 : 240;
   return Math.min(maxH, Math.max(minH, vh));
 }
 

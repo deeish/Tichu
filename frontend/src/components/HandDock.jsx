@@ -13,7 +13,7 @@ const MAX_HAND_DISPLAY = 14;
 const MIN_RAIL_STEP = 26;
 const MIN_CARD_W = 28;
 const MIN_CARD_H = 38;
-const RAIL_SAFETY_PX = 8;
+const RAIL_SAFETY_PX = 16;
 
 function HandDock({
   cards: cardsProp = [],
@@ -120,7 +120,7 @@ function HandDock({
   }, [railW, cardSize.w, rowCount]);
   const totalCardRowWidth = rowCount > 0 ? (rowCount - 1) * step + cardSize.w : 0;
   /* Card has border + margin + box-shadow; reserve space so the last card isn't clipped by overflow */
-  const cardRowExtraRight = railW > 0 && railW < 760 ? 8 : 24;
+  const cardRowExtraRight = railW > 0 && railW < 760 ? 16 : 24;
   const cardRowLeftOffset =
     railW > 0 && totalCardRowWidth > 0
       ? Math.max(0, (railW - totalCardRowWidth - cardRowExtraRight) / 2)

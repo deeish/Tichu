@@ -105,8 +105,9 @@
 
 @media (max-width: 480px) {
   .game-layout .hand-dock-wrapper {
-    min-height: 160px;
+    min-height: 200px;
     padding: 0 var(--s8);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 

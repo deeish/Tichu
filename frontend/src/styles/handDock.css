@@ -729,7 +729,7 @@
 
 @media (max-width: 480px) {
   .hand-dock {
-    min-height: 160px;
+    min-height: 200px;
   }
   .dock-rail {
     padding: 12px 0 6px;
