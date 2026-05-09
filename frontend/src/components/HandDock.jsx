@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Card from './Card';
-import { getHandRailStep, getDockCardSize } from '../styles/layoutTokens';
+import { getHandRailStep, getDockCardSize, getCardSize, isHandRailScrollable } from '../styles/layoutTokens';
 import { cardKey } from '../utils/cardUtils';
 import { isTouchDevice } from '../utils/touchUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
@@ -69,7 +69,7 @@ function HandDock({
   cardsRef.current = cards;
 
   const isExchangeDrag = draggable && onCardDragStart;
-  const isReorderDrag = onReorder && !draggable;
+  const isReorderDrag = onReorder && !draggable && !scrollable;
 
   useEffect(() => {
     const el = railRef.current;
@@ -93,9 +93,12 @@ function HandDock({
     };
   }, []);
 
+  const scrollable = isHandRailScrollable(containerWidth);
   const baseCardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
   const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
   const cardSize = useMemo(() => {
+    // Scrollable mode: use full card size (not dock-scaled) so cards are more readable.
+    if (scrollable) return getCardSize(containerWidth);
     if (visibleCount <= 0) return baseCardSize;
     if (!Number.isFinite(railW) || railW <= 0) return baseCardSize;
     const baseStep = getHandRailStep(railW, baseCardSize.w, visibleCount);
@@ -107,19 +110,21 @@ function HandDock({
       w: Math.max(MIN_CARD_W, Math.floor(baseCardSize.w * fitScale)),
       h: Math.max(MIN_CARD_H, Math.floor(baseCardSize.h * fitScale)),
     };
-  }, [baseCardSize, railW, visibleCount]);
+  }, [scrollable, baseCardSize, railW, visibleCount, containerWidth]);
   const step = useMemo(() => {
     if (visibleCount <= 1) return 0;
     if (!Number.isFinite(railW) || railW <= 0) return MIN_RAIL_STEP;
-    const preferred = getHandRailStep(railW, cardSize.w, visibleCount);
+    const preferred = getHandRailStep(railW, cardSize.w, visibleCount, scrollable);
+    if (scrollable) return preferred;
     const fitStep = Math.floor((railW - cardSize.w - RAIL_SAFETY_PX) / (visibleCount - 1));
     return Math.max(0, Math.min(preferred, fitStep));
-  }, [railW, cardSize.w, visibleCount]);
+  }, [scrollable, railW, cardSize.w, visibleCount]);
   const totalCardRowWidth = visibleCount > 0 ? (visibleCount - 1) * step + cardSize.w : 0;
   /* Card has border + margin + box-shadow; reserve space so the last card isn't clipped by overflow */
   const cardRowExtraRight = railW > 0 && railW < 760 ? 8 : 24;
-  const cardRowLeftOffset =
-    railW > 0 && totalCardRowWidth > 0
+  const cardRowLeftOffset = scrollable
+    ? 8
+    : railW > 0 && totalCardRowWidth > 0
       ? Math.max(0, (railW - totalCardRowWidth - cardRowExtraRight) / 2)
       : 0;
 
@@ -397,8 +402,11 @@ function HandDock({
           <div className="dock-won" aria-hidden="true">
             {/* Placeholder: won cards from round will go here */}
           </div>
-          <div className="dock-rail" ref={railRef}>
-            <div className="dock-rail-inner">
+          <div className={`dock-rail${scrollable ? ' dock-rail--scrollable' : ''}`} ref={railRef}>
+            <div
+              className="dock-rail-inner"
+              style={scrollable && totalCardRowWidth > 0 ? { width: totalCardRowWidth + cardRowExtraRight + cardRowLeftOffset } : {}}
+            >
               {visibleCards.map((card, i) => {
                 if (card == null) return <div key={`card-placeholder-${i}`} className="dock-card-wrap" style={{ left: `${cardRowLeftOffset}px`, transform: `translateX(${i * step}px)`, width: cardSize.w, height: cardSize.h }} aria-hidden="true" />;
                 const isSelected = isCardSelected(card);

@@ -230,9 +230,18 @@ export function getDockWidthClamp(containerWidth) {
 // Hand rail: horizontal distance between cards (px); 60 so 14 cards fit in the rail without clipping
 export const HAND_RAIL_STEP = 65;
 
-export function getHandRailStep(railW, cardW, visibleCount) {
+// Activate horizontal-scroll mode on narrow viewports so cards get comfortable spacing.
+export function isHandRailScrollable(viewportW) {
+  return Number.isFinite(viewportW) && viewportW < 640;
+}
+
+export function getHandRailStep(railW, cardW, visibleCount, scrollable = false) {
   if (visibleCount <= 1) return 0;
   if (!Number.isFinite(railW) || railW <= 0 || !Number.isFinite(cardW) || cardW <= 0) return HAND_RAIL_STEP;
+  if (scrollable) {
+    // Scrollable mode: comfortable step so cards are clearly distinct; rail scrolls to show all.
+    return Math.max(36, Math.round(cardW * 1.1));
+  }
   // Scale preferred overlap with card width so larger cards on wide screens don't look overly stacked.
   const preferredStep = Math.max(66, Math.min(86, Math.round(cardW * 1.08)));
   const fitStep = (railW - cardW) / (visibleCount - 1);

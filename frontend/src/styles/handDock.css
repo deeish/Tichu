@@ -428,6 +428,24 @@
   justify-content: center;
 }
 
+/* Scrollable hand rail on mobile: let cards overflow with comfortable spacing */
+.dock-rail--scrollable {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  justify-content: flex-start;
+  scrollbar-width: none;
+}
+
+.dock-rail--scrollable::-webkit-scrollbar {
+  display: none;
+}
+
+.dock-rail--scrollable .dock-rail-inner {
+  flex-shrink: 0;
+  justify-content: flex-start;
+}
+
 .dock-card-wrap {
   position: absolute;
   bottom: 0;
@@ -728,7 +746,7 @@
   }
   .dock-rail {
     padding: 12px 0 6px;
-    min-height: 68px;
+    min-height: 80px;
   }
   .dock-body {
     gap: 4px;
