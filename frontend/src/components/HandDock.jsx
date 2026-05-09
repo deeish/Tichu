@@ -93,12 +93,11 @@ function HandDock({
     };
   }, []);
 
-  const TWO_ROW_SIZE = 7;
   const ROW_GAP = 6;
   const baseCardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
   const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
   const twoRow = isHandTwoRow(containerWidth, visibleCount);
-  const rowCount = twoRow ? Math.min(TWO_ROW_SIZE, visibleCount) : visibleCount;
+  const rowCount = twoRow ? Math.ceil(visibleCount / 2) : visibleCount;
   const cardSize = useMemo(() => {
     if (visibleCount <= 0) return baseCardSize;
     if (!Number.isFinite(railW) || railW <= 0) return baseCardSize;
