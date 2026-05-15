@@ -102,32 +102,38 @@ function HandDock({
   const ROW_GAP = 6;
   const baseCardSize = useMemo(() => getDockCardSize(containerWidth), [containerWidth]);
   const rowCount = twoRow ? Math.ceil(visibleCount / 2) : visibleCount;
+  // Cap railW at the dock's interior width (containerWidth minus 8px padding each side).
+  // Prevents a stale/transient iOS Safari ResizeObserver measurement from inflating the step.
+  const effectiveRailW = useMemo(() => {
+    if (!Number.isFinite(containerWidth) || containerWidth <= 0) return railW;
+    return Math.min(railW, Math.max(0, containerWidth - 16));
+  }, [railW, containerWidth]);
   const cardSize = useMemo(() => {
     if (visibleCount <= 0) return baseCardSize;
-    if (!Number.isFinite(railW) || railW <= 0) return baseCardSize;
-    const baseStep = getHandRailStep(railW, baseCardSize.w, rowCount);
+    if (!Number.isFinite(effectiveRailW) || effectiveRailW <= 0) return baseCardSize;
+    const baseStep = getHandRailStep(effectiveRailW, baseCardSize.w, rowCount);
     const baseTotal = baseCardSize.w + (rowCount - 1) * baseStep;
-    const maxAllowed = Math.max(0, railW - RAIL_SAFETY_PX);
+    const maxAllowed = Math.max(0, effectiveRailW - RAIL_SAFETY_PX);
     if (baseTotal <= maxAllowed) return baseCardSize;
     const fitScale = baseTotal > 0 ? maxAllowed / baseTotal : 1;
     return {
       w: Math.max(MIN_CARD_W, Math.floor(baseCardSize.w * fitScale)),
       h: Math.max(MIN_CARD_H, Math.floor(baseCardSize.h * fitScale)),
     };
-  }, [baseCardSize, railW, rowCount, visibleCount]);
+  }, [baseCardSize, effectiveRailW, rowCount, visibleCount]);
   const step = useMemo(() => {
     if (rowCount <= 1) return 0;
-    if (!Number.isFinite(railW) || railW <= 0) return MIN_RAIL_STEP;
-    const preferred = getHandRailStep(railW, cardSize.w, rowCount);
-    const fitStep = Math.floor((railW - cardSize.w - RAIL_SAFETY_PX) / (rowCount - 1));
+    if (!Number.isFinite(effectiveRailW) || effectiveRailW <= 0) return MIN_RAIL_STEP;
+    const preferred = getHandRailStep(effectiveRailW, cardSize.w, rowCount);
+    const fitStep = Math.floor((effectiveRailW - cardSize.w - RAIL_SAFETY_PX) / (rowCount - 1));
     return Math.max(0, Math.min(preferred, fitStep));
-  }, [railW, cardSize.w, rowCount]);
+  }, [effectiveRailW, cardSize.w, rowCount]);
   const totalCardRowWidth = rowCount > 0 ? (rowCount - 1) * step + cardSize.w : 0;
   /* Card has border + margin + box-shadow; reserve space so the last card isn't clipped by overflow */
-  const cardRowExtraRight = railW > 0 && railW < 760 ? 16 : 24;
+  const cardRowExtraRight = effectiveRailW > 0 && effectiveRailW < 760 ? 16 : 24;
   const cardRowLeftOffset =
-    railW > 0 && totalCardRowWidth > 0
-      ? Math.max(0, (railW - totalCardRowWidth - cardRowExtraRight) / 2)
+    effectiveRailW > 0 && totalCardRowWidth > 0
+      ? Math.max(0, (effectiveRailW - totalCardRowWidth - cardRowExtraRight) / 2)
       : 0;
 
   const displayCards = useMemo(() => {
