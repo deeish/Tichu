@@ -774,16 +774,18 @@
     height: 36px;
     min-width: 0;
     font-size: 12px;
+    overflow: hidden;
   }
   .dock-btn-secondary {
     flex: 1;
     height: 36px;
     font-size: 11px;
+    overflow: hidden;
   }
   .dock-auto-pass-btn.dock-btn-secondary {
     flex: 1;
     height: 36px;
-    font-size: 11px;
+    font-size: 10px;
     padding: 0 4px;
     letter-spacing: 0;
   }
