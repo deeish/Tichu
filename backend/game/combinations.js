@@ -384,8 +384,8 @@ function validateBomb(cards) {
 function validateStraightFlush(cards) {
   if (cards.length < 5) return { valid: false };
   
-  // Phoenix cannot be used to make a bomb (rulebook: "may not be used to make a bomb!")
-  if (cards.some(c => c.name === 'phoenix')) {
+  // Phoenix and Mah Jong cannot form a straight-flush bomb (no suit / special-card rules).
+  if (cards.some(c => c.name === 'phoenix' || c.name === 'mahjong')) {
     return { valid: false };
   }
   
@@ -399,7 +399,7 @@ function validateStraightFlush(cards) {
   const uniqueSuits = new Set(suits);
   if (uniqueSuits.size !== 1) return { valid: false };
   
-  // Check if it's also a straight (but Phoenix is already excluded above)
+  // Check if it's also a straight (specials excluded above)
   const straight = validateStraight(cards);
   if (straight.valid) {
     // Store highestValue for comparison when straight flushes have same length

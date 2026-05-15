@@ -54,8 +54,24 @@ describe('Mah Jong Wish - Creation', () => {
     expect(result.error).toMatch(/wish|standard|rank/i);
   });
 
+  test('Mah Jong in same-suit straight at lead is allowed (not classified as bomb)', () => {
+    const game = baseGame();
+    const straight = [
+      { type: 'special', name: 'mahjong' },
+      { type: 'standard', rank: '2', suit: 'hearts' },
+      { type: 'standard', rank: '3', suit: 'hearts' },
+      { type: 'standard', rank: '4', suit: 'hearts' },
+      { type: 'standard', rank: '5', suit: 'hearts' }
+    ];
+    game.hands.p1 = straight;
+    const result = makeMove(game, 'p1', straight, 'play');
+    expect(result.success).toBe(true);
+    expect(game.mahJongPlayed).toBe(true);
+    expect(game.mahJongWish).toBe(null);
+  });
+
   test('Mah Jong in straight does not create wish (straight clears previous wish)', () => {
-    // When Mah Jong is played in a straight (mixed suits = regular straight, not bomb), no wish is set and any previous wish is cleared
+    // When Mah Jong is played in a straight (regular straight, not bomb), no wish is set and any previous wish is cleared
     const game = baseGame();
     game.mahJongWish = { wishedRank: 'K', mustPlay: true };
     game.mahJongPlayed = true;

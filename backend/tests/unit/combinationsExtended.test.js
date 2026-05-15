@@ -111,6 +111,20 @@ describe('Combinations - Extended Tests', () => {
       expect(result.type).toBe('straight'); // Not a bomb
       expect(result.type).not.toBe('bomb');
     });
+
+    test('should reject straight flush with Mah Jong (same-suit 1-5 is a regular straight)', () => {
+      const cards = [
+        { type: 'special', name: 'mahjong' },
+        { type: 'standard', rank: '2', suit: 'hearts' },
+        { type: 'standard', rank: '3', suit: 'hearts' },
+        { type: 'standard', rank: '4', suit: 'hearts' },
+        { type: 'standard', rank: '5', suit: 'hearts' }
+      ];
+      const result = validateCombination(cards);
+      expect(result.valid).toBe(true);
+      expect(result.type).toBe('straight');
+      expect(result.type).not.toBe('bomb');
+    });
   });
 
   describe('Comparison Edge Cases', () => {

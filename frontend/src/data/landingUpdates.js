@@ -29,6 +29,15 @@ export function landingUpdateKindLabel(kind) {
  */
 export const LANDING_UPDATE_DAYS = [
   {
+    date: '2026-05-15',
+    items: [
+      {
+        kind: 'bugfix',
+        text: 'Fixed Mah Jong + same-suit straight (e.g. 1–5) being blocked as a bomb at round start.',
+      },
+    ],
+  },
+  {
     date: '2026-05-01',
     items: [
       {
