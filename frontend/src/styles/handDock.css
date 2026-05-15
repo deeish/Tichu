@@ -762,6 +762,7 @@
   .dock-actions {
     flex-direction: row;
     flex-wrap: nowrap;
+    justify-content: flex-start;
     align-items: center;
     gap: 4px;
   }
@@ -785,6 +786,11 @@
     font-size: 11px;
     padding: 0 4px;
     letter-spacing: 0;
+  }
+  .hand-dock.hand-dock--compact .dock-actions-box {
+    width: 100%;
+    min-width: 0;
+    padding-left: 0;
   }
   .dock-hint {
     font-size: 11px;
