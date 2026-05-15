@@ -7,8 +7,6 @@ import {
   getSidebarWidth,
   getVisibleHandCap,
   getHandRailStep,
-  getDockHeight,
-  getDockCardSize,
 } from '../layoutTokens';
 
 describe('layoutTokens geometry guards', () => {
@@ -94,21 +92,6 @@ describe('layoutTokens geometry guards', () => {
     expect(getVisibleHandCap(840)).toBe(11);
     expect(getVisibleHandCap(700)).toBe(10);
     expect(getVisibleHandCap(600)).toBe(9);
-  });
-
-  it('getDockHeight on mobile grows for two-row hands and exchange recap', () => {
-    const phoneH = 844;
-    const single = getDockHeight(390, phoneH, { twoRow: false, showDefaultActions: false });
-    const twoRow = getDockHeight(390, phoneH, {
-      twoRow: true,
-      tallHeader: true,
-      showDefaultActions: true,
-    });
-    const card = getDockCardSize(390);
-    const twoRowMin = 34 + 14 + card.h * 2 + 6 + 6 + 44 + 8;
-    expect(twoRow).toBeGreaterThan(single);
-    expect(twoRow).toBeGreaterThanOrEqual(Math.min(Math.round(phoneH * 0.5), Math.max(152, twoRowMin)));
-    expect(single).toBeLessThan(220);
   });
 });
 

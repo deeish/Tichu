@@ -103,27 +103,24 @@ function HandDock({
     if (!Number.isFinite(railW) || railW <= 0) return baseCardSize;
     const baseStep = getHandRailStep(railW, baseCardSize.w, rowCount);
     const baseTotal = baseCardSize.w + (rowCount - 1) * baseStep;
-    const maxAllowed = Math.max(0, railW - RAIL_SAFETY_PX - (twoRow ? 10 : 0));
+    const maxAllowed = Math.max(0, railW - RAIL_SAFETY_PX);
     if (baseTotal <= maxAllowed) return baseCardSize;
     const fitScale = baseTotal > 0 ? maxAllowed / baseTotal : 1;
     return {
       w: Math.max(MIN_CARD_W, Math.floor(baseCardSize.w * fitScale)),
       h: Math.max(MIN_CARD_H, Math.floor(baseCardSize.h * fitScale)),
     };
-  }, [baseCardSize, railW, rowCount, visibleCount, twoRow]);
+  }, [baseCardSize, railW, rowCount, visibleCount]);
   const step = useMemo(() => {
     if (rowCount <= 1) return 0;
     if (!Number.isFinite(railW) || railW <= 0) return MIN_RAIL_STEP;
     const preferred = getHandRailStep(railW, cardSize.w, rowCount);
-    const fitStep = Math.floor(
-      (railW - cardSize.w - RAIL_SAFETY_PX - (twoRow ? 10 : 0)) / (rowCount - 1)
-    );
+    const fitStep = Math.floor((railW - cardSize.w - RAIL_SAFETY_PX) / (rowCount - 1));
     return Math.max(0, Math.min(preferred, fitStep));
-  }, [railW, cardSize.w, rowCount, twoRow]);
+  }, [railW, cardSize.w, rowCount]);
   const totalCardRowWidth = rowCount > 0 ? (rowCount - 1) * step + cardSize.w : 0;
   /* Card has border + margin + box-shadow; reserve space so the last card isn't clipped by overflow */
-  const cardRowExtraRight =
-    railW > 0 && railW < 760 ? (twoRow ? 22 : 16) : 24;
+  const cardRowExtraRight = railW > 0 && railW < 760 ? 16 : 24;
   const cardRowLeftOffset =
     railW > 0 && totalCardRowWidth > 0
       ? Math.max(0, (railW - totalCardRowWidth - cardRowExtraRight) / 2)
@@ -313,7 +310,6 @@ function HandDock({
   }, []);
 
   const compactDock = containerWidth < 760;
-  const selectLiftPx = compactDock ? (twoRow ? 6 : 8) : 12;
 
   const receiptLines = Array.isArray(exchangeReceiptLines) ? exchangeReceiptLines : [];
   const showExchangeRecap = !!exchangeReceiptNotice || receiptLines.length > 0;
@@ -421,7 +417,7 @@ function HandDock({
                     style={{
                       left: `${cardRowLeftOffset}px`,
                       ...(twoRow ? { bottom: `${cardSize.h + ROW_GAP}px` } : {}),
-                      transform: `translateX(${i * step}px)${isSelected ? ` translateY(-${selectLiftPx}px)` : ''}`,
+                      transform: `translateX(${i * step}px)${isSelected ? ' translateY(-12px)' : ''}`,
                       ...(isReorderDrag ? { touchAction: 'none' } : {}),
                     }}
                     onPointerDown={isReorderDrag ? (e) => handleReorderPointerDown(e, card, i) : undefined}
@@ -486,7 +482,7 @@ function HandDock({
                     className={`dock-card-wrap ${isSelected ? 'selected' : ''} ${!playable ? 'disabled' : ''} ${isExchangeDraggingThis ? 'dock-card-wrap--exchange-dragging' : ''} ${isExchangePending ? 'dock-card-wrap--exchange-pending' : ''}`}
                     style={{
                       left: `${cardRowLeftOffset}px`,
-                      transform: `translateX(${i * step}px)${isSelected ? ` translateY(-${selectLiftPx}px)` : ''}`,
+                      transform: `translateX(${i * step}px)${isSelected ? ' translateY(-12px)' : ''}`,
                     }}
                   >
                     <Card

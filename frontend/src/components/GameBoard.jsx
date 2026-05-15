@@ -12,7 +12,6 @@ import { DEBUG_HAND_DRAG } from '../debug';
 import { reportClientError, setClientCorrelation } from '../clientErrorReport';
 import {
   getDockHeight,
-  isHandTwoRow,
   getSidebarLayoutMode,
   getSidebarWidth,
   getCenterRect,
@@ -317,30 +316,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
 
   const sidebarMode = useMemo(() => getSidebarLayoutMode(viewport.w), [viewport.w]);
   const sidebarW = useMemo(() => (sidebarMode === 'overlay' ? 0 : getSidebarWidth(viewport.w)), [sidebarMode, viewport.w]);
-  const dockH = useMemo(() => {
-    const dockW = dockWrapperSize.w > 0 ? dockWrapperSize.w : viewport.w;
-    const handCount = game?.hands?.[playerId]?.length ?? 0;
-    const tallHeader =
-      game?.state === 'playing' &&
-      Array.isArray(game?.exchangeReceipt) &&
-      game.exchangeReceipt.length > 0;
-    const hasCustomActions =
-      game?.state === 'exchanging' || game?.state === 'grand-tichu';
-    return getDockHeight(viewport.w, viewport.h, {
-      twoRow: isHandTwoRow(dockW, handCount),
-      tallHeader,
-      hasCustomActions,
-      showDefaultActions: game?.state !== 'grand-tichu' && game?.state !== 'exchanging',
-    });
-  }, [
-    viewport.w,
-    viewport.h,
-    dockWrapperSize.w,
-    game?.hands?.[playerId]?.length,
-    game?.state,
-    game?.exchangeReceipt,
-    playerId,
-  ]);
+  const dockH = useMemo(() => getDockHeight(), [viewport.h]);
   const isTouch = isTouchDevice();
   const mobileTokens = useMemo(() => getMobileAwareTokens(viewport.w), [viewport.w]);
 
