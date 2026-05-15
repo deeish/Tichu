@@ -1754,6 +1754,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           turnAlertLevel={turnAlertActive ? turnAlertLevel : 0}
           hintText={hintText}
           containerWidth={dockContainerWidth}
+          viewportWidth={viewport.w}
           primaryLabel={selectedIsBomb ? 'Play bomb' : `Play (${selectedCards.length})`}
           showDefaultActions={game.state !== 'grand-tichu' && game.state !== 'exchanging'}
           draggable={game.state === 'exchanging' && !exchangeSubmitted && !game.exchangeSubmitted}

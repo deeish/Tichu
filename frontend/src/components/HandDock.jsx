@@ -47,10 +47,14 @@ function HandDock({
   /** While playing: compact “who passed you what” (private to this client). */
   exchangeReceiptLines = null,
   onExchangeReceiptDismiss,
+  viewportWidth = null,
 }) {
   const cards = Array.isArray(cardsProp) ? cardsProp.slice(0, MAX_HAND_DISPLAY) : [];
   const visibleCount = Math.min(Math.max(0, cards.length), MAX_HAND_DISPLAY);
-  const twoRow = isHandTwoRow(containerWidth, visibleCount);
+  const twoRow = isHandTwoRow(
+    typeof viewportWidth === 'number' ? viewportWidth : containerWidth,
+    visibleCount
+  );
   const railRef = useRef(null);
   const lastRailWRef = useRef(0);
   const [railW, setRailW] = useState(0);

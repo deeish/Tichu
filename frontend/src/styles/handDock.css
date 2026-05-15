@@ -729,7 +729,9 @@
 
 @media (max-width: 480px) {
   .hand-dock {
-    min-height: 160px;
+    height: auto;
+    min-height: 0;
+    grid-template-rows: auto auto;
   }
   .dock-rail {
     padding: 12px 0 6px;
