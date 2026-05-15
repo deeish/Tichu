@@ -575,7 +575,9 @@ function HandDock({
                       aria-pressed={autoPassEnabled}
                       title="UI-only toggle for the upcoming auto-pass feature"
                     >
-                      Auto-pass: {autoPassEnabled ? 'ON' : 'OFF'}
+                      {containerWidth < 480
+                        ? (autoPassEnabled ? 'Auto: ON' : 'Auto: OFF')
+                        : `Auto-pass: ${autoPassEnabled ? 'ON' : 'OFF'}`}
                     </button>
                   </div>
                 </>
