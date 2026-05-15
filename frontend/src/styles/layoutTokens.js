@@ -52,12 +52,58 @@ export function getSidebarWidth(viewportW) {
   return Math.max(280, Math.min(360, dynamic));
 }
 
-// Dock height: mobile min raised to fit two-row card layout (cards × 2 + actions)
-export function getDockHeight() {
-  if (typeof window === 'undefined') return 200;
-  const vh = window.innerHeight * 0.22;
-  const minH = window.innerWidth < 480 ? 240 : 180;
-  const maxH = window.innerWidth < 480 ? 300 : 240;
+const DOCK_ROW_GAP = 6;
+
+/**
+ * Hand dock height. On narrow mobile, sizes to content (header + cards + actions)
+ * instead of a fixed 22vh band that was too tall empty or too short for two rows.
+ *
+ * @param {number} [viewportW]
+ * @param {number} [viewportH]
+ * @param {{ twoRow?: boolean, tallHeader?: boolean, hasCustomActions?: boolean, showDefaultActions?: boolean }} [options]
+ */
+export function getDockHeight(viewportW, viewportH, options = {}) {
+  const w =
+    Number.isFinite(viewportW) && viewportW > 0
+      ? viewportW
+      : typeof window !== 'undefined'
+        ? window.innerWidth
+        : 1440;
+  const h =
+    Number.isFinite(viewportH) && viewportH > 0
+      ? viewportH
+      : typeof window !== 'undefined'
+        ? window.innerHeight
+        : 800;
+
+  const twoRow = !!options.twoRow;
+  const tallHeader = !!options.tallHeader;
+  const hasCustomActions = !!options.hasCustomActions;
+  const showDefaultActions = options.showDefaultActions !== false;
+
+  if (w < 480) {
+    const card = getDockCardSize(w);
+    const headerH = tallHeader ? 50 : 34;
+    const actionsH = hasCustomActions ? 48 : showDefaultActions ? 44 : 0;
+    const railBlock = twoRow ? card.h * 2 + DOCK_ROW_GAP : card.h;
+    const content = headerH + 14 + railBlock + 6 + actionsH + 8;
+    const maxH = Math.round(h * 0.5);
+    return Math.min(maxH, Math.max(twoRow ? 152 : 108, content));
+  }
+
+  if (w < 640) {
+    const card = getDockCardSize(w);
+    const headerH = tallHeader ? 46 : 40;
+    const actionsH = hasCustomActions || showDefaultActions ? 52 : 0;
+    const railBlock = twoRow ? card.h * 2 + DOCK_ROW_GAP : card.h;
+    const content = headerH + 20 + railBlock + 10 + actionsH;
+    const vh = h * 0.24;
+    return Math.min(300, Math.max(content, vh, twoRow ? 188 : 156));
+  }
+
+  const vh = h * 0.22;
+  const minH = 180;
+  const maxH = 240;
   return Math.min(maxH, Math.max(minH, vh));
 }
 
