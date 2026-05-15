@@ -757,7 +757,7 @@
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     padding-left: 0;
     padding-top: 4px;
-    padding-bottom: 10px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
   }
   .dock-actions {
     flex-direction: row;
@@ -770,19 +770,19 @@
   }
   .dock-btn {
     flex: 1;
-    height: 44px;
+    height: 36px;
     min-width: 0;
-    font-size: 14px;
+    font-size: 12px;
   }
   .dock-btn-secondary {
     flex: 1;
-    height: 44px;
-    font-size: 13px;
+    height: 36px;
+    font-size: 11px;
   }
   .dock-auto-pass-btn.dock-btn-secondary {
     flex: 1;
-    height: 44px;
-    font-size: 12px;
+    height: 36px;
+    font-size: 11px;
     padding: 0 4px;
     letter-spacing: 0;
   }
