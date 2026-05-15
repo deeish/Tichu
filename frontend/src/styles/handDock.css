@@ -762,7 +762,6 @@
   .dock-actions {
     flex-direction: row;
     flex-wrap: nowrap;
-    justify-content: flex-end;
     align-items: center;
     gap: 4px;
   }
@@ -770,13 +769,22 @@
     display: contents;
   }
   .dock-btn {
-    height: 36px;
+    flex: 1;
+    height: 44px;
     min-width: 0;
-    font-size: 12px;
+    font-size: 14px;
   }
   .dock-btn-secondary {
-    height: 32px;
-    font-size: 11px;
+    flex: 1;
+    height: 44px;
+    font-size: 13px;
+  }
+  .dock-auto-pass-btn.dock-btn-secondary {
+    flex: 1;
+    height: 44px;
+    font-size: 12px;
+    padding: 0 4px;
+    letter-spacing: 0;
   }
   .dock-hint {
     font-size: 11px;
