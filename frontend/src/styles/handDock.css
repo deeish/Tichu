@@ -804,6 +804,16 @@
     padding: 4px var(--s8);
     min-height: 30px;
     overflow: hidden;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .dock-sort {
+    order: 2;
+  }
+  .dock-exchange-recap {
+    order: 3;
+    width: 100%;
+    flex: none;
   }
   .dock-sort button {
     padding: 3px 6px;
