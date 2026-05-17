@@ -498,16 +498,23 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     () => getMatPosition(centerRect, matSize.w, matSize.h),
     [centerRect, matSize.w, matSize.h, MAT_VERTICAL_BIAS, MAT_TOP_OFFSET]
   );
-  const seatPositions = useMemo(
-    () => getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize, {
+  const seatPositions = useMemo(() => {
+    const positions = getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize, {
       seatWidth: mobileTokens.seatWidth,
       seatHeight: mobileTokens.seatHeight,
       outerMargin: mobileTokens.outerMargin,
       tableHeaderHeight: mobileTokens.tableHeaderHeight,
       leftBand: mobileTokens.leftBand,
-    }),
-    [tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize, mobileTokens.seatWidth, mobileTokens.seatHeight, mobileTokens.outerMargin, mobileTokens.tableHeaderHeight, mobileTokens.leftBand]
-  );
+    });
+    // On narrow mobile: move left/right seats to same row as top seat (corner-row layout)
+    if (viewport.w < 480) {
+      positions.left = { ...positions.left, y: positions.top.y };
+      positions.right = { ...positions.right, y: positions.top.y };
+    }
+    return positions;
+  }, [tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize,
+      mobileTokens.seatWidth, mobileTokens.seatHeight, mobileTokens.outerMargin,
+      mobileTokens.tableHeaderHeight, mobileTokens.leftBand, viewport.w]);
 
   // Expose computed geometry to CSS (used for trick scroll sizing, etc.).
   // Use layout effect to avoid a "one paint behind" mismatch on fast resizes.

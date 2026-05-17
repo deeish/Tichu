@@ -272,10 +272,14 @@ export function getMobileAwareTokens(viewportW) {
     };
   }
   const scale = Math.max(0.5, viewportW / 600);
-  const seatWidth = Math.round(SEAT_WIDTH * scale);
+  let seatWidth = Math.round(SEAT_WIDTH * scale);
   const seatHeight = Math.round(SEAT_HEIGHT * scale);
   const tableHeaderHeight = Math.min(TABLE_HEADER_HEIGHT, 60);
   const outerMargin = Math.round(OUTER_MARGIN * scale);
+  // Cap seatWidth so 3 chips fit side-by-side with 8px gaps on very narrow screens
+  if (viewportW < 480) {
+    seatWidth = Math.min(seatWidth, Math.floor((viewportW - 2 * outerMargin - 16) / 3));
+  }
   const leftBand = outerMargin + seatWidth + SEAT_MAT_GAP;
   const topBand = tableHeaderHeight + TABLE_HEADER_SEAT_GAP + seatHeight + SEAT_MAT_GAP;
   // Narrower band for mat sizing on mobile — seats overlap mat edges (seats have higher z-index)
