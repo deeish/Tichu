@@ -576,7 +576,7 @@ function HandDock({
                       title="UI-only toggle for the upcoming auto-pass feature"
                     >
                       {containerWidth < 480
-                        ? (autoPassEnabled ? 'Auto: ON' : 'Auto: OFF')
+                        ? (autoPassEnabled ? 'Auto-pass: ON' : 'Auto-pass: OFF')
                         : `Auto-pass: ${autoPassEnabled ? 'ON' : 'OFF'}`}
                     </button>
                   </div>
