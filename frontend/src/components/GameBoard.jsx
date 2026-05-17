@@ -650,7 +650,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           dragonPassSigRef.current = sig;
           setDragonPassNotice({
             key: sig,
-            text: `Dragon trick passed to ${recipientName} (${role}).`,
+            text: `Dragon → ${recipientName}`,
           });
           setDragonPassNoticeDismissed(false);
 
