@@ -472,10 +472,10 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
 
   const centerRect = useMemo(
     () => getCenterRect(tableSize.w, tableSize.h, dockH, sidebarW, {
-      leftBand: mobileTokens.leftBand,
+      leftBand: mobileTokens.centerBand ?? mobileTokens.leftBand,
       topBand: mobileTokens.topBand,
     }),
-    [tableSize.w, tableSize.h, dockH, sidebarW, mobileTokens.leftBand, mobileTokens.topBand]
+    [tableSize.w, tableSize.h, dockH, sidebarW, mobileTokens.centerBand, mobileTokens.leftBand, mobileTokens.topBand]
   );
 
   // Development-only geometry overlay (query param or localStorage flag).

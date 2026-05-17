@@ -278,5 +278,7 @@ export function getMobileAwareTokens(viewportW) {
   const outerMargin = Math.round(OUTER_MARGIN * scale);
   const leftBand = outerMargin + seatWidth + SEAT_MAT_GAP;
   const topBand = tableHeaderHeight + TABLE_HEADER_SEAT_GAP + seatHeight + SEAT_MAT_GAP;
-  return { seatWidth, seatHeight, tableHeaderHeight, outerMargin, leftBand, topBand };
+  // Narrower band for mat sizing on mobile — seats overlap mat edges (seats have higher z-index)
+  const centerBand = outerMargin + Math.round(seatWidth * 0.4) + SEAT_MAT_GAP;
+  return { seatWidth, seatHeight, tableHeaderHeight, outerMargin, leftBand, topBand, centerBand };
 }
