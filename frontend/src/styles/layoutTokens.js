@@ -286,8 +286,8 @@ export function getMobileAwareTokens(viewportW) {
   const topBand = tableHeaderHeight + TABLE_HEADER_SEAT_GAP + seatHeight + SEAT_MAT_GAP;
   // Narrower band for mat sizing on mobile — seats overlap mat edges (seats have higher z-index)
   const centerBand = outerMargin + Math.round(seatWidth * 0.4) + SEAT_MAT_GAP;
-  const seatWidthSide  = viewportW < 480 ? 80  : seatWidth;
-  const seatHeightSide = viewportW < 480 ? 80  : seatHeight;
+  const seatWidthSide  = viewportW < 480 ? 56  : seatWidth;
+  const seatHeightSide = viewportW < 480 ? 88  : seatHeight;
   const centerBandSide = viewportW < 480
     ? outerMargin + Math.round(seatWidthSide * 0.4) + SEAT_MAT_GAP
     : centerBand;
