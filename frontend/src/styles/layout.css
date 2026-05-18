@@ -40,6 +40,8 @@
 /* 2-column grid: left = HUD | table | hand dock (stacked); right = full-height sidebar */
 /* Background uses --layout-bg so themes in tableSurface.css can override */
 .game-layout {
+  position: fixed;
+  inset: 0;
   display: grid;
   grid-template-columns: 1fr minmax(0, var(--sidebar-w));
   grid-template-rows: 1fr;
