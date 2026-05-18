@@ -289,7 +289,7 @@ export function getMobileAwareTokens(viewportW) {
   const seatWidthSide  = viewportW < 480 ? 56  : seatWidth;
   const seatHeightSide = viewportW < 480 ? 88  : seatHeight;
   const centerBandSide = viewportW < 480
-    ? outerMargin + Math.round(seatWidthSide * 0.4) + SEAT_MAT_GAP
+    ? outerMargin + seatWidthSide
     : centerBand;
   // Mobile won pile cards are much smaller; use actual height so the mat can grow downward
   const { h: cardH } = getCardSize(viewportW);
