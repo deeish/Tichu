@@ -562,17 +562,6 @@ function App() {
     }
   }, [showToast])
 
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      if (document.hidden || !socket.connected) return
-      if (localStorage.getItem(REJOIN_GAME_KEY)) {
-        socket.emit('get-game-state', { reason: 'visibility-resume' })
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
-  }, [])
-
   const handleCreateGame = () => {
     if (!playerName.trim()) {
       showToast('Please enter your name', 'warning')
