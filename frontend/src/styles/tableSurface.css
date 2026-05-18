@@ -741,12 +741,13 @@
     flex-shrink: 0;
   }
   .seat--mobile-side .seat-body {
-    align-items: center;
+    align-items: stretch;
     width: 100%;
     gap: 1px;
   }
   .seat--mobile-side .seat-name-row {
     justify-content: center;
+    overflow: hidden;
   }
   .seat--mobile-side .seat-name {
     font-size: 9px;
