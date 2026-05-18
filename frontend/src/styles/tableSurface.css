@@ -178,6 +178,11 @@
     font-size: 9px;
     letter-spacing: 0.02em;
   }
+  .wished-card-panel .card {
+    width: 30px !important;
+    height: 44px !important;
+    font-size: 7.9px !important;
+  }
 }
 
 .wished-card-display {
