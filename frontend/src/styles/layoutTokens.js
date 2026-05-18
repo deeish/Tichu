@@ -74,7 +74,7 @@ export function getCenterRect(tableW, tableH, dockH, drawerW, overrides = {}) {
   const leftBand = overrides.leftBand ?? LEFT_BAND;
   const topBand = overrides.topBand ?? TOP_BAND;
   const rightBand = overrides.leftBand ?? getRightBand(drawerW);
-  const bottomBand = BOTTOM_BAND_FOR_WON_CARDS;
+  const bottomBand = overrides.bottomBand ?? BOTTOM_BAND_FOR_WON_CARDS;
   const x = leftBand;
   const y = topBand;
   const w = Math.max(0, tableW - leftBand - rightBand);
@@ -284,5 +284,10 @@ export function getMobileAwareTokens(viewportW) {
   const topBand = tableHeaderHeight + TABLE_HEADER_SEAT_GAP + seatHeight + SEAT_MAT_GAP;
   // Narrower band for mat sizing on mobile — seats overlap mat edges (seats have higher z-index)
   const centerBand = outerMargin + Math.round(seatWidth * 0.4) + SEAT_MAT_GAP;
-  return { seatWidth, seatHeight, tableHeaderHeight, outerMargin, leftBand, topBand, centerBand };
+  // Mobile won pile cards are much smaller; use actual height so the mat can grow downward
+  const { h: cardH } = getCardSize(viewportW);
+  const mobileBotBand = viewportW < 480
+    ? Math.round(cardH * 0.7) + WON_STACK_GAP + outerMargin
+    : undefined;
+  return { seatWidth, seatHeight, tableHeaderHeight, outerMargin, leftBand, topBand, centerBand, mobileBotBand };
 }

@@ -474,8 +474,9 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     () => getCenterRect(tableSize.w, tableSize.h, dockH, sidebarW, {
       leftBand: mobileTokens.centerBand ?? mobileTokens.leftBand,
       topBand: mobileTokens.topBand,
+      bottomBand: mobileTokens.mobileBotBand,
     }),
-    [tableSize.w, tableSize.h, dockH, sidebarW, mobileTokens.centerBand, mobileTokens.leftBand, mobileTokens.topBand]
+    [tableSize.w, tableSize.h, dockH, sidebarW, mobileTokens.centerBand, mobileTokens.leftBand, mobileTokens.topBand, mobileTokens.mobileBotBand]
   );
 
   // Development-only geometry overlay (query param or localStorage flag).
@@ -498,23 +499,18 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     () => getMatPosition(centerRect, matSize.w, matSize.h),
     [centerRect, matSize.w, matSize.h, MAT_VERTICAL_BIAS, MAT_TOP_OFFSET]
   );
-  const seatPositions = useMemo(() => {
-    const positions = getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize, {
+  const seatPositions = useMemo(
+    () => getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize, {
       seatWidth: mobileTokens.seatWidth,
       seatHeight: mobileTokens.seatHeight,
       outerMargin: mobileTokens.outerMargin,
       tableHeaderHeight: mobileTokens.tableHeaderHeight,
       leftBand: mobileTokens.leftBand,
-    });
-    // On narrow mobile: move left/right seats to same row as top seat (corner-row layout)
-    if (viewport.w < 480) {
-      positions.left = { ...positions.left, y: positions.top.y };
-      positions.right = { ...positions.right, y: positions.top.y };
-    }
-    return positions;
-  }, [tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize,
-      mobileTokens.seatWidth, mobileTokens.seatHeight, mobileTokens.outerMargin,
-      mobileTokens.tableHeaderHeight, mobileTokens.leftBand, viewport.w]);
+    }),
+    [tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize,
+     mobileTokens.seatWidth, mobileTokens.seatHeight, mobileTokens.outerMargin,
+     mobileTokens.tableHeaderHeight, mobileTokens.leftBand]
+  );
 
   // Expose computed geometry to CSS (used for trick scroll sizing, etc.).
   // Use layout effect to avoid a "one paint behind" mismatch on fast resizes.
