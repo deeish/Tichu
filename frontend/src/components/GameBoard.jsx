@@ -1489,12 +1489,16 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
                 : mobileTokens.seatWidth;
               const effectiveSeatH = isMobileSide
                 ? (mobileTokens.seatHeightSide ?? mobileTokens.seatHeight)
-                : mobileTokens.seatHeight;
+                : isTop && viewport.w < 480
+                  ? (mobileTokens.seatHeightTop ?? mobileTokens.seatHeight)
+                  : mobileTokens.seatHeight;
               const chipExchangeSize = (() => {
                 if (viewport.w >= 480) return exchangeCardSize;
                 const baseW = 38, baseH = 54;
                 if (isMobileSide) return { w: Math.round(baseW * 0.52), h: Math.round(baseH * 0.52) };
-                return { w: Math.round(effectiveSeatH * baseW / baseH), h: effectiveSeatH };
+                // Top chip: card fills content area (chip height minus vertical padding ~8px)
+                const h = effectiveSeatH - 8;
+                return { w: Math.round(h * baseW / baseH), h };
               })();
               const isTouchExchangeTarget = isTouch && isExchangeDropTarget && !!exchangePendingCard;
               const wonStackLeft = isTop
@@ -1512,9 +1516,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
                       left: `${posObj.x}px`,
                       top: `${posObj.y}px`,
                       width: effectiveSeatW,
-                      height: isTop && viewport.w < 480 && isExchanging && exchangeAssignedCard
-                        ? 'auto'
-                        : effectiveSeatH,
+                      height: effectiveSeatH,
                     }}
                     onClick={isTouchExchangeTarget ? () => {
                       handleDropOnSlot(exchangeSlotIndex, exchangePendingCard);

@@ -283,7 +283,9 @@ export function getMobileAwareTokens(viewportW) {
     seatWidth = Math.min(seatWidth, Math.floor((viewportW - 2 * outerMargin - 16) / 3));
   }
   const leftBand = outerMargin + seatWidth + SEAT_MAT_GAP;
-  const topBand = tableHeaderHeight + TABLE_HEADER_SEAT_GAP + seatHeight + SEAT_MAT_GAP;
+  // Top chip is taller than the scaled seatHeight on mobile so text can stack without truncation
+  const seatHeightTop = viewportW < 480 ? 52 : seatHeight;
+  const topBand = tableHeaderHeight + TABLE_HEADER_SEAT_GAP + seatHeightTop + SEAT_MAT_GAP;
   // Narrower band for mat sizing on mobile — seats overlap mat edges (seats have higher z-index)
   const centerBand = outerMargin + Math.round(seatWidth * 0.4) + SEAT_MAT_GAP;
   const seatWidthSide  = viewportW < 480 ? 56  : seatWidth;
@@ -296,6 +298,6 @@ export function getMobileAwareTokens(viewportW) {
   const mobileBotBand = viewportW < 480
     ? Math.round(cardH * 0.7) + WON_STACK_GAP + outerMargin
     : undefined;
-  return { seatWidth, seatHeight, tableHeaderHeight, outerMargin, leftBand, topBand,
+  return { seatWidth, seatHeight, seatHeightTop, tableHeaderHeight, outerMargin, leftBand, topBand,
            centerBand, centerBandSide, seatWidthSide, seatHeightSide, mobileBotBand };
 }

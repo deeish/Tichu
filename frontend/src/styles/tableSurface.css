@@ -587,6 +587,11 @@
     font-size: 8px;
     gap: 3px;
   }
+  .seat--top .seat-meta {
+    flex-direction: column;
+    gap: 1px;
+    align-items: flex-start;
+  }
   .seat-team-pill {
     font-size: 7px;
     padding: 1px 3px;
