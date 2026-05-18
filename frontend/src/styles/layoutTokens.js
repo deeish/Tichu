@@ -145,6 +145,7 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
   const leftBand = overrides.leftBand ?? LEFT_BAND;
 
   const seatWSide = overrides.seatWidthSide ?? seatW;
+  const seatHSide = overrides.seatHeightSide ?? seatH;
   const rightX = tableW - outerMargin - seatWSide;
   const tableH = _tableH;
   const seatMinY = 0;
@@ -160,7 +161,7 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
   const seatMaxX = Math.max(0, tableW - outerMargin - seatWSide);
 
   const leftSeatX = clamp(outerMargin, seatMinX, seatMaxX);
-  const leftSeatY = clamp(Math.round(matCenterY - seatH / 2), seatMinY, seatMaxY);
+  const leftSeatY = clamp(Math.round(matCenterY - seatHSide / 2), seatMinY, Math.max(0, tableH - seatHSide));
 
   const topSeatX = clamp(Math.round(matCenterX - seatW / 2), seatMinX, seatMaxX);
   const topSeatYClamped = clamp(topSeatY, seatMinY, seatMaxY);

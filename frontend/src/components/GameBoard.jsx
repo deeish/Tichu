@@ -504,13 +504,14 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       seatWidth: mobileTokens.seatWidth,
       seatWidthSide: mobileTokens.seatWidthSide,
       seatHeight: mobileTokens.seatHeight,
+      seatHeightSide: mobileTokens.seatHeightSide,
       outerMargin: mobileTokens.outerMargin,
       tableHeaderHeight: mobileTokens.tableHeaderHeight,
       leftBand: mobileTokens.leftBand,
     }),
     [tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize,
-     mobileTokens.seatWidth, mobileTokens.seatWidthSide, mobileTokens.seatHeight, mobileTokens.outerMargin,
-     mobileTokens.tableHeaderHeight, mobileTokens.leftBand]
+     mobileTokens.seatWidth, mobileTokens.seatWidthSide, mobileTokens.seatHeight, mobileTokens.seatHeightSide,
+     mobileTokens.outerMargin, mobileTokens.tableHeaderHeight, mobileTokens.leftBand]
   );
 
   // Expose computed geometry to CSS (used for trick scroll sizing, etc.).
