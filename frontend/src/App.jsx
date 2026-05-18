@@ -270,7 +270,6 @@ function App() {
     const handlers = {
       onConnect: () => {
         setIsConnected(true)
-        setPlayerId(socket.id)
         const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
         const savedToken = localStorage.getItem(REJOIN_TOKEN_KEY)
         if (savedGameId && savedToken) {
@@ -529,12 +528,10 @@ function App() {
           if (
             msg.includes('rejoin') ||
             msg === 'Game not found' ||
-            msg === 'Already in game' ||
             msg === 'Invalid rejoin token' ||
             code === 'not_in_game' ||
             code === 'game_not_found' ||
-            code === 'invalid_rejoin_token' ||
-            code === 'already_in_game'
+            code === 'invalid_rejoin_token'
           ) {
             clearRejoinCreds()
           }
@@ -564,6 +561,17 @@ function App() {
       toastTimersRef.current.clear()
     }
   }, [showToast])
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.hidden || !socket.connected) return
+      if (localStorage.getItem(REJOIN_GAME_KEY)) {
+        socket.emit('get-game-state', { reason: 'visibility-resume' })
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [])
 
   const handleCreateGame = () => {
     if (!playerName.trim()) {

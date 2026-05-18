@@ -590,7 +590,7 @@ function setupSocketHandlers(io, games, players) {
         socket.emit('error', { code: 'invalid_rejoin_token', message: 'Invalid rejoin token', requestId });
         return;
       }
-      if (!player.disconnected) {
+      if (!player.disconnected && player.socketId === socket.id) {
         socket.emit('error', { code: 'already_in_game', message: 'Already in game', requestId });
         return;
       }
@@ -618,10 +618,13 @@ function setupSocketHandlers(io, games, players) {
           p = game.players.find((x) => x.id === playerInfo.playerId);
         }
         if (game && p) {
-          p.disconnected = true;
-          p.disconnectedAt = Date.now();
-          p.socketId = null;
-          broadcastGameUpdate(io, game, games);
+          if (p.socketId === socket.id) {
+            p.disconnected = true;
+            p.disconnectedAt = Date.now();
+            p.socketId = null;
+            broadcastGameUpdate(io, game, games);
+          }
+          // else: player already rejoined with a newer socket — don't disrupt their session
         } else if (game && playerInfo) {
           console.warn('[disconnect] no player row matched socket', {
             socketId: socket.id,
