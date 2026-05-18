@@ -459,6 +459,12 @@ function App() {
             handleResyncGame('protocol-mismatch')
             return
           }
+          // Save credentials before the stale-version check so a game-update/game-state
+          // version tie (both carry V+1) doesn't silently lose the rejoin token.
+          const earlyMe = findMyPlayerInWireSnapshot(data.game.players, socket.id)
+          if (earlyMe?.token && data.game.id) {
+            saveRejoinCreds(data.game.id, earlyMe.token)
+          }
           const incomingVersion = typeof data?.game?.stateVersion === 'number' ? data.game.stateVersion : null
           if (incomingVersion != null && incomingVersion <= lastAppliedServerStateVersionRef.current) {
             if (isDebugGameSync()) {
@@ -529,12 +535,13 @@ function App() {
             msg.includes('rejoin') ||
             msg === 'Game not found' ||
             msg === 'Invalid rejoin token' ||
-            code === 'not_in_game' ||
             code === 'game_not_found' ||
             code === 'invalid_rejoin_token'
           ) {
             clearRejoinCreds()
           }
+          // not_in_game is a transient race (rejoin not yet processed by server) —
+          // do not clear credentials so the next reconnect can still rejoin.
           showToast((data?.message ?? msg) || 'Unexpected error')
         } catch (e) {
           console.error('[socket error handler]', e); reportClientError({ source: 'socket-error', message: e?.message ?? String(e) })

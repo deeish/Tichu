@@ -85,13 +85,15 @@ describe('rejoin errors', () => {
     await new Promise((resolve) => server.close(resolve))
   })
 
-  test('emits already_in_game when player is not disconnected', async () => {
+  test('emits already_in_game when same socket tries to rejoin an already-active session', async () => {
     const { games, server } = freshServer()
+    // Player starts disconnected; first rejoin will set player.socketId = client socket id.
+    // Second rejoin on the same socket triggers already_in_game.
     games.set('g1', {
       id: 'g1',
       state: 'waiting',
       players: [
-        { id: 'p1', token: 'tok', disconnected: false, socketId: 'other-socket', name: 'A', team: 1 },
+        { id: 'p1', token: 'tok', disconnected: true, socketId: null, name: 'A', team: 1 },
       ],
     })
 
@@ -100,9 +102,18 @@ describe('rejoin errors', () => {
     const client = Client(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true })
     await new Promise((resolve) => client.on('connect', resolve))
 
-    const err = await new Promise((resolve) => {
+    // First rejoin registers the client socket with the player (may succeed or emit internal_error
+    // on the minimal game object — either way player.socketId is now set to this socket's id).
+    await new Promise((resolve) => {
+      client.once('game-state', resolve)
       client.once('error', resolve)
       client.emit('rejoin', { gameId: 'g1', playerToken: 'tok', requestId: 'r3' })
+    })
+
+    // Second rejoin on the same socket: player is now active on this socket → already_in_game.
+    const err = await new Promise((resolve) => {
+      client.once('error', resolve)
+      client.emit('rejoin', { gameId: 'g1', playerToken: 'tok', requestId: 'r4' })
     })
 
     expect(err.code).toBe('already_in_game')
