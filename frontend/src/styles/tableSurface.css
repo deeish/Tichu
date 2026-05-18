@@ -781,5 +781,8 @@
     font-size: 8px;
     padding: 1px 5px;
   }
+  .seat--mobile-side .seat-badges {
+    display: none;
+  }
 }
 
