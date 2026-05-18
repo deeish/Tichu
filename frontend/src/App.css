@@ -1078,8 +1078,8 @@ body {
 
 .end-game-test-stats {
   position: fixed;
-  top: 12px;
-  left: 160px;
+  top: 58px;
+  left: 12px;
   z-index: 9999;
   padding: 0.5rem 1rem;
   font-size: 0.9rem;

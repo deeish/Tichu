@@ -923,7 +923,7 @@ function App() {
               <button type="button" className="landing-link" onClick={handleCreateTestGame}>
                 Quick test game (4 players)
               </button>
-              <button type="button" className="landing-link" onClick={() => setShowEndGameTest(true)}>
+              <button type="button" className="landing-link" onClick={() => { setShowEndGameTest(true); setShowStatsPopup(true); }}>
                 Test end game screen
               </button>
             </div>
