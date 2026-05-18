@@ -169,6 +169,17 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
+@media (max-width: 480px) {
+  .wished-card-panel {
+    padding: var(--s8);
+    gap: var(--s4);
+  }
+  .wished-card-label {
+    font-size: 9px;
+    letter-spacing: 0.02em;
+  }
+}
+
 .wished-card-display {
   line-height: 0;
   border-radius: 6px;

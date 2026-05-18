@@ -1592,8 +1592,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
                 <div className="wished-card-display">
                   <Card
                     card={{ type: 'standard', rank: game.mahJongWish.wishedRank, suit: 'hearts' }}
-                    width={44}
-                    height={62}
+                    width={viewport.w < 480 ? 30 : 44}
+                    height={viewport.w < 480 ? 44 : 62}
                     compact
                   />
                 </div>
