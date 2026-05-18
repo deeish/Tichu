@@ -472,11 +472,11 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
 
   const centerRect = useMemo(
     () => getCenterRect(tableSize.w, tableSize.h, dockH, sidebarW, {
-      leftBand: mobileTokens.centerBand ?? mobileTokens.leftBand,
+      leftBand: mobileTokens.centerBandSide ?? mobileTokens.centerBand ?? mobileTokens.leftBand,
       topBand: mobileTokens.topBand,
       bottomBand: mobileTokens.mobileBotBand,
     }),
-    [tableSize.w, tableSize.h, dockH, sidebarW, mobileTokens.centerBand, mobileTokens.leftBand, mobileTokens.topBand, mobileTokens.mobileBotBand]
+    [tableSize.w, tableSize.h, dockH, sidebarW, mobileTokens.centerBandSide, mobileTokens.centerBand, mobileTokens.leftBand, mobileTokens.topBand, mobileTokens.mobileBotBand]
   );
 
   // Development-only geometry overlay (query param or localStorage flag).
@@ -502,13 +502,14 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   const seatPositions = useMemo(
     () => getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize, {
       seatWidth: mobileTokens.seatWidth,
+      seatWidthSide: mobileTokens.seatWidthSide,
       seatHeight: mobileTokens.seatHeight,
       outerMargin: mobileTokens.outerMargin,
       tableHeaderHeight: mobileTokens.tableHeaderHeight,
       leftBand: mobileTokens.leftBand,
     }),
     [tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize,
-     mobileTokens.seatWidth, mobileTokens.seatHeight, mobileTokens.outerMargin,
+     mobileTokens.seatWidth, mobileTokens.seatWidthSide, mobileTokens.seatHeight, mobileTokens.outerMargin,
      mobileTokens.tableHeaderHeight, mobileTokens.leftBand]
   );
 
@@ -1481,23 +1482,30 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
               const isDragOverThisSeat = exchangeDragOverSlot === exchangeSlotIndex;
 
               const isTop = pos === 'top';
+              const isMobileSide = !isTop && viewport.w < 480;
+              const effectiveSeatW = isMobileSide
+                ? (mobileTokens.seatWidthSide ?? mobileTokens.seatWidth)
+                : mobileTokens.seatWidth;
+              const effectiveSeatH = isMobileSide
+                ? (mobileTokens.seatHeightSide ?? mobileTokens.seatHeight)
+                : mobileTokens.seatHeight;
               const isTouchExchangeTarget = isTouch && isExchangeDropTarget && !!exchangePendingCard;
               const wonStackLeft = isTop
-                ? posObj.x + mobileTokens.seatWidth + WON_STACK_GAP
-                : posObj.x + (mobileTokens.seatWidth - wonCardSize.w) / 2;
+                ? posObj.x + effectiveSeatW + WON_STACK_GAP
+                : posObj.x + (effectiveSeatW - wonCardSize.w) / 2;
               const wonStackTop = isTop
-                ? posObj.y + (mobileTokens.seatHeight - wonCardSize.h) / 2
-                : posObj.y + mobileTokens.seatHeight + WON_STACK_GAP;
+                ? posObj.y + (effectiveSeatH - wonCardSize.h) / 2
+                : posObj.y + effectiveSeatH + WON_STACK_GAP;
 
               return (
                 <Fragment key={`seat-${pos}-${player.id}`}>
                   <div
-                    className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''} ${isDisconnected ? 'seat--disconnected' : ''} ${isExchangeDropTarget ? 'seat--exchange-drop' : ''} ${isDragOverThisSeat ? 'seat--exchange-drag-over' : ''} ${isTouchExchangeTarget ? 'seat--exchange-touch-target' : ''}`}
+                    className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''} ${isDisconnected ? 'seat--disconnected' : ''} ${isExchangeDropTarget ? 'seat--exchange-drop' : ''} ${isDragOverThisSeat ? 'seat--exchange-drag-over' : ''} ${isTouchExchangeTarget ? 'seat--exchange-touch-target' : ''} ${isMobileSide ? 'seat--mobile-side' : ''}`}
                     style={{
                       left: `${posObj.x}px`,
                       top: `${posObj.y}px`,
-                      width: mobileTokens.seatWidth,
-                      height: mobileTokens.seatHeight,
+                      width: effectiveSeatW,
+                      height: effectiveSeatH,
                     }}
                     onClick={isTouchExchangeTarget ? () => {
                       handleDropOnSlot(exchangeSlotIndex, exchangePendingCard);

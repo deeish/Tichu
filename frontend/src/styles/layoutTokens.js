@@ -144,7 +144,8 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
   const headerH = overrides.tableHeaderHeight ?? TABLE_HEADER_HEIGHT;
   const leftBand = overrides.leftBand ?? LEFT_BAND;
 
-  const rightX = tableW - outerMargin - seatW;
+  const seatWSide = overrides.seatWidthSide ?? seatW;
+  const rightX = tableW - outerMargin - seatWSide;
   const tableH = _tableH;
   const seatMinY = 0;
   const seatMaxY = Math.max(0, tableH - seatH);
@@ -156,7 +157,7 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
   const matCenterY = matPosition.y + matSize.h / 2;
 
   const seatMinX = outerMargin;
-  const seatMaxX = Math.max(0, tableW - outerMargin - seatW);
+  const seatMaxX = Math.max(0, tableW - outerMargin - seatWSide);
 
   const leftSeatX = clamp(outerMargin, seatMinX, seatMaxX);
   const leftSeatY = clamp(Math.round(matCenterY - seatH / 2), seatMinY, seatMaxY);
@@ -284,10 +285,16 @@ export function getMobileAwareTokens(viewportW) {
   const topBand = tableHeaderHeight + TABLE_HEADER_SEAT_GAP + seatHeight + SEAT_MAT_GAP;
   // Narrower band for mat sizing on mobile — seats overlap mat edges (seats have higher z-index)
   const centerBand = outerMargin + Math.round(seatWidth * 0.4) + SEAT_MAT_GAP;
+  const seatWidthSide  = viewportW < 480 ? 64  : seatWidth;
+  const seatHeightSide = viewportW < 480 ? 76  : seatHeight;
+  const centerBandSide = viewportW < 480
+    ? outerMargin + Math.round(seatWidthSide * 0.4) + SEAT_MAT_GAP
+    : centerBand;
   // Mobile won pile cards are much smaller; use actual height so the mat can grow downward
   const { h: cardH } = getCardSize(viewportW);
   const mobileBotBand = viewportW < 480
     ? Math.round(cardH * 0.7) + WON_STACK_GAP + outerMargin
     : undefined;
-  return { seatWidth, seatHeight, tableHeaderHeight, outerMargin, leftBand, topBand, centerBand, mobileBotBand };
+  return { seatWidth, seatHeight, tableHeaderHeight, outerMargin, leftBand, topBand,
+           centerBand, centerBandSide, seatWidthSide, seatHeightSide, mobileBotBand };
 }

@@ -726,3 +726,46 @@
   }
 }
 
+@media (max-width: 480px) {
+  .seat--mobile-side {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 2px;
+    gap: 2px;
+  }
+  .seat--mobile-side .seat-avatar {
+    width: 26px;
+    height: 26px;
+    font-size: 9px;
+    flex-shrink: 0;
+  }
+  .seat--mobile-side .seat-body {
+    align-items: center;
+    width: 100%;
+    gap: 1px;
+  }
+  .seat--mobile-side .seat-name-row {
+    justify-content: center;
+  }
+  .seat--mobile-side .seat-name {
+    font-size: 9px;
+    text-align: center;
+    max-width: 100%;
+  }
+  .seat--mobile-side .seat-meta {
+    font-size: 7px;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+  }
+  .seat--mobile-side .seat-declaration-float {
+    top: 2px;
+    right: 2px;
+  }
+  .seat--mobile-side .seat-declaration-pill {
+    font-size: 7px;
+    padding: 1px 4px;
+  }
+}
+
