@@ -759,13 +759,9 @@
     justify-content: center;
     gap: 2px;
   }
-  .seat--mobile-side .seat-declaration-float {
-    top: 2px;
-    right: 2px;
-  }
   .seat--mobile-side .seat-declaration-pill {
-    font-size: 7px;
-    padding: 1px 4px;
+    font-size: 8px;
+    padding: 1px 5px;
   }
 }
 
