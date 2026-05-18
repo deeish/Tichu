@@ -636,12 +636,36 @@
   pointer-events: auto;
 }
 
+.prompt-strip p {
+  margin: 0;
+}
+
 .prompt-strip .prompt-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s12);
   justify-content: center;
   margin-top: var(--s12);
+}
+
+@media (max-width: 480px) {
+  .prompt-strip {
+    padding: var(--s8) var(--s12);
+    font-size: 13px;
+    width: calc(100vw - var(--s32));
+    max-width: none;
+  }
+  .prompt-strip .prompt-actions {
+    gap: var(--s8);
+    margin-top: var(--s8);
+  }
+  .prompt-strip .dock-btn,
+  .prompt-strip .dock-btn-secondary {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    font-size: 13px;
+  }
 }
 
 /* ========== Theme: try one at a time by setting data-theme on .game-layout ========== */
