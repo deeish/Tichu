@@ -1427,6 +1427,13 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           {isSidebarOpen ? 'Hide panel' : 'Show panel'}
         </button>
       )}
+      {sidebarMode === 'overlay' && (
+        <div
+          className={`sidebar-scrim${isSidebarOpen ? ' sidebar-scrim--visible' : ''}`}
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       {geomDebug && (
         <div className="geom-debug-overlay" aria-hidden="true">
           {`viewport: w=${Math.round(viewport.w)} h=${Math.round(viewport.h)} mode=${sidebarMode} open=${isSidebarOpen}\n`}
