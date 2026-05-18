@@ -276,7 +276,7 @@ export function getMobileAwareTokens(viewportW) {
   const scale = Math.max(0.5, viewportW / 600);
   let seatWidth = Math.round(SEAT_WIDTH * scale);
   const seatHeight = Math.round(SEAT_HEIGHT * scale);
-  const tableHeaderHeight = Math.min(TABLE_HEADER_HEIGHT, 60);
+  const tableHeaderHeight = Math.min(TABLE_HEADER_HEIGHT, 80);
   const outerMargin = Math.round(OUTER_MARGIN * scale);
   // Cap seatWidth so 3 chips fit side-by-side with 8px gaps on very narrow screens
   if (viewportW < 480) {
