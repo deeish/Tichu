@@ -280,14 +280,21 @@ function App() {
           pendingRejoinRef.current = { gameId: savedGameId, timerId: null, resolved: false }
           const requestId = nextRequestId()
           setClientCorrelation({ requestId })
-          socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId })
           setRejoinPending(true)
+          socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId }, (ack) => {
+            // Ack fires only after server has called players.set() — safe to enable play.
+            setRejoinPending(false)
+            if (ack?.error === 'game_not_found' || ack?.error === 'invalid_rejoin_token') {
+              clearRejoinCreds()
+              setGameState(null)
+              setGameId('')
+            }
+          })
           pendingRejoinRef.current.timerId = setTimeout(() => {
             if (pendingRejoinRef.current.resolved) return
-            // Do NOT clear credentials here — the rejoin may just be slow (high latency,
-            // server load). Genuine failures (game_not_found, invalid_rejoin_token) clear
-            // credentials via onError. Clearing them preemptively here destroys the ability
-            // to rejoin on the next reconnect if this get-game-state also races.
+            // If ack never arrived, unlock play so the user isn't stuck forever.
+            // Part C in onError will auto-rejoin if make-move then fails with not_in_game.
+            setRejoinPending(false)
             handleResyncGame('rejoin-timeout')
           }, 2500)
         }
@@ -456,7 +463,6 @@ function App() {
             pendingRejoinRef.current.resolved = true
             if (pendingRejoinRef.current.timerId) clearTimeout(pendingRejoinRef.current.timerId)
             pendingRejoinRef.current.timerId = null
-            setRejoinPending(false)
           }
           if (typeof data?.game?.protocolVersion === 'number' && data.game.protocolVersion !== EXPECTED_PROTOCOL_VERSION) {
             setProtocolMismatch(true)
@@ -535,6 +541,27 @@ function App() {
         try {
           const msg = data?.message ?? ''
           const code = data?.code
+          if (code === 'not_in_game') {
+            // Server doesn't have this socket registered — likely the rejoin ack was slow
+            // and the user tapped before it arrived. Silently retry rejoin if credentials exist.
+            const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
+            const savedToken = localStorage.getItem(REJOIN_TOKEN_KEY)
+            const noActiveRejoin = !pendingRejoinRef.current.gameId || pendingRejoinRef.current.resolved
+            if (savedGameId && savedToken && socket.connected && noActiveRejoin) {
+              pendingRejoinRef.current = { gameId: savedGameId, timerId: null, resolved: false }
+              setRejoinPending(true)
+              socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId: nextRequestId() }, (ack) => {
+                setRejoinPending(false)
+                pendingRejoinRef.current.resolved = true
+                if (ack?.error === 'game_not_found' || ack?.error === 'invalid_rejoin_token') {
+                  clearRejoinCreds()
+                  setGameState(null)
+                  setGameId('')
+                }
+              })
+              return
+            }
+          }
           if (
             msg.includes('rejoin') ||
             msg === 'Game not found' ||
@@ -544,8 +571,6 @@ function App() {
           ) {
             clearRejoinCreds()
           }
-          // not_in_game is a transient race (rejoin not yet processed by server) —
-          // do not clear credentials so the next reconnect can still rejoin.
           showToast((data?.message ?? msg) || 'Unexpected error')
         } catch (e) {
           console.error('[socket error handler]', e); reportClientError({ source: 'socket-error', message: e?.message ?? String(e) })

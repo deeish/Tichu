@@ -567,31 +567,36 @@ function setupSocketHandlers(io, games, players) {
       });
     });
 
-    safeOn('rejoin', (payload) => {
+    safeOn('rejoin', (payload, ack) => {
       const body = payload && typeof payload === 'object' ? payload : null;
       const gameId = body?.gameId;
       const playerToken = body?.playerToken;
       const requestId = body?.requestId;
       if (typeof gameId !== 'string' || !gameId.trim()) {
         socket.emit('error', { code: 'bad_payload', message: 'Invalid rejoin gameId', requestId });
+        if (typeof ack === 'function') ack({ error: 'bad_payload' });
         return;
       }
       if (typeof playerToken !== 'string' || !playerToken.trim()) {
         socket.emit('error', { code: 'bad_payload', message: 'Invalid rejoin token', requestId });
+        if (typeof ack === 'function') ack({ error: 'bad_payload' });
         return;
       }
       const game = games.get(gameId);
       if (!game) {
         socket.emit('error', { code: 'game_not_found', message: 'Game not found', requestId });
+        if (typeof ack === 'function') ack({ error: 'game_not_found' });
         return;
       }
       const player = game.players.find((p) => p.token === playerToken);
       if (!player) {
         socket.emit('error', { code: 'invalid_rejoin_token', message: 'Invalid rejoin token', requestId });
+        if (typeof ack === 'function') ack({ error: 'invalid_rejoin_token' });
         return;
       }
       if (!player.disconnected && player.socketId === socket.id) {
         socket.emit('error', { code: 'already_in_game', message: 'Already in game', requestId });
+        if (typeof ack === 'function') ack({ error: 'already_in_game' });
         return;
       }
       player.socketId = socket.id;
@@ -601,6 +606,8 @@ function setupSocketHandlers(io, games, players) {
       if (!player.name) player.name = players.get(socket.id)?.playerName || 'Player';
       players.set(socket.id, { gameId, playerName: player.name, playerId: player.id });
       socket.join(gameId);
+      // Ack BEFORE broadcasting so client unblocks only after players.set() is guaranteed done.
+      if (typeof ack === 'function') ack({ success: true });
       broadcastGameUpdate(io, game, games);
       const view = getPlayerView(game, socket.id);
       capGameForWire(view);
