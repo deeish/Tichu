@@ -155,6 +155,7 @@ function App() {
   const [playerName, setPlayerName] = useState('')
   const [gameId, setGameId] = useState('')
   const [isConnected, setIsConnected] = useState(false)
+  const [rejoinPending, setRejoinPending] = useState(false)
   const [playerId, setPlayerId] = useState(null)
   const [showEndGameTest, setShowEndGameTest] = useState(false)
   const [showStatsPopup, setShowStatsPopup] = useState(false)
@@ -280,6 +281,7 @@ function App() {
           const requestId = nextRequestId()
           setClientCorrelation({ requestId })
           socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId })
+          setRejoinPending(true)
           pendingRejoinRef.current.timerId = setTimeout(() => {
             if (pendingRejoinRef.current.resolved) return
             // Do NOT clear credentials here — the rejoin may just be slow (high latency,
@@ -293,6 +295,7 @@ function App() {
       },
       onDisconnect: () => {
         try { setIsConnected(false) } catch (e) { console.error('[disconnect]', e); reportClientError({ source: 'disconnect', message: e?.message }) }
+        setRejoinPending(false)
         if (pendingRejoinRef.current.timerId) {
           clearTimeout(pendingRejoinRef.current.timerId)
         }
@@ -453,6 +456,7 @@ function App() {
             pendingRejoinRef.current.resolved = true
             if (pendingRejoinRef.current.timerId) clearTimeout(pendingRejoinRef.current.timerId)
             pendingRejoinRef.current.timerId = null
+            setRejoinPending(false)
           }
           if (typeof data?.game?.protocolVersion === 'number' && data.game.protocolVersion !== EXPECTED_PROTOCOL_VERSION) {
             setProtocolMismatch(true)
@@ -835,6 +839,7 @@ function App() {
             socket={socket}
             playerId={playerId || socket.id}
             isConnected={isConnected}
+            rejoinPending={rejoinPending}
             onResyncGame={handleResyncGame}
             onBackToLobby={handleLeaveParty}
           />

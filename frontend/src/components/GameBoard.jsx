@@ -78,7 +78,7 @@ function exchangeSeatSortWeight(seatKey) {
   return 3;
 }
 
-function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, onBackToLobby = null }) {
+function GameBoard({ game, socket, playerId, isConnected = true, rejoinPending = false, onResyncGame, onBackToLobby = null }) {
   // ----- UI state (do not reset on game update unless invalidated) -----
   const [tableTheme, setTableTheme] = useState(() => {
     try {
@@ -1163,10 +1163,11 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     game?.state === 'playing' &&
     selectedStillInHand &&
     selectedCards.length > 0 &&
+    !rejoinPending &&
     (isMyTurn || selectedIsBomb);
   const mustPlayAfterTichu =
     !!game?.tichuDeclarations?.[playerId] && !game?.firstCardPlayed?.[playerId];
-  const canPass = isMyTurn && game?.state === 'playing' && !mustPlayAfterTichu;
+  const canPass = isMyTurn && game?.state === 'playing' && !mustPlayAfterTichu && !rejoinPending;
 
   // ---- Auto-pass (UI toggle) ----
   // Keep this conservative so we don't spam invalid pass actions.
