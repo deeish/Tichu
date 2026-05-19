@@ -283,6 +283,11 @@ function App() {
           setRejoinPending(true)
           socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId }, (ack) => {
             // Ack fires only after server has called players.set() — safe to enable play.
+            pendingRejoinRef.current.resolved = true
+            if (pendingRejoinRef.current.timerId) {
+              clearTimeout(pendingRejoinRef.current.timerId)
+              pendingRejoinRef.current.timerId = null
+            }
             setRejoinPending(false)
             if (ack?.error === 'game_not_found' || ack?.error === 'invalid_rejoin_token') {
               clearRejoinCreds()
@@ -579,10 +584,63 @@ function App() {
       },
     }
 
+    // Proactive session validation when tab becomes visible.
+    // Covers: (a) socket reconnected while JS was suspended on iOS — onConnect queued, not yet fired;
+    // (b) zombie socket (server restart cleared players map while socket appeared connected).
+    const handleVisibilityChange = () => {
+      if (document.hidden) return
+      const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
+      const savedToken = localStorage.getItem(REJOIN_TOKEN_KEY)
+      if (!savedGameId || !savedToken) return
+      if (!socket.connected) {
+        socket.connect()
+        return
+      }
+      // Already rejoining? Don't double-emit.
+      if (pendingRejoinRef.current.gameId && !pendingRejoinRef.current.resolved) return
+      if (pendingRejoinRef.current.timerId) {
+        clearTimeout(pendingRejoinRef.current.timerId)
+        pendingRejoinRef.current.timerId = null
+      }
+      pendingRejoinRef.current = { gameId: savedGameId, timerId: null, resolved: false }
+      setRejoinPending(true)
+      const visRequestId = nextRequestId()
+      socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId: visRequestId }, (ack) => {
+        pendingRejoinRef.current.resolved = true
+        if (pendingRejoinRef.current.timerId) {
+          clearTimeout(pendingRejoinRef.current.timerId)
+          pendingRejoinRef.current.timerId = null
+        }
+        setRejoinPending(false)
+        if (ack?.error === 'game_not_found' || ack?.error === 'invalid_rejoin_token') {
+          clearRejoinCreds()
+          setGameState(null)
+          setGameId('')
+        }
+      })
+      pendingRejoinRef.current.timerId = setTimeout(() => {
+        if (pendingRejoinRef.current.resolved) return
+        pendingRejoinRef.current.resolved = true
+        pendingRejoinRef.current.timerId = null
+        setRejoinPending(false)
+        handleResyncGame('vis-rejoin-timeout')
+      }, 2500)
+    }
+
+    // If device comes back online while disconnected, force reconnect so onConnect handles rejoin.
+    const handleNetworkOnline = () => {
+      if (!socket.connected) socket.connect()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('online', handleNetworkOnline)
+
     if (socket.connected) handlers.onConnect()
     unsubscribe = subscribeSocketEvents(socket, handlers)
 
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('online', handleNetworkOnline)
       if (flushTimerRef.current != null) {
         clearTimeout(flushTimerRef.current)
         flushTimerRef.current = null
