@@ -1195,6 +1195,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, rejoinPending =
 
   const canAutoPass =
     autoPassUIEnabled &&
+    !rejoinPending &&
     game?.state === 'playing' &&
     isMyTurn &&
     selectedCards.length === 0 &&

@@ -85,10 +85,11 @@ describe('rejoin errors', () => {
     await new Promise((resolve) => server.close(resolve))
   })
 
-  test('emits already_in_game when same socket tries to rejoin an already-active session', async () => {
+  test('silently succeeds (game-state) when same socket rejoins an already-active session', async () => {
     const { games, server } = freshServer()
-    // Player starts disconnected; first rejoin will set player.socketId = client socket id.
-    // Second rejoin on the same socket triggers already_in_game.
+    // Player starts disconnected; first rejoin sets player.socketId = client socket id.
+    // Second rejoin on the same socket now returns game-state (not an error) because the
+    // session is active and we treat it as a state-refresh rather than a conflict.
     games.set('g1', {
       id: 'g1',
       state: 'waiting',
@@ -102,21 +103,22 @@ describe('rejoin errors', () => {
     const client = Client(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true })
     await new Promise((resolve) => client.on('connect', resolve))
 
-    // First rejoin registers the client socket with the player (may succeed or emit internal_error
-    // on the minimal game object — either way player.socketId is now set to this socket's id).
+    // First rejoin registers the client socket with the player.
     await new Promise((resolve) => {
       client.once('game-state', resolve)
       client.once('error', resolve)
       client.emit('rejoin', { gameId: 'g1', playerToken: 'tok', requestId: 'r3' })
     })
 
-    // Second rejoin on the same socket: player is now active on this socket → already_in_game.
-    const err = await new Promise((resolve) => {
+    // Second rejoin on the same socket: session already active → no 'already_in_game' error.
+    // May return game-state or an internal error on the minimal game object, but never already_in_game.
+    const result = await new Promise((resolve) => {
+      client.once('game-state', resolve)
       client.once('error', resolve)
       client.emit('rejoin', { gameId: 'g1', playerToken: 'tok', requestId: 'r4' })
     })
 
-    expect(err.code).toBe('already_in_game')
+    expect(result.code).not.toBe('already_in_game')
 
     client.close()
     await new Promise((resolve) => server.close(resolve))

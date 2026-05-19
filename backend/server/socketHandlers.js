@@ -154,6 +154,23 @@ function setupSocketHandlers(io, games, players) {
   io.on('connection', (socket) => {
     console.log('Player connected:', socket.id);
 
+    // Restore session synchronously from handshake auth so players.set() is populated
+    // before any event (auto-pass make-move, manual tap) can race with rejoin processing.
+    const { gameId: _authGameId, token: _authToken } = socket.handshake.auth || {};
+    if (_authGameId && _authToken) {
+      const _authGame = games.get(_authGameId);
+      const _authPlayer = _authGame?.players.find((p) => p.token === _authToken);
+      if (_authGame && _authPlayer && (_authPlayer.disconnected || _authPlayer.socketId !== socket.id)) {
+        _authPlayer.socketId = socket.id;
+        _authPlayer.disconnected = false;
+        delete _authPlayer.disconnectedAt;
+        if (!_authPlayer.name) _authPlayer.name = 'Player';
+        players.set(socket.id, { gameId: _authGameId, playerName: _authPlayer.name, playerId: _authPlayer.id });
+        socket.join(_authGameId);
+        console.log('[handshake-auth] session restored:', _authPlayer.name, socket.id, 'game', _authGameId);
+      }
+    }
+
     const safeOn = (eventName, handler) => safeSocketOn(socket, eventName, handler);
 
     function getCurrentStateVersion() {
@@ -595,8 +612,14 @@ function setupSocketHandlers(io, games, players) {
         return;
       }
       if (!player.disconnected && player.socketId === socket.id) {
-        socket.emit('error', { code: 'already_in_game', message: 'Already in game', requestId });
-        if (typeof ack === 'function') ack({ error: 'already_in_game' });
+        // Session already active on this socket (restored by handshake auth before this event).
+        // Ack success and send fresh game-state so the client unblocks and has current data.
+        if (typeof ack === 'function') ack({ success: true });
+        broadcastGameUpdate(io, game, games);
+        const existingView = getPlayerView(game, socket.id);
+        capGameForWire(existingView);
+        sanitizeWireSnapshot(existingView);
+        socket.emit('game-state', { game: existingView });
         return;
       }
       player.socketId = socket.id;

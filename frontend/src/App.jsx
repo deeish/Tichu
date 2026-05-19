@@ -292,8 +292,9 @@ function App() {
           })
           pendingRejoinRef.current.timerId = setTimeout(() => {
             if (pendingRejoinRef.current.resolved) return
-            // If ack never arrived, unlock play so the user isn't stuck forever.
-            // Part C in onError will auto-rejoin if make-move then fails with not_in_game.
+            // Mark resolved so Part C in onError can fire if make-move still fails.
+            pendingRejoinRef.current.resolved = true
+            pendingRejoinRef.current.timerId = null
             setRejoinPending(false)
             handleResyncGame('rejoin-timeout')
           }, 2500)
