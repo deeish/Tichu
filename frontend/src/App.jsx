@@ -282,10 +282,10 @@ function App() {
           socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId })
           pendingRejoinRef.current.timerId = setTimeout(() => {
             if (pendingRejoinRef.current.resolved) return
-            // Clear token creds so a broken token doesn't cause infinite reconnect attempts.
-            clearRejoinCreds()
-            // Deterministic fallback: request latest state once and let existing
-            // resync/backoff logic handle subsequent recovery.
+            // Do NOT clear credentials here — the rejoin may just be slow (high latency,
+            // server load). Genuine failures (game_not_found, invalid_rejoin_token) clear
+            // credentials via onError. Clearing them preemptively here destroys the ability
+            // to rejoin on the next reconnect if this get-game-state also races.
             handleResyncGame('rejoin-timeout')
           }, 2500)
         }
