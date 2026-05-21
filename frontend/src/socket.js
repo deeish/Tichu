@@ -10,6 +10,8 @@ const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001', {
     const token = localStorage.getItem('tichu_rejoin_token') || undefined
     cb(gameId && token ? { gameId, token } : {})
   },
+  reconnectionDelay: 500,
+  reconnectionDelayMax: 2500,
 })
 initClientErrorReport(socket)
 

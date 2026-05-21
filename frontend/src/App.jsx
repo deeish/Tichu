@@ -300,10 +300,9 @@ function App() {
             pendingRejoinRef.current.resolved = true
             pendingRejoinRef.current.timerId = null
             setRejoinPending(false)
-            // Ack didn't arrive — zombie socket or very slow network. Force a clean reconnect;
-            // handshake auth will restore the session synchronously before any event races.
-            socket.disconnect()
-            socket.connect()
+            // Ack didn't arrive — zombie socket or very slow network. Close the transport so
+            // Socket.IO's built-in reconnect fires (auth callback re-reads localStorage fresh).
+            socket.io.engine?.close()
           }, 2500)
         }
         console.log('Connected to server')
@@ -576,8 +575,7 @@ function App() {
                 pendingRejoinRef.current.resolved = true
                 pendingRejoinRef.current.timerId = null
                 setRejoinPending(false)
-                socket.disconnect()
-                socket.connect()
+                socket.io.engine?.close()
               }, 2500)
               return
             }
@@ -638,9 +636,8 @@ function App() {
         pendingRejoinRef.current.timerId = null
         setRejoinPending(false)
         // Ack didn't arrive — zombie socket (server timed out while JS was frozen on iOS).
-        // Force a clean reconnect; handshake auth restores the session before any event fires.
-        socket.disconnect()
-        socket.connect()
+        // Close the transport so Socket.IO's built-in reconnect fires with fresh auth creds.
+        socket.io.engine?.close()
       }, 2500)
     }
 
