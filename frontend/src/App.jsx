@@ -103,6 +103,7 @@ function App() {
   const lastAppliedServerStateVersionRef = useRef(-1)
   const requestSeqRef = useRef(0)
   const pendingRejoinRef = useRef({ gameId: null, timerId: null, resolved: false })
+  const hiddenAtRef = useRef(null)
   const nextRequestId = () => {
     requestSeqRef.current += 1
     return `${Date.now()}-${requestSeqRef.current}`
@@ -605,7 +606,15 @@ function App() {
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        if (socket.connected) socket.disconnect()
+        hiddenAtRef.current = Date.now()
+        return
+      }
+      const hiddenMs = hiddenAtRef.current ? Date.now() - hiddenAtRef.current : 0
+      hiddenAtRef.current = null
+      if (hiddenMs > 25_000) {
+        // Long background — server has killed the socket and iOS WebSocket is frozen.
+        // Reload is the only reliable path to a fresh connection.
+        window.location.reload()
         return
       }
       const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
