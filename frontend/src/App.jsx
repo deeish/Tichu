@@ -597,19 +597,37 @@ function App() {
       },
     }
 
-    // Disconnect when going to background so iOS freezes a clean state, not a zombie socket.
-    // On return, socket.connected is definitively false → socket.connect() creates a fresh
-    // connection with the auth callback (reads localStorage creds) → onConnect → rejoin.
     const handlePageHide = () => {
-      if (socket.connected) socket.disconnect()
+      try { localStorage.setItem('tichu_hidden_at', String(Date.now())) } catch(_) {}
+    }
+
+    // pageshow(persisted=true) fires reliably on iOS bfcache restore — more reliable than visibilitychange.
+    const handlePageShow = (e) => {
+      if (!e.persisted) return
+      const storedAt = localStorage.getItem('tichu_hidden_at')
+      try { localStorage.removeItem('tichu_hidden_at') } catch(_) {}
+      const hiddenMs = storedAt
+        ? Date.now() - Number(storedAt)
+        : hiddenAtRef.current
+          ? Date.now() - hiddenAtRef.current
+          : Infinity
+      hiddenAtRef.current = null
+      if (hiddenMs > 25_000) {
+        window.location.reload()
+      }
     }
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
         hiddenAtRef.current = Date.now()
+        try { localStorage.setItem('tichu_hidden_at', String(hiddenAtRef.current)) } catch(_) {}
         return
       }
-      const hiddenMs = hiddenAtRef.current ? Date.now() - hiddenAtRef.current : 0
+      const storedAt = localStorage.getItem('tichu_hidden_at')
+      try { localStorage.removeItem('tichu_hidden_at') } catch(_) {}
+      const hiddenMs = hiddenAtRef.current
+        ? Date.now() - hiddenAtRef.current
+        : storedAt ? Date.now() - Number(storedAt) : 0
       hiddenAtRef.current = null
       if (hiddenMs > 25_000) {
         // Long background — server has killed the socket and iOS WebSocket is frozen.
@@ -664,6 +682,7 @@ function App() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('pagehide', handlePageHide)
+    window.addEventListener('pageshow', handlePageShow)
     window.addEventListener('online', handleNetworkOnline)
 
     if (socket.connected) handlers.onConnect()
@@ -672,6 +691,7 @@ function App() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('pagehide', handlePageHide)
+      window.removeEventListener('pageshow', handlePageShow)
       window.removeEventListener('online', handleNetworkOnline)
       if (flushTimerRef.current != null) {
         clearTimeout(flushTimerRef.current)
