@@ -557,6 +557,10 @@ function App() {
               pendingRejoinRef.current = { gameId: savedGameId, timerId: null, resolved: false }
               setRejoinPending(true)
               socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId: nextRequestId() }, (ack) => {
+                if (pendingRejoinRef.current.timerId) {
+                  clearTimeout(pendingRejoinRef.current.timerId)
+                  pendingRejoinRef.current.timerId = null
+                }
                 setRejoinPending(false)
                 pendingRejoinRef.current.resolved = true
                 if (ack?.error === 'game_not_found' || ack?.error === 'invalid_rejoin_token') {
@@ -565,6 +569,14 @@ function App() {
                   setGameId('')
                 }
               })
+              pendingRejoinRef.current.timerId = setTimeout(() => {
+                if (pendingRejoinRef.current.resolved) return
+                pendingRejoinRef.current.resolved = true
+                pendingRejoinRef.current.timerId = null
+                setRejoinPending(false)
+                socket.disconnect()
+                socket.connect()
+              }, 2500)
               return
             }
           }
@@ -623,7 +635,10 @@ function App() {
         pendingRejoinRef.current.resolved = true
         pendingRejoinRef.current.timerId = null
         setRejoinPending(false)
-        handleResyncGame('vis-rejoin-timeout')
+        // Ack didn't arrive — zombie socket (server timed out while JS was frozen on iOS).
+        // Force a clean reconnect; handshake auth restores the session before any event fires.
+        socket.disconnect()
+        socket.connect()
       }, 2500)
     }
 
