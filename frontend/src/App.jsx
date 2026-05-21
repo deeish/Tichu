@@ -297,11 +297,13 @@ function App() {
           })
           pendingRejoinRef.current.timerId = setTimeout(() => {
             if (pendingRejoinRef.current.resolved) return
-            // Mark resolved so Part C in onError can fire if make-move still fails.
             pendingRejoinRef.current.resolved = true
             pendingRejoinRef.current.timerId = null
             setRejoinPending(false)
-            handleResyncGame('rejoin-timeout')
+            // Ack didn't arrive — zombie socket or very slow network. Force a clean reconnect;
+            // handshake auth will restore the session synchronously before any event races.
+            socket.disconnect()
+            socket.connect()
           }, 2500)
         }
         console.log('Connected to server')
