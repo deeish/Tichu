@@ -596,11 +596,18 @@ function App() {
       },
     }
 
-    // Proactive session validation when tab becomes visible.
-    // Covers: (a) socket reconnected while JS was suspended on iOS — onConnect queued, not yet fired;
-    // (b) zombie socket (server restart cleared players map while socket appeared connected).
+    // Disconnect when going to background so iOS freezes a clean state, not a zombie socket.
+    // On return, socket.connected is definitively false → socket.connect() creates a fresh
+    // connection with the auth callback (reads localStorage creds) → onConnect → rejoin.
+    const handlePageHide = () => {
+      if (socket.connected) socket.disconnect()
+    }
+
     const handleVisibilityChange = () => {
-      if (document.hidden) return
+      if (document.hidden) {
+        if (socket.connected) socket.disconnect()
+        return
+      }
       const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
       const savedToken = localStorage.getItem(REJOIN_TOKEN_KEY)
       if (!savedGameId || !savedToken) return
@@ -647,6 +654,7 @@ function App() {
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pagehide', handlePageHide)
     window.addEventListener('online', handleNetworkOnline)
 
     if (socket.connected) handlers.onConnect()
@@ -654,6 +662,7 @@ function App() {
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pagehide', handlePageHide)
       window.removeEventListener('online', handleNetworkOnline)
       if (flushTimerRef.current != null) {
         clearTimeout(flushTimerRef.current)
