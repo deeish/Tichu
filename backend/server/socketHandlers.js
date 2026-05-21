@@ -299,7 +299,15 @@ function setupSocketHandlers(io, games, players) {
       // Immediately start the game
       const broadcastFn = (game) => broadcastGameUpdate(io, game, games);
       startGame(gameId, games, broadcastFn);
-      
+
+      // Emit game-created so client calls saveRejoinCreds — without this, localStorage stays
+      // empty and every reconnect silently skips handshake-auth + rejoin for test games.
+      const humanPlayer = game.players[0];
+      const view = getPlayerView(game, socket.id);
+      capGameForWire(view);
+      sanitizeWireSnapshot(view);
+      socket.emit('game-created', { game: view, gameId, playerToken: humanPlayer.token });
+
       console.log(`Test game ${gameId} created with 4 players (teams: ${teamAssignment.join(', ')})`);
     });
 
