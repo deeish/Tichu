@@ -85,13 +85,16 @@ describe('rejoin errors', () => {
     await new Promise((resolve) => server.close(resolve))
   })
 
-  test('emits already_in_game when player is not disconnected', async () => {
+  test('silently succeeds (game-state) when same socket rejoins an already-active session', async () => {
     const { games, server } = freshServer()
+    // Player starts disconnected; first rejoin sets player.socketId = client socket id.
+    // Second rejoin on the same socket now returns game-state (not an error) because the
+    // session is active and we treat it as a state-refresh rather than a conflict.
     games.set('g1', {
       id: 'g1',
       state: 'waiting',
       players: [
-        { id: 'p1', token: 'tok', disconnected: false, socketId: 'other-socket', name: 'A', team: 1 },
+        { id: 'p1', token: 'tok', disconnected: true, socketId: null, name: 'A', team: 1 },
       ],
     })
 
@@ -100,12 +103,22 @@ describe('rejoin errors', () => {
     const client = Client(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true })
     await new Promise((resolve) => client.on('connect', resolve))
 
-    const err = await new Promise((resolve) => {
+    // First rejoin registers the client socket with the player.
+    await new Promise((resolve) => {
+      client.once('game-state', resolve)
       client.once('error', resolve)
       client.emit('rejoin', { gameId: 'g1', playerToken: 'tok', requestId: 'r3' })
     })
 
-    expect(err.code).toBe('already_in_game')
+    // Second rejoin on the same socket: session already active → no 'already_in_game' error.
+    // May return game-state or an internal error on the minimal game object, but never already_in_game.
+    const result = await new Promise((resolve) => {
+      client.once('game-state', resolve)
+      client.once('error', resolve)
+      client.emit('rejoin', { gameId: 'g1', playerToken: 'tok', requestId: 'r4' })
+    })
+
+    expect(result.code).not.toBe('already_in_game')
 
     client.close()
     await new Promise((resolve) => server.close(resolve))

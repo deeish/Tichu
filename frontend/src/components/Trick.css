@@ -93,3 +93,36 @@
   color: #666;
   margin-left: 4px;
 }
+
+@media (max-width: 640px) {
+  .trick {
+    padding: 6px;
+    margin: 2px 0;
+  }
+  .trick h3 {
+    font-size: 0.75rem;
+    margin-bottom: 4px;
+  }
+  .trick-plays {
+    gap: 4px;
+  }
+  .trick-play {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 3px 4px;
+  }
+  .play-player {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: rgba(255, 255, 255, 0.75);
+    font-weight: 600;
+  }
+  .play-cards {
+    gap: 2px;
+  }
+}

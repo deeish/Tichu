@@ -9,6 +9,21 @@
   min-height: 0;
 }
 
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+
+.sidebar-scrim--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .sidebar-column.sidebar-overlay {
   position: fixed;
   top: 0;
@@ -32,6 +47,7 @@
   transform: translateX(0);
   opacity: 1;
   pointer-events: auto;
+  background: rgba(12, 16, 28, 0.97);
 }
 
 .drawer-content {
@@ -328,7 +344,7 @@
   min-width: 0;
   height: 40px;
   padding: 0 var(--s12);
-  font-size: 14px;
+  font-size: 16px;
   color: #fff;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.12);

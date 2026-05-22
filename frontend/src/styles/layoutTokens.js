@@ -52,11 +52,13 @@ export function getSidebarWidth(viewportW) {
   return Math.max(280, Math.min(360, dynamic));
 }
 
-// Dock height: clamp(180px, 22vh, 240px)
+// Dock height: mobile min raised to fit two-row card layout (cards × 2 + actions)
 export function getDockHeight() {
   if (typeof window === 'undefined') return 200;
   const vh = window.innerHeight * 0.22;
-  return Math.min(240, Math.max(180, vh));
+  const minH = window.innerWidth < 480 ? 240 : 180;
+  const maxH = window.innerWidth < 480 ? 300 : 240;
+  return Math.min(maxH, Math.max(minH, vh));
 }
 
 // Right band = same as left (space for right seat). Sidebar is in a separate grid column, so we do not subtract its width from the table column.
@@ -67,13 +69,16 @@ export function getRightBand(_drawerWidth) {
 // Center rect inside table (safe area for play mat).
 // Table column height (tableH) already excludes the hand dock (sibling below .game-main).
 // Reserve bottom band for "my won cards" slot so the play mat does not cover it.
-export function getCenterRect(tableW, tableH, dockH, drawerW) {
-  const rightBand = getRightBand(drawerW);
-  const bottomBand = BOTTOM_BAND_FOR_WON_CARDS;
-  const x = LEFT_BAND;
-  const y = TOP_BAND;
-  const w = Math.max(0, tableW - LEFT_BAND - rightBand);
-  const h = Math.max(0, tableH - TOP_BAND - bottomBand);
+// Pass overrides.leftBand / overrides.topBand to use mobile-scaled values without touching static constants.
+export function getCenterRect(tableW, tableH, dockH, drawerW, overrides = {}) {
+  const leftBand = overrides.leftBand ?? LEFT_BAND;
+  const topBand = overrides.topBand ?? TOP_BAND;
+  const rightBand = overrides.leftBand ?? getRightBand(drawerW);
+  const bottomBand = overrides.bottomBand ?? BOTTOM_BAND_FOR_WON_CARDS;
+  const x = leftBand;
+  const y = topBand;
+  const w = Math.max(0, tableW - leftBand - rightBand);
+  const h = Math.max(0, tableH - topBand - bottomBand);
   return { x, y, w, h };
 }
 
@@ -131,28 +136,37 @@ export function getMatPosition(centerRect, matW, matH) {
 
 // Seat anchor positions (absolute within table). Centered with the play mat.
 // matPosition/matSize are used so top seat aligns with mat horizontal center, left/right with mat vertical center.
-export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition, matSize) {
-  const rightX = tableW - OUTER_MARGIN - SEAT_WIDTH;
+// Pass overrides (seatWidth, seatHeight, outerMargin, tableHeaderHeight, leftBand) to use mobile-scaled values.
+export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition, matSize, overrides = {}) {
+  const seatW = overrides.seatWidth ?? SEAT_WIDTH;
+  const seatH = overrides.seatHeight ?? SEAT_HEIGHT;
+  const outerMargin = overrides.outerMargin ?? OUTER_MARGIN;
+  const headerH = overrides.tableHeaderHeight ?? TABLE_HEADER_HEIGHT;
+  const leftBand = overrides.leftBand ?? LEFT_BAND;
+
+  const seatWSide = overrides.seatWidthSide ?? seatW;
+  const seatHSide = overrides.seatHeightSide ?? seatH;
+  const rightX = tableW - outerMargin - seatWSide;
   const tableH = _tableH;
   const seatMinY = 0;
-  const seatMaxY = Math.max(0, tableH - SEAT_HEIGHT);
+  const seatMaxY = Math.max(0, tableH - seatH);
 
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-  const topSeatY = TABLE_HEADER_HEIGHT + TABLE_HEADER_SEAT_GAP;
+  const topSeatY = headerH + TABLE_HEADER_SEAT_GAP;
   const matCenterX = matPosition.x + matSize.w / 2;
   const matCenterY = matPosition.y + matSize.h / 2;
 
-  const seatMinX = OUTER_MARGIN;
-  const seatMaxX = Math.max(0, tableW - OUTER_MARGIN - SEAT_WIDTH);
+  const seatMinX = outerMargin;
+  const seatMaxX = Math.max(0, tableW - outerMargin - seatWSide);
 
-  const leftSeatX = clamp(OUTER_MARGIN, seatMinX, seatMaxX);
-  const leftSeatY = clamp(Math.round(matCenterY - SEAT_HEIGHT / 2), seatMinY, seatMaxY);
+  const leftSeatX = clamp(outerMargin, seatMinX, seatMaxX);
+  const leftSeatY = clamp(Math.round(matCenterY - seatHSide / 2), seatMinY, Math.max(0, tableH - seatHSide));
 
-  const topSeatX = clamp(Math.round(matCenterX - SEAT_WIDTH / 2), seatMinX, seatMaxX);
+  const topSeatX = clamp(Math.round(matCenterX - seatW / 2), seatMinX, seatMaxX);
   const topSeatYClamped = clamp(topSeatY, seatMinY, seatMaxY);
 
-  const rightSeatX = clamp(Math.max(LEFT_BAND + 16, rightX), seatMinX, seatMaxX);
+  const rightSeatX = clamp(Math.max(leftBand + 16, rightX), seatMinX, seatMaxX);
   const rightSeatY = leftSeatY;
 
   return {
@@ -164,6 +178,7 @@ export function getSeatPositions(tableW, _tableH, _dockH, _drawerW, matPosition,
 
 // Card dimensions by breakpoint (for play mat / general use)
 export function getCardSize(containerWidth) {
+  if (containerWidth < 480) return { w: 38, h: 54 };
   if (containerWidth <= 1280) return { w: 64, h: 92 };
   if (containerWidth >= 1600) return { w: 80, h: 116 };
   return { w: 72, h: 104 };
@@ -217,6 +232,11 @@ export function getDockWidthClamp(containerWidth) {
 // Hand rail: horizontal distance between cards (px); 60 so 14 cards fit in the rail without clipping
 export const HAND_RAIL_STEP = 65;
 
+// Two-row mode: on narrow mobile viewports show cards in two rows of 7 so all fit without scrolling.
+export function isHandTwoRow(viewportW, cardCount) {
+  return Number.isFinite(viewportW) && viewportW < 640 && cardCount > 8;
+}
+
 export function getHandRailStep(railW, cardW, visibleCount) {
   if (visibleCount <= 1) return 0;
   if (!Number.isFinite(railW) || railW <= 0 || !Number.isFinite(cardW) || cardW <= 0) return HAND_RAIL_STEP;
@@ -237,3 +257,47 @@ export const Z = {
   TOOLTIPS: 5,
   MODALS: 6,
 };
+
+// Mobile-aware layout tokens: returns scaled values for viewportW < 600, static constants otherwise.
+// Desktop (>= 600px): identical to the static constants — zero change to layout.
+// Mobile (< 600px): proportionally scaled so seat panels don't overflow narrow screens.
+// Also computes mobileLeftBand / mobileTopBand for passing to getCenterRect and getSeatPositions.
+export function getMobileAwareTokens(viewportW) {
+  if (!Number.isFinite(viewportW) || viewportW >= 600) {
+    return {
+      seatWidth: SEAT_WIDTH,
+      seatHeight: SEAT_HEIGHT,
+      tableHeaderHeight: TABLE_HEADER_HEIGHT,
+      outerMargin: OUTER_MARGIN,
+      leftBand: LEFT_BAND,
+      topBand: TOP_BAND,
+    };
+  }
+  const scale = Math.max(0.5, viewportW / 600);
+  let seatWidth = Math.round(SEAT_WIDTH * scale);
+  const seatHeight = Math.round(SEAT_HEIGHT * scale);
+  const tableHeaderHeight = Math.min(TABLE_HEADER_HEIGHT, 80);
+  const outerMargin = Math.round(OUTER_MARGIN * scale);
+  // Cap seatWidth so 3 chips fit side-by-side with 8px gaps on very narrow screens
+  if (viewportW < 480) {
+    seatWidth = Math.min(seatWidth, Math.floor((viewportW - 2 * outerMargin - 16) / 3));
+  }
+  const leftBand = outerMargin + seatWidth + SEAT_MAT_GAP;
+  // Top chip is taller than the scaled seatHeight on mobile so text can stack without truncation
+  const seatHeightTop = viewportW < 480 ? 52 : seatHeight;
+  const topBand = tableHeaderHeight + TABLE_HEADER_SEAT_GAP + seatHeightTop + SEAT_MAT_GAP;
+  // Narrower band for mat sizing on mobile — seats overlap mat edges (seats have higher z-index)
+  const centerBand = outerMargin + Math.round(seatWidth * 0.4) + SEAT_MAT_GAP;
+  const seatWidthSide  = viewportW < 480 ? 56  : seatWidth;
+  const seatHeightSide = viewportW < 480 ? 88  : seatHeight;
+  const centerBandSide = viewportW < 480
+    ? outerMargin + seatWidthSide
+    : centerBand;
+  // Mobile won pile cards are much smaller; use actual height so the mat can grow downward
+  const { h: cardH } = getCardSize(viewportW);
+  const mobileBotBand = viewportW < 480
+    ? Math.round(cardH * 0.7) + WON_STACK_GAP + outerMargin
+    : undefined;
+  return { seatWidth, seatHeight, seatHeightTop, tableHeaderHeight, outerMargin, leftBand, topBand,
+           centerBand, centerBandSide, seatWidthSide, seatHeightSide, mobileBotBand };
+}

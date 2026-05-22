@@ -428,6 +428,11 @@
   justify-content: center;
 }
 
+/* Two-row hand rail on mobile: taller to accommodate both rows of cards */
+.dock-rail--two-row {
+  min-height: 130px;
+}
+
 .dock-card-wrap {
   position: absolute;
   bottom: 0;
@@ -720,4 +725,111 @@
 
 .dock-hint.success {
   color: #86efac;
+}
+
+@media (max-width: 480px) {
+  .hand-dock {
+    height: auto;
+    min-height: 0;
+    grid-template-rows: auto auto;
+  }
+  .dock-rail {
+    padding: 12px 0 6px;
+    min-height: 68px;
+  }
+  .dock-rail--two-row {
+    min-height: 120px;
+  }
+  .dock-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .dock-main {
+    flex: 1;
+    min-height: 0;
+  }
+  .dock-actions-box {
+    flex-shrink: 0;
+    width: 100%;
+    min-width: 0;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-left: 0;
+    padding-top: 4px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+    overflow: hidden;
+  }
+  .dock-actions {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 4px;
+  }
+  .dock-pass-row {
+    display: contents;
+  }
+  .dock-btn {
+    flex: 1;
+    height: 36px;
+    min-width: 0;
+    font-size: 12px;
+    overflow: hidden;
+  }
+  .dock-btn-secondary {
+    flex: 1;
+    height: 36px;
+    font-size: 11px;
+    overflow: hidden;
+  }
+  .dock-auto-pass-btn.dock-btn-secondary {
+    flex: 1;
+    height: 36px;
+    font-size: 9px;
+    padding: 0 4px;
+    letter-spacing: 0;
+  }
+  .hand-dock.hand-dock--compact .dock-actions-box {
+    width: 100%;
+    min-width: 0;
+    padding-left: 0;
+  }
+  .dock-hint {
+    font-size: 11px;
+    padding: 2px 0 4px;
+    min-height: 14px;
+  }
+  .dock-header {
+    padding: 4px var(--s8);
+    min-height: 30px;
+    overflow: hidden;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .dock-sort {
+    order: 2;
+  }
+  .dock-exchange-recap {
+    order: 3;
+    width: 100%;
+    flex: none;
+  }
+  .dock-sort button {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+  .dock-rail .card {
+    margin: 0 1px;
+  }
+}
+
+@media (pointer: coarse) {
+  .hand-dock {
+    backdrop-filter: none;
+  }
+  .dock-card-wrap--exchange-pending {
+    outline: 2px solid rgba(96, 165, 250, 0.8);
+    border-radius: 8px;
+  }
 }

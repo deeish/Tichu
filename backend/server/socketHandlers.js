@@ -154,6 +154,23 @@ function setupSocketHandlers(io, games, players) {
   io.on('connection', (socket) => {
     console.log('Player connected:', socket.id);
 
+    // Restore session synchronously from handshake auth so players.set() is populated
+    // before any event (auto-pass make-move, manual tap) can race with rejoin processing.
+    const { gameId: _authGameId, token: _authToken } = socket.handshake.auth || {};
+    if (_authGameId && _authToken) {
+      const _authGame = games.get(_authGameId);
+      const _authPlayer = _authGame?.players.find((p) => p.token === _authToken);
+      if (_authGame && _authPlayer && (_authPlayer.disconnected || _authPlayer.socketId !== socket.id)) {
+        _authPlayer.socketId = socket.id;
+        _authPlayer.disconnected = false;
+        delete _authPlayer.disconnectedAt;
+        if (!_authPlayer.name) _authPlayer.name = 'Player';
+        players.set(socket.id, { gameId: _authGameId, playerName: _authPlayer.name, playerId: _authPlayer.id });
+        socket.join(_authGameId);
+        console.log('[handshake-auth] session restored:', _authPlayer.name, socket.id, 'game', _authGameId);
+      }
+    }
+
     const safeOn = (eventName, handler) => safeSocketOn(socket, eventName, handler);
 
     function getCurrentStateVersion() {
@@ -282,7 +299,15 @@ function setupSocketHandlers(io, games, players) {
       // Immediately start the game
       const broadcastFn = (game) => broadcastGameUpdate(io, game, games);
       startGame(gameId, games, broadcastFn);
-      
+
+      // Emit game-created so client calls saveRejoinCreds — without this, localStorage stays
+      // empty and every reconnect silently skips handshake-auth + rejoin for test games.
+      const humanPlayer = game.players[0];
+      const view = getPlayerView(game, socket.id);
+      capGameForWire(view);
+      sanitizeWireSnapshot(view);
+      socket.emit('game-created', { game: view, gameId, playerToken: humanPlayer.token });
+
       console.log(`Test game ${gameId} created with 4 players (teams: ${teamAssignment.join(', ')})`);
     });
 
@@ -567,31 +592,42 @@ function setupSocketHandlers(io, games, players) {
       });
     });
 
-    safeOn('rejoin', (payload) => {
+    safeOn('rejoin', (payload, ack) => {
       const body = payload && typeof payload === 'object' ? payload : null;
       const gameId = body?.gameId;
       const playerToken = body?.playerToken;
       const requestId = body?.requestId;
       if (typeof gameId !== 'string' || !gameId.trim()) {
         socket.emit('error', { code: 'bad_payload', message: 'Invalid rejoin gameId', requestId });
+        if (typeof ack === 'function') ack({ error: 'bad_payload' });
         return;
       }
       if (typeof playerToken !== 'string' || !playerToken.trim()) {
         socket.emit('error', { code: 'bad_payload', message: 'Invalid rejoin token', requestId });
+        if (typeof ack === 'function') ack({ error: 'bad_payload' });
         return;
       }
       const game = games.get(gameId);
       if (!game) {
         socket.emit('error', { code: 'game_not_found', message: 'Game not found', requestId });
+        if (typeof ack === 'function') ack({ error: 'game_not_found' });
         return;
       }
       const player = game.players.find((p) => p.token === playerToken);
       if (!player) {
         socket.emit('error', { code: 'invalid_rejoin_token', message: 'Invalid rejoin token', requestId });
+        if (typeof ack === 'function') ack({ error: 'invalid_rejoin_token' });
         return;
       }
-      if (!player.disconnected) {
-        socket.emit('error', { code: 'already_in_game', message: 'Already in game', requestId });
+      if (!player.disconnected && player.socketId === socket.id) {
+        // Session already active on this socket (restored by handshake auth before this event).
+        // Ack success and send fresh game-state so the client unblocks and has current data.
+        if (typeof ack === 'function') ack({ success: true });
+        broadcastGameUpdate(io, game, games);
+        const existingView = getPlayerView(game, socket.id);
+        capGameForWire(existingView);
+        sanitizeWireSnapshot(existingView);
+        socket.emit('game-state', { game: existingView });
         return;
       }
       player.socketId = socket.id;
@@ -601,6 +637,8 @@ function setupSocketHandlers(io, games, players) {
       if (!player.name) player.name = players.get(socket.id)?.playerName || 'Player';
       players.set(socket.id, { gameId, playerName: player.name, playerId: player.id });
       socket.join(gameId);
+      // Ack BEFORE broadcasting so client unblocks only after players.set() is guaranteed done.
+      if (typeof ack === 'function') ack({ success: true });
       broadcastGameUpdate(io, game, games);
       const view = getPlayerView(game, socket.id);
       capGameForWire(view);
@@ -618,10 +656,13 @@ function setupSocketHandlers(io, games, players) {
           p = game.players.find((x) => x.id === playerInfo.playerId);
         }
         if (game && p) {
-          p.disconnected = true;
-          p.disconnectedAt = Date.now();
-          p.socketId = null;
-          broadcastGameUpdate(io, game, games);
+          if (p.socketId === socket.id) {
+            p.disconnected = true;
+            p.disconnectedAt = Date.now();
+            p.socketId = null;
+            broadcastGameUpdate(io, game, games);
+          }
+          // else: player already rejoined with a newer socket — don't disrupt their session
         } else if (game && playerInfo) {
           console.warn('[disconnect] no player row matched socket', {
             socketId: socket.id,

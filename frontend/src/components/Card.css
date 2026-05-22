@@ -13,6 +13,7 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   margin: 2px;
   user-select: none;
+  touch-action: manipulation;
 }
 
 .card-draggable {
@@ -100,4 +101,15 @@
 
 .card.black {
   color: #1f2937;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .card:hover {
+    transform: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+  .card.playable:hover {
+    transform: none;
+    border-color: #667eea;
+  }
 }

@@ -70,7 +70,7 @@ function ChatPanel({ playerId, players, socket, game }) {
     setClientCorrelation({ requestId });
     socket.emit('chat-message', { text: trimmed, requestId });
     setMessage('');
-    inputRef.current?.focus();
+    inputRef.current?.blur();
   };
 
   return (

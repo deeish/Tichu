@@ -30,6 +30,14 @@
   pointer-events: none;
 }
 
+@media (max-width: 480px) {
+  .toast-stack {
+    right: 12px;
+    bottom: calc(140px + env(safe-area-inset-bottom));
+    width: min(80vw, 280px);
+  }
+}
+
 .toast {
   display: flex;
   align-items: flex-start;
@@ -710,7 +718,7 @@ body {
   flex: 1;
   min-width: 0;
   padding: 0.35rem 0.5rem;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #fff;
   background: rgba(255, 255, 255, 0.12);
@@ -1070,8 +1078,8 @@ body {
 
 .end-game-test-stats {
   position: fixed;
-  top: 12px;
-  left: 160px;
+  top: 58px;
+  left: 12px;
   z-index: 9999;
   padding: 0.5rem 1rem;
   font-size: 0.9rem;

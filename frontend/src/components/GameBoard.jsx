@@ -7,6 +7,7 @@ import HandDock from './HandDock';
 import { GrandTichuHoldButton } from './GrandTichuHoldButton';
 import HandErrorBoundary from './HandErrorBoundary';
 import { sortCardsByRank, cardKey, isValidCard } from '../utils/cardUtils';
+import { isTouchDevice } from '../utils/touchUtils';
 import { DEBUG_HAND_DRAG } from '../debug';
 import { reportClientError, setClientCorrelation } from '../clientErrorReport';
 import {
@@ -20,6 +21,7 @@ import {
   getWonPileCardSize,
   getExchangeCardSize,
   getDockCardSize,
+  getMobileAwareTokens,
   TABLE_HEADER_HEIGHT,
   MAT_VERTICAL_BIAS,
   MAT_TOP_OFFSET,
@@ -76,7 +78,7 @@ function exchangeSeatSortWeight(seatKey) {
   return 3;
 }
 
-function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, onBackToLobby = null }) {
+function GameBoard({ game, socket, playerId, isConnected = true, rejoinPending = false, onResyncGame, onBackToLobby = null }) {
   // ----- UI state (do not reset on game update unless invalidated) -----
   const [tableTheme, setTableTheme] = useState(() => {
     try {
@@ -106,6 +108,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   const [mahJongWish, setMahJongWish] = useState('');
   const [showWishInput, setShowWishInput] = useState(false);
   const [exchangeAssignments, setExchangeAssignments] = useState([null, null, null]);
+  const [exchangePendingCard, setExchangePendingCard] = useState(null);
   const [exchangeDragOverSlot, setExchangeDragOverSlot] = useState(null);
   const [exchangeDraggingIndex, setExchangeDraggingIndex] = useState(null);
   const [exchangeSubmitted, setExchangeSubmitted] = useState(false);
@@ -314,6 +317,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   const sidebarMode = useMemo(() => getSidebarLayoutMode(viewport.w), [viewport.w]);
   const sidebarW = useMemo(() => (sidebarMode === 'overlay' ? 0 : getSidebarWidth(viewport.w)), [sidebarMode, viewport.w]);
   const dockH = useMemo(() => getDockHeight(), [viewport.h]);
+  const isTouch = isTouchDevice();
+  const mobileTokens = useMemo(() => getMobileAwareTokens(viewport.w), [viewport.w]);
 
   // Keep sidebar open on desktop, keep previous user toggle in overlay mode.
   useEffect(() => {
@@ -419,6 +424,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   useEffect(() => {
     if (game?.state !== 'exchanging') {
       setExchangeAssignments([null, null, null]);
+      setExchangePendingCard(null);
       setExchangeDraggingIndex(null);
       setExchangeSubmitted(false);
     }
@@ -465,8 +471,12 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
   }, []);
 
   const centerRect = useMemo(
-    () => getCenterRect(tableSize.w, tableSize.h, dockH, sidebarW),
-    [tableSize.w, tableSize.h, dockH, sidebarW]
+    () => getCenterRect(tableSize.w, tableSize.h, dockH, sidebarW, {
+      leftBand: mobileTokens.centerBandSide ?? mobileTokens.centerBand ?? mobileTokens.leftBand,
+      topBand: mobileTokens.topBand,
+      bottomBand: mobileTokens.mobileBotBand,
+    }),
+    [tableSize.w, tableSize.h, dockH, sidebarW, mobileTokens.centerBandSide, mobileTokens.centerBand, mobileTokens.leftBand, mobileTokens.topBand, mobileTokens.mobileBotBand]
   );
 
   // Development-only geometry overlay (query param or localStorage flag).
@@ -490,8 +500,18 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     [centerRect, matSize.w, matSize.h, MAT_VERTICAL_BIAS, MAT_TOP_OFFSET]
   );
   const seatPositions = useMemo(
-    () => getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize),
-    [tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize]
+    () => getSeatPositions(tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize, {
+      seatWidth: mobileTokens.seatWidth,
+      seatWidthSide: mobileTokens.seatWidthSide,
+      seatHeight: mobileTokens.seatHeight,
+      seatHeightSide: mobileTokens.seatHeightSide,
+      outerMargin: mobileTokens.outerMargin,
+      tableHeaderHeight: mobileTokens.tableHeaderHeight,
+      leftBand: mobileTokens.leftBand,
+    }),
+    [tableSize.w, tableSize.h, dockH, sidebarW, matPosition, matSize,
+     mobileTokens.seatWidth, mobileTokens.seatWidthSide, mobileTokens.seatHeight, mobileTokens.seatHeightSide,
+     mobileTokens.outerMargin, mobileTokens.tableHeaderHeight, mobileTokens.leftBand]
   );
 
   // Expose computed geometry to CSS (used for trick scroll sizing, etc.).
@@ -635,7 +655,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           dragonPassSigRef.current = sig;
           setDragonPassNotice({
             key: sig,
-            text: `Dragon trick passed to ${recipientName} (${role}).`,
+            text: `Dragon → ${recipientName}`,
           });
           setDragonPassNoticeDismissed(false);
 
@@ -664,11 +684,11 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
                 const posObj = seatPositions[seatKey];
                 const isTop = seatKey === 'top';
                 const wonStackLeft = isTop
-                  ? posObj.x + SEAT_WIDTH + WON_STACK_GAP
-                  : posObj.x + (SEAT_WIDTH - dragonWonCardSize.w) / 2;
+                  ? posObj.x + mobileTokens.seatWidth + WON_STACK_GAP
+                  : posObj.x + (mobileTokens.seatWidth - dragonWonCardSize.w) / 2;
                 const wonStackTop = isTop
-                  ? posObj.y + (SEAT_HEIGHT - dragonWonCardSize.h) / 2
-                  : posObj.y + SEAT_HEIGHT + WON_STACK_GAP;
+                  ? posObj.y + (mobileTokens.seatHeight - dragonWonCardSize.h) / 2
+                  : posObj.y + mobileTokens.seatHeight + WON_STACK_GAP;
                 toX = sRect.left + wonStackLeft + dragonWonCardSize.w / 2;
                 toY = sRect.top + wonStackTop + dragonWonCardSize.h / 2;
               }
@@ -753,8 +773,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
         }
       }
       const pos = seatPositions[seatKey];
-      const fromX = sRect.left + pos.x + SEAT_WIDTH / 2;
-      const fromY = sRect.top + pos.y + SEAT_HEIGHT / 2;
+      const fromX = sRect.left + pos.x + mobileTokens.seatWidth / 2;
+      const fromY = sRect.top + pos.y + mobileTokens.seatHeight / 2;
       const fan = (index - 1) * 26;
       const toX = toXBase + fan;
       return {
@@ -968,6 +988,13 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
       if (!validCard) return;
 
       if (game?.state === 'exchanging') {
+        if (isTouch) {
+          // Touch: two-tap flow — tap card to stage it, then tap a seat to assign it.
+          // Tapping the same pending card deselects it.
+          setExchangePendingCard((prev) => (prev && cardMatches(prev, card) ? null : card));
+          return;
+        }
+        // Desktop: assign to next empty slot on click.
         setExchangeAssignments((prev) => {
           const i = prev.findIndex((x) => !x);
           if (i === -1) return prev;
@@ -1136,10 +1163,11 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
     game?.state === 'playing' &&
     selectedStillInHand &&
     selectedCards.length > 0 &&
+    !rejoinPending &&
     (isMyTurn || selectedIsBomb);
   const mustPlayAfterTichu =
     !!game?.tichuDeclarations?.[playerId] && !game?.firstCardPlayed?.[playerId];
-  const canPass = isMyTurn && game?.state === 'playing' && !mustPlayAfterTichu;
+  const canPass = isMyTurn && game?.state === 'playing' && !mustPlayAfterTichu && !rejoinPending;
 
   // ---- Auto-pass (UI toggle) ----
   // Keep this conservative so we don't spam invalid pass actions.
@@ -1167,6 +1195,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
 
   const canAutoPass =
     autoPassUIEnabled &&
+    !rejoinPending &&
     game?.state === 'playing' &&
     isMyTurn &&
     selectedCards.length === 0 &&
@@ -1400,6 +1429,13 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           {isSidebarOpen ? 'Hide panel' : 'Show panel'}
         </button>
       )}
+      {sidebarMode === 'overlay' && (
+        <div
+          className={`sidebar-scrim${isSidebarOpen ? ' sidebar-scrim--visible' : ''}`}
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       {geomDebug && (
         <div className="geom-debug-overlay" aria-hidden="true">
           {`viewport: w=${Math.round(viewport.w)} h=${Math.round(viewport.h)} mode=${sidebarMode} open=${isSidebarOpen}\n`}
@@ -1415,7 +1451,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
         <div className="table-column" ref={tableRef}>
           <div className="table-surface" ref={tableSurfaceRef}>
             {/* Table header: title + current action (above top seat) */}
-            <div className="table-header" style={{ height: TABLE_HEADER_HEIGHT }}>
+            <div className="table-header" style={{ height: mobileTokens.tableHeaderHeight }}>
               <h1 className="table-title">Tichu</h1>
               <div
                 className={`table-current-action-box${
@@ -1456,23 +1492,45 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
               const isDragOverThisSeat = exchangeDragOverSlot === exchangeSlotIndex;
 
               const isTop = pos === 'top';
+              const isMobileSide = !isTop && viewport.w < 480;
+              const effectiveSeatW = isMobileSide
+                ? (mobileTokens.seatWidthSide ?? mobileTokens.seatWidth)
+                : mobileTokens.seatWidth;
+              const effectiveSeatH = isMobileSide
+                ? (mobileTokens.seatHeightSide ?? mobileTokens.seatHeight)
+                : isTop && viewport.w < 480
+                  ? (mobileTokens.seatHeightTop ?? mobileTokens.seatHeight)
+                  : mobileTokens.seatHeight;
+              const chipExchangeSize = (() => {
+                if (viewport.w >= 480) return exchangeCardSize;
+                const baseW = 38, baseH = 54;
+                if (isMobileSide) return { w: Math.round(baseW * 0.52), h: Math.round(baseH * 0.52) };
+                // Top chip: card fills content area (chip height minus vertical padding ~8px)
+                const h = effectiveSeatH - 8;
+                return { w: Math.round(h * baseW / baseH), h };
+              })();
+              const isTouchExchangeTarget = isTouch && isExchangeDropTarget && !!exchangePendingCard;
               const wonStackLeft = isTop
-                ? posObj.x + SEAT_WIDTH + WON_STACK_GAP
-                : posObj.x + (SEAT_WIDTH - wonCardSize.w) / 2;
+                ? posObj.x + effectiveSeatW + WON_STACK_GAP
+                : posObj.x + (effectiveSeatW - wonCardSize.w) / 2;
               const wonStackTop = isTop
-                ? posObj.y + (SEAT_HEIGHT - wonCardSize.h) / 2
-                : posObj.y + SEAT_HEIGHT + WON_STACK_GAP;
+                ? posObj.y + (effectiveSeatH - wonCardSize.h) / 2
+                : posObj.y + effectiveSeatH + WON_STACK_GAP;
 
               return (
                 <Fragment key={`seat-${pos}-${player.id}`}>
                   <div
-                    className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''} ${isDisconnected ? 'seat--disconnected' : ''} ${isExchangeDropTarget ? 'seat--exchange-drop' : ''} ${isDragOverThisSeat ? 'seat--exchange-drag-over' : ''}`}
+                    className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''} ${isDisconnected ? 'seat--disconnected' : ''} ${isExchangeDropTarget ? 'seat--exchange-drop' : ''} ${isDragOverThisSeat ? 'seat--exchange-drag-over' : ''} ${isTouchExchangeTarget ? 'seat--exchange-touch-target' : ''} ${isMobileSide ? 'seat--mobile-side' : ''}`}
                     style={{
                       left: `${posObj.x}px`,
                       top: `${posObj.y}px`,
-                      width: SEAT_WIDTH,
-                      height: SEAT_HEIGHT,
+                      width: effectiveSeatW,
+                      height: effectiveSeatH,
                     }}
+                    onClick={isTouchExchangeTarget ? () => {
+                      handleDropOnSlot(exchangeSlotIndex, exchangePendingCard);
+                      setExchangePendingCard(null);
+                    } : undefined}
                     onDragOver={isExchangeDropTarget ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setExchangeDragOverSlot(exchangeSlotIndex); } : undefined}
                     onDragLeave={isExchangeDropTarget ? () => setExchangeDragOverSlot(null) : undefined}
                     onDrop={isExchangeDropTarget ? (e) => {
@@ -1510,7 +1568,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
                     </div>
                     {isExchanging && exchangeAssignedCard && (
                       <div className="seat-exchange-card" onClick={!exchangeLocked ? () => handleRemoveFromSlot(exchangeSlotIndex) : undefined} title={!exchangeLocked ? 'Click to remove' : undefined}>
-                        <Card card={exchangeAssignedCard} width={exchangeCardSize.w} height={exchangeCardSize.h} compact />
+                        <Card card={exchangeAssignedCard} width={chipExchangeSize.w} height={chipExchangeSize.h} compact />
                       </div>
                     )}
                     {isDisconnected && (
@@ -1553,8 +1611,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
                 <div className="wished-card-display">
                   <Card
                     card={{ type: 'standard', rank: game.mahJongWish.wishedRank, suit: 'hearts' }}
-                    width={44}
-                    height={62}
+                    width={viewport.w < 480 ? 30 : 44}
+                    height={viewport.w < 480 ? 44 : 62}
                     compact
                   />
                 </div>
@@ -1579,7 +1637,9 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
                     containerWidth={tableContainerWidthBasis}
                   />
                 ) : game?.state === 'exchanging' && !game.exchangeCards?.[playerId] ? (
-                  <span className="play-mat-empty-msg play-mat-empty-msg--instruction">Drag a card to each player, or click to assign to next slot</span>
+                  <span className="play-mat-empty-msg play-mat-empty-msg--instruction">
+                    {isTouch ? 'Tap a card, then tap a player to assign it' : 'Drag a card to each player, or click to assign to next slot'}
+                  </span>
                 ) : game?.state === 'playing' && currentPlayer?.id === playerId && selectedCards.length === 0 ? (
                   <span className="play-mat-empty-msg play-mat-empty-msg--instruction">Select cards to play</span>
                 ) : (
@@ -1725,12 +1785,14 @@ function GameBoard({ game, socket, playerId, isConnected = true, onResyncGame, o
           turnAlertLevel={turnAlertActive ? turnAlertLevel : 0}
           hintText={hintText}
           containerWidth={dockContainerWidth}
+          viewportWidth={viewport.w}
           primaryLabel={selectedIsBomb ? 'Play bomb' : `Play (${selectedCards.length})`}
           showDefaultActions={game.state !== 'grand-tichu' && game.state !== 'exchanging'}
           draggable={game.state === 'exchanging' && !exchangeSubmitted && !game.exchangeSubmitted}
           onCardDragStart={game.state === 'exchanging' && !exchangeSubmitted && !game.exchangeSubmitted ? handleExchangeDragStart : undefined}
           onCardDragEnd={game.state === 'exchanging' ? handleExchangeDragEnd : undefined}
           exchangeDraggingIndex={game.state === 'exchanging' ? exchangeDraggingIndex : null}
+          exchangePendingCard={game.state === 'exchanging' ? exchangePendingCard : null}
           onReorder={game.state === 'playing' ? handleHandReorder : undefined}
           exchangeReceiptLines={
             game.state === 'playing' && (!dragonPassNotice || dragonPassNoticeDismissed) && !exchangeReceiptSummaryDismissed

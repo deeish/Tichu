@@ -103,6 +103,7 @@ function App() {
   const lastAppliedServerStateVersionRef = useRef(-1)
   const requestSeqRef = useRef(0)
   const pendingRejoinRef = useRef({ gameId: null, timerId: null, resolved: false })
+  const hiddenAtRef = useRef(null)
   const nextRequestId = () => {
     requestSeqRef.current += 1
     return `${Date.now()}-${requestSeqRef.current}`
@@ -155,6 +156,7 @@ function App() {
   const [playerName, setPlayerName] = useState('')
   const [gameId, setGameId] = useState('')
   const [isConnected, setIsConnected] = useState(false)
+  const [rejoinPending, setRejoinPending] = useState(false)
   const [playerId, setPlayerId] = useState(null)
   const [showEndGameTest, setShowEndGameTest] = useState(false)
   const [showStatsPopup, setShowStatsPopup] = useState(false)
@@ -270,7 +272,6 @@ function App() {
     const handlers = {
       onConnect: () => {
         setIsConnected(true)
-        setPlayerId(socket.id)
         const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
         const savedToken = localStorage.getItem(REJOIN_TOKEN_KEY)
         if (savedGameId && savedToken) {
@@ -280,20 +281,36 @@ function App() {
           pendingRejoinRef.current = { gameId: savedGameId, timerId: null, resolved: false }
           const requestId = nextRequestId()
           setClientCorrelation({ requestId })
-          socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId })
+          setRejoinPending(true)
+          socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId }, (ack) => {
+            // Ack fires only after server has called players.set() — safe to enable play.
+            pendingRejoinRef.current.resolved = true
+            if (pendingRejoinRef.current.timerId) {
+              clearTimeout(pendingRejoinRef.current.timerId)
+              pendingRejoinRef.current.timerId = null
+            }
+            setRejoinPending(false)
+            if (ack?.error === 'game_not_found' || ack?.error === 'invalid_rejoin_token') {
+              clearRejoinCreds()
+              setGameState(null)
+              setGameId('')
+            }
+          })
           pendingRejoinRef.current.timerId = setTimeout(() => {
             if (pendingRejoinRef.current.resolved) return
-            // Clear token creds so a broken token doesn't cause infinite reconnect attempts.
-            clearRejoinCreds()
-            // Deterministic fallback: request latest state once and let existing
-            // resync/backoff logic handle subsequent recovery.
-            handleResyncGame('rejoin-timeout')
+            pendingRejoinRef.current.resolved = true
+            pendingRejoinRef.current.timerId = null
+            setRejoinPending(false)
+            // Ack didn't arrive — zombie socket or very slow network. Reload so the fresh
+            // page gets a clean socket (engine.close() silently fails on frozen iOS WebSockets).
+            window.location.reload()
           }, 2500)
         }
         console.log('Connected to server')
       },
       onDisconnect: () => {
         try { setIsConnected(false) } catch (e) { console.error('[disconnect]', e); reportClientError({ source: 'disconnect', message: e?.message }) }
+        setRejoinPending(false)
         if (pendingRejoinRef.current.timerId) {
           clearTimeout(pendingRejoinRef.current.timerId)
         }
@@ -460,6 +477,12 @@ function App() {
             handleResyncGame('protocol-mismatch')
             return
           }
+          // Save credentials before the stale-version check so a game-update/game-state
+          // version tie (both carry V+1) doesn't silently lose the rejoin token.
+          const earlyMe = findMyPlayerInWireSnapshot(data.game.players, socket.id)
+          if (earlyMe?.token && data.game.id) {
+            saveRejoinCreds(data.game.id, earlyMe.token)
+          }
           const incomingVersion = typeof data?.game?.stateVersion === 'number' ? data.game.stateVersion : null
           if (incomingVersion != null && incomingVersion <= lastAppliedServerStateVersionRef.current) {
             if (isDebugGameSync()) {
@@ -526,15 +549,49 @@ function App() {
         try {
           const msg = data?.message ?? ''
           const code = data?.code
+          if (code === 'not_in_game') {
+            // Server doesn't have this socket registered — likely the rejoin ack was slow
+            // and the user tapped before it arrived. Silently retry rejoin if credentials exist.
+            const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
+            const savedToken = localStorage.getItem(REJOIN_TOKEN_KEY)
+            const noActiveRejoin = !pendingRejoinRef.current.gameId || pendingRejoinRef.current.resolved
+            if (savedGameId && savedToken && socket.connected && !noActiveRejoin) {
+              // Rejoin already in-flight from onConnect — its 2500ms timer will reload if ack never arrives.
+              return
+            }
+            if (savedGameId && savedToken && socket.connected && noActiveRejoin) {
+              pendingRejoinRef.current = { gameId: savedGameId, timerId: null, resolved: false }
+              setRejoinPending(true)
+              socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId: nextRequestId() }, (ack) => {
+                if (pendingRejoinRef.current.timerId) {
+                  clearTimeout(pendingRejoinRef.current.timerId)
+                  pendingRejoinRef.current.timerId = null
+                }
+                setRejoinPending(false)
+                pendingRejoinRef.current.resolved = true
+                if (ack?.error === 'game_not_found' || ack?.error === 'invalid_rejoin_token') {
+                  clearRejoinCreds()
+                  setGameState(null)
+                  setGameId('')
+                }
+              })
+              pendingRejoinRef.current.timerId = setTimeout(() => {
+                if (pendingRejoinRef.current.resolved) return
+                pendingRejoinRef.current.resolved = true
+                pendingRejoinRef.current.timerId = null
+                setRejoinPending(false)
+                // engine.close() silently fails on frozen iOS WebSockets; reload instead.
+                window.location.reload()
+              }, 2500)
+              return
+            }
+          }
           if (
             msg.includes('rejoin') ||
             msg === 'Game not found' ||
-            msg === 'Already in game' ||
             msg === 'Invalid rejoin token' ||
-            code === 'not_in_game' ||
             code === 'game_not_found' ||
-            code === 'invalid_rejoin_token' ||
-            code === 'already_in_game'
+            code === 'invalid_rejoin_token'
           ) {
             clearRejoinCreds()
           }
@@ -545,10 +602,105 @@ function App() {
       },
     }
 
+    const handlePageHide = () => {
+      socket.disconnect()
+      try { localStorage.setItem('tichu_hidden_at', String(Date.now())) } catch(_) {}
+    }
+
+    // pageshow(persisted=true) fires reliably on iOS bfcache restore — more reliable than visibilitychange.
+    const handlePageShow = (e) => {
+      if (!e.persisted) return
+      const storedAt = localStorage.getItem('tichu_hidden_at')
+      try { localStorage.removeItem('tichu_hidden_at') } catch(_) {}
+      const hiddenMs = storedAt
+        ? Date.now() - Number(storedAt)
+        : hiddenAtRef.current
+          ? Date.now() - hiddenAtRef.current
+          : Infinity
+      hiddenAtRef.current = null
+      if (hiddenMs > 70_000) {
+        window.location.reload()
+        return
+      }
+      socket.connect()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        hiddenAtRef.current = Date.now()
+        try { localStorage.setItem('tichu_hidden_at', String(hiddenAtRef.current)) } catch(_) {}
+        socket.disconnect()
+        return
+      }
+      const storedAt = localStorage.getItem('tichu_hidden_at')
+      try { localStorage.removeItem('tichu_hidden_at') } catch(_) {}
+      const hiddenMs = hiddenAtRef.current
+        ? Date.now() - hiddenAtRef.current
+        : storedAt ? Date.now() - Number(storedAt) : 0
+      hiddenAtRef.current = null
+      if (hiddenMs > 70_000) {
+        // Long background — server has killed the socket and iOS WebSocket is frozen.
+        // Reload is the only reliable path to a fresh connection.
+        window.location.reload()
+        return
+      }
+      const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
+      const savedToken = localStorage.getItem(REJOIN_TOKEN_KEY)
+      if (!savedGameId || !savedToken) return
+      if (!socket.connected) {
+        socket.connect()
+        return
+      }
+      // Already rejoining? Don't double-emit.
+      if (pendingRejoinRef.current.gameId && !pendingRejoinRef.current.resolved) return
+      if (pendingRejoinRef.current.timerId) {
+        clearTimeout(pendingRejoinRef.current.timerId)
+        pendingRejoinRef.current.timerId = null
+      }
+      pendingRejoinRef.current = { gameId: savedGameId, timerId: null, resolved: false }
+      setRejoinPending(true)
+      const visRequestId = nextRequestId()
+      socket.emit('rejoin', { gameId: savedGameId, playerToken: savedToken, requestId: visRequestId }, (ack) => {
+        pendingRejoinRef.current.resolved = true
+        if (pendingRejoinRef.current.timerId) {
+          clearTimeout(pendingRejoinRef.current.timerId)
+          pendingRejoinRef.current.timerId = null
+        }
+        setRejoinPending(false)
+        if (ack?.error === 'game_not_found' || ack?.error === 'invalid_rejoin_token') {
+          clearRejoinCreds()
+          setGameState(null)
+          setGameId('')
+        }
+      })
+      pendingRejoinRef.current.timerId = setTimeout(() => {
+        if (pendingRejoinRef.current.resolved) return
+        pendingRejoinRef.current.resolved = true
+        pendingRejoinRef.current.timerId = null
+        setRejoinPending(false)
+        // engine.close() silently fails on frozen iOS WebSockets; reload instead.
+        window.location.reload()
+      }, 2500)
+    }
+
+    // If device comes back online while disconnected, force reconnect so onConnect handles rejoin.
+    const handleNetworkOnline = () => {
+      if (!socket.connected) socket.connect()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pagehide', handlePageHide)
+    window.addEventListener('pageshow', handlePageShow)
+    window.addEventListener('online', handleNetworkOnline)
+
     if (socket.connected) handlers.onConnect()
     unsubscribe = subscribeSocketEvents(socket, handlers)
 
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pagehide', handlePageHide)
+      window.removeEventListener('pageshow', handlePageShow)
+      window.removeEventListener('online', handleNetworkOnline)
       if (flushTimerRef.current != null) {
         clearTimeout(flushTimerRef.current)
         flushTimerRef.current = null
@@ -831,6 +983,7 @@ function App() {
             socket={socket}
             playerId={playerId || socket.id}
             isConnected={isConnected}
+            rejoinPending={rejoinPending}
             onResyncGame={handleResyncGame}
             onBackToLobby={handleLeaveParty}
           />
@@ -923,7 +1076,7 @@ function App() {
               <button type="button" className="landing-link" onClick={handleCreateTestGame}>
                 Quick test game (4 players)
               </button>
-              <button type="button" className="landing-link" onClick={() => setShowEndGameTest(true)}>
+              <button type="button" className="landing-link" onClick={() => { setShowEndGameTest(true); setShowStatsPopup(true); }}>
                 Test end game screen
               </button>
             </div>

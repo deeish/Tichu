@@ -141,6 +141,10 @@
   background: rgba(0, 0, 0, 0.7);
 }
 
+.game-layout.sidebar-overlay-open .sidebar-toggle-btn {
+  display: none;
+}
+
 /* Exchange complete: cards fly from opponent seats toward the hand dock */
 .exchange-flight-overlay {
   position: fixed;
