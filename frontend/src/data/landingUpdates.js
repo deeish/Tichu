@@ -29,6 +29,15 @@ export function landingUpdateKindLabel(kind) {
  */
 export const LANDING_UPDATE_DAYS = [
   {
+    date: '2026-05-21',
+    items: [
+      {
+        kind: 'improvement',
+        text: 'Mobile support: the game is now playable on mobile devices.',
+      },
+    ],
+  },
+  {
     date: '2026-05-15',
     items: [
       {
