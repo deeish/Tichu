@@ -12,6 +12,7 @@ const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001', {
   },
   reconnectionDelay: 500,
   reconnectionDelayMax: 2500,
+  closeOnBeforeunload: false,
 })
 initClientErrorReport(socket)
 

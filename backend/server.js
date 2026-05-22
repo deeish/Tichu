@@ -36,8 +36,8 @@ async function main() {
   }
   setGameplayPersistence(persistence);
 
-  const socketPingTimeout = envPositiveMs('SOCKET_IO_PING_TIMEOUT_MS', 20_000);
-  const socketPingInterval = envPositiveMs('SOCKET_IO_PING_INTERVAL_MS', 10_000);
+  const socketPingTimeout = envPositiveMs('SOCKET_IO_PING_TIMEOUT_MS', 60_000);
+  const socketPingInterval = envPositiveMs('SOCKET_IO_PING_INTERVAL_MS', 25_000);
 
   const app = express();
   const server = http.createServer(app);

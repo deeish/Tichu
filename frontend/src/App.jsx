@@ -603,6 +603,7 @@ function App() {
     }
 
     const handlePageHide = () => {
+      socket.disconnect()
       try { localStorage.setItem('tichu_hidden_at', String(Date.now())) } catch(_) {}
     }
 
@@ -617,15 +618,18 @@ function App() {
           ? Date.now() - hiddenAtRef.current
           : Infinity
       hiddenAtRef.current = null
-      if (hiddenMs > 25_000) {
+      if (hiddenMs > 70_000) {
         window.location.reload()
+        return
       }
+      socket.connect()
     }
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
         hiddenAtRef.current = Date.now()
         try { localStorage.setItem('tichu_hidden_at', String(hiddenAtRef.current)) } catch(_) {}
+        socket.disconnect()
         return
       }
       const storedAt = localStorage.getItem('tichu_hidden_at')
@@ -634,7 +638,7 @@ function App() {
         ? Date.now() - hiddenAtRef.current
         : storedAt ? Date.now() - Number(storedAt) : 0
       hiddenAtRef.current = null
-      if (hiddenMs > 25_000) {
+      if (hiddenMs > 70_000) {
         // Long background — server has killed the socket and iOS WebSocket is frozen.
         // Reload is the only reliable path to a fresh connection.
         window.location.reload()
