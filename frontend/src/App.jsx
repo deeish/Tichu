@@ -301,9 +301,9 @@ function App() {
             pendingRejoinRef.current.resolved = true
             pendingRejoinRef.current.timerId = null
             setRejoinPending(false)
-            // Ack didn't arrive — zombie socket or very slow network. Close the transport so
-            // Socket.IO's built-in reconnect fires (auth callback re-reads localStorage fresh).
-            socket.io.engine?.close()
+            // Ack didn't arrive — zombie socket or very slow network. Reload so the fresh
+            // page gets a clean socket (engine.close() silently fails on frozen iOS WebSockets).
+            window.location.reload()
           }, 2500)
         }
         console.log('Connected to server')
@@ -555,6 +555,10 @@ function App() {
             const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
             const savedToken = localStorage.getItem(REJOIN_TOKEN_KEY)
             const noActiveRejoin = !pendingRejoinRef.current.gameId || pendingRejoinRef.current.resolved
+            if (savedGameId && savedToken && socket.connected && !noActiveRejoin) {
+              // Rejoin already in-flight from onConnect — its 2500ms timer will reload if ack never arrives.
+              return
+            }
             if (savedGameId && savedToken && socket.connected && noActiveRejoin) {
               pendingRejoinRef.current = { gameId: savedGameId, timerId: null, resolved: false }
               setRejoinPending(true)
