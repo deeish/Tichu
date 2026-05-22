@@ -576,7 +576,8 @@ function App() {
                 pendingRejoinRef.current.resolved = true
                 pendingRejoinRef.current.timerId = null
                 setRejoinPending(false)
-                socket.io.engine?.close()
+                // engine.close() silently fails on frozen iOS WebSockets; reload instead.
+                window.location.reload()
               }, 2500)
               return
             }
@@ -669,9 +670,8 @@ function App() {
         pendingRejoinRef.current.resolved = true
         pendingRejoinRef.current.timerId = null
         setRejoinPending(false)
-        // Ack didn't arrive — zombie socket (server timed out while JS was frozen on iOS).
-        // Close the transport so Socket.IO's built-in reconnect fires with fresh auth creds.
-        socket.io.engine?.close()
+        // engine.close() silently fails on frozen iOS WebSockets; reload instead.
+        window.location.reload()
       }, 2500)
     }
 
