@@ -3,8 +3,6 @@
 -if multiple people leave have them pick which seat to sit at instead of auto join
 -hard to see if my turn?
 
-*potentially add for soom*
--Add fly.io so the backend can run in multiple regions(mostly for soom)
 
 
 Might need to add:
