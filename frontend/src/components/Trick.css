@@ -132,3 +132,14 @@
   font-size: 0.72rem;
   padding: 6px;
 }
+
+/* Mobile: trick cards shrink to ~27x38px, so the 0.72rem rule above overflows.
+   Scale Mah Jong / Dragon / Phoenix text down and allow long names to wrap. */
+@media (max-width: 480px) {
+  .trick .play-cards .card.special .card-special {
+    font-size: 0.5rem;
+    padding: 2px;
+    line-height: 1.05;
+    overflow-wrap: anywhere;
+  }
+}

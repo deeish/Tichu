@@ -29,15 +29,6 @@ export function landingUpdateKindLabel(kind) {
  */
 export const LANDING_UPDATE_DAYS = [
   {
-    date: '2026-05-29',
-    items: [
-      {
-        kind: 'improvement',
-        text: 'Quick test game now uses smarter bots.',
-      },
-    ],
-  },
-  {
     date: '2026-05-21',
     items: [
       {
