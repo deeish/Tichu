@@ -32,8 +32,8 @@ export const LANDING_UPDATE_DAYS = [
     date: '2026-05-29',
     items: [
       {
-        kind: 'feature',
-        text: 'Play vs Bots: single-player against 3 AI opponents.',
+        kind: 'improvement',
+        text: 'Quick test game now uses smarter bots.',
       },
     ],
   },

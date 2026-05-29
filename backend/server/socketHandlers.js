@@ -21,7 +21,7 @@ const { sanitizeWireSnapshot } = require('../game/sanitizeWireSnapshot');
 const { createActionDeduper } = require('./actionDeduper');
 const { createFixedWindowRateLimiter } = require('./simpleRateLimiter');
 const { createMetricsStore } = require('./metricsStore');
-const { getBotMove, getDragonOpponentChoice, getBotExchange, shouldDeclareTichu } = require('../game/simpleBot');
+const { getBotMove, getDragonOpponentChoice, getBotExchange, shouldDeclareTichu, shouldDeclareGrandTichu } = require('../game/simpleBot');
 const { assignRandomTeamsToGame, startGame, generateGameId } = require('./gameManager');
 const { initializeGame } = require('../game/initialization');
 
@@ -1638,6 +1638,16 @@ function broadcastGameUpdate(io, game, gamesMap) {
         live.roundPreviewPending = false;
         live.roundPreviewEndedAt = Date.now();
         initializeGame(live);
+        // Bot games: auto-reveal bots for the new round (startGame only does this for round 1).
+        // Without this, bots stay in the Grand Tichu phase and the round can never advance to exchange.
+        live.players.filter(p => p.isTestPlayer).forEach(bot => {
+          if (live.cardsRevealed?.[bot.id]) return;
+          if (shouldDeclareGrandTichu(live.hands?.[bot.id] || [])) {
+            declareGrandTichu(live, bot.id); // reveals remaining cards as a side effect
+          } else {
+            revealRemainingCards(live, bot.id);
+          }
+        });
         broadcastGameUpdate(io, live, gamesMap);
       } catch (err) {
         console.error('[round-preview] finalize failed', err?.message ?? String(err), err?.stack ?? '');

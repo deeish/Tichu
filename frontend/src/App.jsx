@@ -832,7 +832,7 @@ function App() {
     setEditingMyName(false)
   }
 
-  const handlePlayVsBots = () => {
+  const handleTestGame = () => {
     const name = playerName.trim() || 'You'
     const requestId = nextRequestId()
     setClientCorrelation({ requestId })
@@ -1024,8 +1024,8 @@ function App() {
                   Join Party
                 </button>
               </div>
-              <button type="button" className="landing-btn-small" onClick={handlePlayVsBots}>
-                Play vs Bots
+              <button type="button" className="landing-btn-small" onClick={handleTestGame}>
+                Quick test game
               </button>
             </div>
           ) : landingMode === 'start' ? (
