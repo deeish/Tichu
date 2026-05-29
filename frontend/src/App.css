@@ -216,6 +216,31 @@ body {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
 }
 
+.landing-btn-small {
+  align-self: center;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.landing-btn-small:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #fff;
+}
+
+.landing-btn-small:focus-visible {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+}
+
 .landing-back {
   margin-top: 1rem;
   padding: 0.5rem;

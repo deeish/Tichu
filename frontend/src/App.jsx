@@ -832,8 +832,8 @@ function App() {
     setEditingMyName(false)
   }
 
-  const handleCreateTestGame = () => {
-    const name = playerName.trim() || 'Test Player'
+  const handlePlayVsBots = () => {
+    const name = playerName.trim() || 'You'
     const requestId = nextRequestId()
     setClientCorrelation({ requestId })
     socket.emit('create-test-game', { playerName: name, requestId })
@@ -1024,6 +1024,9 @@ function App() {
                   Join Party
                 </button>
               </div>
+              <button type="button" className="landing-btn-small" onClick={handlePlayVsBots}>
+                Play vs Bots
+              </button>
             </div>
           ) : landingMode === 'start' ? (
             <div className="landing-actions">
@@ -1073,9 +1076,6 @@ function App() {
 
           {landingMode == null && (
             <div className="landing-secondary">
-              <button type="button" className="landing-link" onClick={handleCreateTestGame}>
-                Quick test game (4 players)
-              </button>
               <button type="button" className="landing-link" onClick={() => { setShowEndGameTest(true); setShowStatsPopup(true); }}>
                 Test end game screen
               </button>

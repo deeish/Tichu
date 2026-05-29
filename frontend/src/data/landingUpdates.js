@@ -29,6 +29,15 @@ export function landingUpdateKindLabel(kind) {
  */
 export const LANDING_UPDATE_DAYS = [
   {
+    date: '2026-05-29',
+    items: [
+      {
+        kind: 'feature',
+        text: 'Play vs Bots: single-player against 3 AI opponents.',
+      },
+    ],
+  },
+  {
     date: '2026-05-21',
     items: [
       {

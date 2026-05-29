@@ -3,8 +3,9 @@
  * Handles game creation, team assignment, and game starting
  */
 
-const { initializeGame, revealRemainingCards } = require('../game/gameState');
+const { initializeGame, revealRemainingCards, declareGrandTichu } = require('../game/gameState');
 const { parseStartingScores } = require('../config/gameRules');
+const { shouldDeclareGrandTichu, getBotExchange } = require('../game/simpleBot');
 
 /**
  * Fisher–Yates shuffle (in-place). Used to randomize team assignment.
@@ -43,21 +44,6 @@ function assignRandomTeamsToGame(game) {
   });
   
   console.log(`Teams assigned: ${game.players.map(p => `${p.name} (Team ${p.team})`).join(', ')}`);
-}
-
-/**
- * Test game setup: set one player as Grand Tichu (so we can see the tag).
- * Mah Jong is left wherever the deal put it.
- */
-function setupTestGameRigging(game) {
-  if (!game.players.some(p => p.isTestPlayer)) return;
-
-  // One test player has already called Grand Tichu (so we can see the tag)
-  const grandTichuPlayer = game.players.find((p, i) => i > 0 && p.isTestPlayer);
-  if (grandTichuPlayer) {
-    game.grandTichuDeclarations = game.grandTichuDeclarations || {};
-    game.grandTichuDeclarations[grandTichuPlayer.id] = true;
-  }
 }
 
 /**
@@ -104,20 +90,20 @@ function startGame(gameId, games, broadcastGameUpdate, options = {}) {
   // Initialize the game (deal cards, set up state)
   initializeGame(game);
 
-  // Test games: one bot has Grand Tichu (Mah Jong stays where dealt)
-  setupTestGameRigging(game);
-  
   // Broadcast game started to all players
   broadcastGameUpdate(game);
-  
-  // Auto-handle test players in Grand Tichu phase
+
+  // Auto-handle bot players in Grand Tichu phase
   if (game.state === 'grand-tichu') {
-    // Test players automatically reveal cards (skip Grand Tichu)
+    // Each bot declares Grand Tichu on a strong hand, otherwise just reveals.
     setTimeout(() => {
       try {
         const testPlayers = game.players.filter(p => p.isTestPlayer);
         testPlayers.forEach(testPlayer => {
-          if (!game.cardsRevealed[testPlayer.id]) {
+          if (game.cardsRevealed[testPlayer.id]) return;
+          if (shouldDeclareGrandTichu(game.hands[testPlayer.id] || [])) {
+            declareGrandTichu(game, testPlayer.id); // reveals remaining cards as a side effect
+          } else {
             revealRemainingCards(game, testPlayer.id);
           }
         });
@@ -132,12 +118,12 @@ function startGame(gameId, games, broadcastGameUpdate, options = {}) {
                 game.state = 'exchanging';
                 broadcastGameUpdate(game);
 
-                // Auto-exchange for test players
+                // Strategic auto-exchange for bot players
                 const testPlayersInner = game.players.filter(p => p.isTestPlayer);
                 testPlayersInner.forEach(testPlayer => {
                   const testHand = game.hands[testPlayer.id] || [];
                   if (testHand.length >= 3) {
-                    game.exchangeCards[testPlayer.id] = testHand.slice(0, 3);
+                    game.exchangeCards[testPlayer.id] = getBotExchange(game, testPlayer.id);
                     game.exchangeComplete[testPlayer.id] = true;
                   }
                 });

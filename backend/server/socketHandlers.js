@@ -21,7 +21,7 @@ const { sanitizeWireSnapshot } = require('../game/sanitizeWireSnapshot');
 const { createActionDeduper } = require('./actionDeduper');
 const { createFixedWindowRateLimiter } = require('./simpleRateLimiter');
 const { createMetricsStore } = require('./metricsStore');
-const { getBotMove, getDragonOpponentChoice } = require('../game/simpleBot');
+const { getBotMove, getDragonOpponentChoice, getBotExchange, shouldDeclareTichu } = require('../game/simpleBot');
 const { assignRandomTeamsToGame, startGame, generateGameId } = require('./gameManager');
 const { initializeGame } = require('../game/initialization');
 
@@ -247,11 +247,11 @@ function setupSocketHandlers(io, games, players) {
       const protocolVersion = 1;
       const gameId = generateGameId();
       gameStateVersionCounter.set(gameId, 0);
+      const botNamePool = ['Ada', 'Boris', 'Cleo', 'Dmitri', 'Esme', 'Felix', 'Greta', 'Hugo', 'Iris', 'Jonas', 'Kira', 'Leo'];
+      const botNames = [...botNamePool].sort(() => Math.random() - 0.5).slice(0, 3);
       const testPlayerNames = [
-        cleanedName || 'Player 1',
-        'Test Player 2',
-        'Test Player 3',
-        'Test Player 4'
+        cleanedName || 'You',
+        ...botNames
       ];
       
       const game = {
@@ -742,7 +742,7 @@ function setupSocketHandlers(io, games, players) {
               testPlayers.forEach(testPlayer => {
                 const testHand = game.hands[testPlayer.id] || [];
                 if (testHand.length >= 3) {
-                  game.exchangeCards[testPlayer.id] = testHand.slice(0, 3);
+                  game.exchangeCards[testPlayer.id] = getBotExchange(game, testPlayer.id);
                   game.exchangeComplete[testPlayer.id] = true;
                 }
               });
@@ -821,7 +821,7 @@ function setupSocketHandlers(io, games, players) {
               testPlayers.forEach(testPlayer => {
                 const testHand = game.hands[testPlayer.id] || [];
                 if (testHand.length >= 3) {
-                  game.exchangeCards[testPlayer.id] = testHand.slice(0, 3);
+                  game.exchangeCards[testPlayer.id] = getBotExchange(game, testPlayer.id);
                   game.exchangeComplete[testPlayer.id] = true;
                 }
               });
@@ -900,7 +900,7 @@ function setupSocketHandlers(io, games, players) {
               testPlayers.forEach(testPlayer => {
                 const testHand = game.hands[testPlayer.id] || [];
                 if (testHand.length >= 3) {
-                  game.exchangeCards[testPlayer.id] = testHand.slice(0, 3);
+                  game.exchangeCards[testPlayer.id] = getBotExchange(game, testPlayer.id);
                   game.exchangeComplete[testPlayer.id] = true;
                 }
               });
@@ -1173,14 +1173,13 @@ function setupSocketHandlers(io, games, players) {
         }
         game.exchangeComplete[playerId] = true;
         
-        // For test games, auto-exchange for test players
+        // Strategic auto-exchange for bot players
         const testPlayers = game.players.filter(p => p.isTestPlayer);
         testPlayers.forEach(testPlayer => {
           if (!game.exchangeComplete[testPlayer.id]) {
             const testHand = game.hands[testPlayer.id] || [];
-            // Auto-select first 3 cards for test players
             if (testHand.length >= 3) {
-              game.exchangeCards[testPlayer.id] = testHand.slice(0, 3);
+              game.exchangeCards[testPlayer.id] = getBotExchange(game, testPlayer.id);
               game.exchangeComplete[testPlayer.id] = true;
             }
           }
@@ -1194,17 +1193,8 @@ function setupSocketHandlers(io, games, players) {
             socket.emit('error', { message: exchangeResult.error, stateVersion: getCurrentStateVersion() });
             return;
           }
-          // Test games: have one test player "call Tichu" (use a different one than Grand Tichu so both tags are visible)
-          const testPlayers = game.players.filter(p => p.isTestPlayer);
-          const tichuPlayer = testPlayers.length >= 2 ? testPlayers[1] : testPlayers[0];
-          if (tichuPlayer && !game.grandTichuDeclarations?.[tichuPlayer.id]) {
-            game.tichuDeclarations = game.tichuDeclarations || {};
-            game.tichuDeclarations[tichuPlayer.id] = true;
-          } else if (testPlayers.length > 0 && !game.grandTichuDeclarations?.[testPlayers[0].id]) {
-            game.tichuDeclarations = game.tichuDeclarations || {};
-            game.tichuDeclarations[testPlayers[0].id] = true;
-          }
-          // Start bot turns so test players play until it's the human's turn
+          // Bots decide whether to declare Tichu in handleTestPlayerTurn (before their first play).
+          // Start bot turns so bots play until it's the human's turn
           if (game.players.some(p => p.isTestPlayer)) {
             safeSetTimeout(socket, 'exchange-cards', () => handleTestPlayerTurn(game, games, io), 500, { gameId: game?.id });
           }
@@ -1439,6 +1429,15 @@ function setupSocketHandlers(io, games, players) {
 
       const currentPlayer = game.turnOrder[game.currentPlayerIndex];
       if (!currentPlayer || !currentPlayer.isTestPlayer) return;
+
+      // Bot Tichu declaration: only before its first card of the round, on a strong hand.
+      if (!game.firstCardPlayed?.[currentPlayer.id]
+        && !game.grandTichuDeclarations?.[currentPlayer.id]
+        && !game.tichuDeclarations?.[currentPlayer.id]
+        && shouldDeclareTichu(game.hands[currentPlayer.id] || [])) {
+        const tichuResult = declareTichu(game, currentPlayer.id);
+        if (tichuResult.success) broadcastGameUpdate(io, game, games);
+      }
 
       const move = getBotMove(game, currentPlayer.id);
       if (!move) return;
