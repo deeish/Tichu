@@ -126,3 +126,9 @@
     gap: 2px;
   }
 }
+
+/* Slightly smaller special-card text (Dragon, Phoenix, etc.) in the play field */
+.trick .play-cards .card.special .card-special {
+  font-size: 0.72rem;
+  padding: 6px;
+}
