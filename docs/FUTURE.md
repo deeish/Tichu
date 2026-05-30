@@ -1,27 +1,9 @@
-
-*Might need to add*
--if multiple people leave have them pick which seat to sit at instead of auto join
--hard to see if my turn?
-
+***Next things i want to work on, if i'd like ***
+-Some form of notice when a play calls tichu/grand(animated or some notice)
+-make the text under "tichu" actually mean something i guess with more information?
 
 
-Might need to add:
--if multiple people leave have them pick which seat to sit at instead of auto join
--when server is loading usually a minute, should i make a loading screen?
-
-
-
-***Fix in frontend***
--make buttons on start screen better size
-
--Make sure when a card is played the "current trick" moves down to show the card played(currently doesnt move)
-
-
-
-
-
-
-***Fix these in the rules****
+***Fix these in the rules***
 
 -Fix trick and trun flow steps
 
@@ -42,6 +24,7 @@ Trick layout
 -Show the current trick as cards in the center of the table (e.g. in a small pile or by position per player), not as a vertical list. Optionally show who led and who followed.
 -Do i want to change the look of passing dragon
 -Player card count a bit too small
+
 3. Feedback & timing
 Sound (optional but high impact)
 Card play (place / slide).
@@ -60,12 +43,8 @@ Then show "Trick won by [Name]" and update scores.
 This makes the trick feel like a real round that "resolves" before the next one.
 Phase transitions
 For Grand Tichu → Exchange → Playing (and round end), use short messages or overlays ("Exchanging cards…", "New round") so phases don't feel abrupt.
-4. Clarity & "game feel"
-Errors
-Declarations
-Grand Tichu / Tichu declarations can have a short visual cue (e.g. badge, icon, or one-time animation) so they feel like real "moments" in the game.
-Dragon / Mah Jong
-When Dragon is played and the player must choose who gets the trick, use a clear modal or highlighted buttons. 
+
+
 
 
 
