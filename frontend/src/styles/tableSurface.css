@@ -767,6 +767,59 @@
   }
 }
 
+/* Arcane — violet void, electric glow, ritual-circle rings */
+.game-layout[data-theme="arcane"] {
+  --layout-bg: #080510;
+  --table-bg: #0d0818;
+  --table-glow:
+    radial-gradient(ellipse 75% 62% at 50% 50%,
+      rgba(165, 55, 255, 0.62) 0%,
+      rgba(120, 35, 210, 0.38) 20%,
+      rgba(75,  18, 165, 0.20) 45%,
+      transparent 65%),
+    radial-gradient(ellipse 50% 42% at 54% 52%,
+      rgba(210, 90, 255, 0.22) 0%,
+      transparent 48%),
+    radial-gradient(ellipse 35% 28% at 46% 47%,
+      rgba(110, 180, 255, 0.10) 0%,
+      transparent 40%);
+  --seat-bg: linear-gradient(145deg, rgba(28, 10, 55, 0.93) 0%, rgba(16, 5, 35, 0.97) 100%);
+  --seat-border: rgba(155, 70, 230, 0.24);
+  --noise-scale: 1;
+}
+
+/* Ritual circles: concentric rings radiating from center */
+.game-layout[data-theme="arcane"] .table-surface {
+  background:
+    repeating-radial-gradient(
+      circle at 50% 50%,
+      transparent 0px,
+      transparent 44px,
+      rgba(145, 55, 215, 0.06) 45px,
+      transparent 46px
+    ),
+    var(--table-bg);
+}
+
+/* Arcane surge: starts compressed, expands outward — different shape from other themes */
+@keyframes arcaneSurge {
+  0%   { opacity: 0.75; transform: scale(0.96); }
+  40%  { opacity: 1;    transform: scale(1.07); }
+  70%  { opacity: 0.88; transform: scale(1.03); }
+  100% { opacity: 0.75; transform: scale(0.96); }
+}
+
+.game-layout[data-theme="arcane"] .table-surface::before {
+  animation: arcaneSurge 15s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-layout[data-theme="arcane"] .table-surface::before {
+    animation: none;
+  }
+}
+
 @media (pointer: coarse) {
   .seat-panel {
     backdrop-filter: none;
