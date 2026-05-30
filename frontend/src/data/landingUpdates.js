@@ -39,6 +39,10 @@ export const LANDING_UPDATE_DAYS = [
         kind: 'bugfix',
         text: 'Fixed special card names (Dragon, Phoenix, Mah Jong) overflowing their card on mobile.',
       },
+      {
+        kind: 'bugfix',
+        text: 'Fixed selected cards not fully raising on mobile when tapping multiple cards.',
+      },
     ],
   },
   {
