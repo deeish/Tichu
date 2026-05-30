@@ -64,15 +64,22 @@ function Card({ card, onClick, selected = false, playable = false, width, height
   const display = getCardDisplay();
   const isSpecial = card.type === 'special';
 
-  // For special cards not using compact height-scaling, calculate a font-size
-  // that guarantees the full name fits on one line at any card width.
-  // Uses a conservative char-width ratio (0.75) so even wide system fonts fit.
-  const specialFontStyle = isSpecial && !(compact && height != null)
+  // Always calculate font-size for special cards so the full name fits on one
+  // line at any card size. Skip only when abbreviations are shown (compact + width ≤ 40).
+  // Sets padding inline too so CSS specificity can't override it back to 0.5em.
+  const specialFontStyle = isSpecial && !(compact && width != null && width <= 40)
     ? (() => {
-        const contentW = (width ?? 80) - 4; // subtract 2px border each side
-        const available = contentW - 6;      // subtract 3px padding each side
+        // Best-guess card content width: use explicit width, else estimate from height,
+        // else fall back to default 80px card.
+        const cardW = width != null ? width : height != null ? Math.round(height * 0.714) : 80;
+        const contentW = cardW - 4;   // subtract 2px border each side (border-box)
+        const paddingH = 3;           // horizontal padding each side (px)
+        const available = contentW - paddingH * 2;
         const fitted = available / (display.length * 0.75);
-        return { fontSize: `${Math.min(12.5, Math.max(8, fitted))}px` };
+        return {
+          fontSize: `${Math.min(12.5, Math.max(7, fitted))}px`,
+          padding: `4px ${paddingH}px`,
+        };
       })()
     : null;
 
