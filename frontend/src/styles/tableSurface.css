@@ -820,41 +820,34 @@
   }
 }
 
-/* Brickyard — 4-color Lego stud grid, colorful brick-light corners */
+/* Brickyard — dark charcoal Lego baseplate, plastic stud sheen */
 .game-layout[data-theme="brickyard"] {
-  --layout-bg: #1a1510;
-  --table-bg: #1e1e1e;
+  --layout-bg: #111111;
+  --table-bg: #141414;
   --table-glow:
-    /* Soft overhead lamp */
-    radial-gradient(ellipse 60% 50% at 50% 50%,
-      rgba(255, 248, 220, 0.18) 0%,
-      transparent 60%),
-    /* Corner ambient: red / blue / yellow / green (subdued — studs carry the color now) */
-    radial-gradient(ellipse 40% 30% at 18% 18%, rgba(220, 40,  40,  0.14) 0%, transparent 55%),
-    radial-gradient(ellipse 35% 28% at 82% 18%, rgba(40,  80,  220, 0.12) 0%, transparent 55%),
-    radial-gradient(ellipse 30% 24% at 82% 82%, rgba(220, 180, 0,   0.12) 0%, transparent 50%),
-    radial-gradient(ellipse 35% 28% at 18% 82%, rgba(40,  165, 45,  0.10) 0%, transparent 55%);
-  --seat-bg: linear-gradient(145deg, rgba(18, 18, 22, 0.93) 0%, rgba(10, 10, 14, 0.97) 100%);
-  --seat-border: rgba(240, 200, 30, 0.32);
+    radial-gradient(ellipse 65% 55% at 50% 50%,
+      rgba(255, 242, 190, 0.14) 0%,
+      rgba(200, 180, 120, 0.06) 45%,
+      transparent 65%);
+  --seat-bg: linear-gradient(145deg, rgba(20, 20, 24, 0.93) 0%, rgba(12, 12, 16, 0.97) 100%);
+  --seat-border: rgba(240, 200, 30, 0.38);
   --noise-scale: 0;
 }
 
 /*
- * 4-color stud grid: 4 colored layers on a 64px grid, offset 32px so they
- * interleave into a green/red/blue/yellow checkerboard. Highlight and shadow
- * ring tile on the 32px sub-grid so they apply uniformly to all studs.
- * 32px sub-grid = studs are large enough to read clearly, with visible gaps.
+ * Lego stud on a 32px grid. Three layers:
+ *   1. Stud top face (flat charcoal circle)
+ *   2. Shadow ring around the cylinder wall — strong contrast for 3D depth
+ *   3. Plastic sheen highlight — top-left ellipse simulating gloss
  */
 .game-layout[data-theme="brickyard"] .table-surface {
   background:
-    /* Highlight: top-left ellipse (32px sub-grid) */
-    radial-gradient(ellipse 48% 44% at 36% 30%, rgba(255, 255, 255, 0.26) 0%, transparent 100%) 0 0 / 32px 32px,
-    /* Shadow ring (32px sub-grid) */
-    radial-gradient(circle, transparent 44%, rgba(0, 0, 0, 0.30) 45%, rgba(0, 0, 0, 0.30) 51%, transparent 52%) 0 0 / 32px 32px,
-    /* Green  */ radial-gradient(circle, #267c28 22%, transparent 23%) 0    0    / 64px 64px,
-    /* Red    */ radial-gradient(circle, #b01414 22%, transparent 23%) 32px 0    / 64px 64px,
-    /* Blue   */ radial-gradient(circle, #0e48a8 22%, transparent 23%) 0    32px / 64px 64px,
-    /* Yellow */ radial-gradient(circle, #c49200 22%, transparent 23%) 32px 32px / 64px 64px,
+    /* Plastic sheen: bright top-left highlight */
+    radial-gradient(ellipse 52% 46% at 34% 27%, rgba(255, 255, 255, 0.28) 0%, transparent 100%) 0 0 / 32px 32px,
+    /* Shadow ring: cylinder wall below the stud top */
+    radial-gradient(circle, transparent 42%, rgba(0, 0, 0, 0.50) 43%, rgba(0, 0, 0, 0.50) 52%, transparent 53%) 0 0 / 32px 32px,
+    /* Stud top face */
+    radial-gradient(circle, #2e2e2e 42%, transparent 43%) 0 0 / 32px 32px,
     var(--table-bg);
 }
 
