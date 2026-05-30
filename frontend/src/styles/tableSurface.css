@@ -840,20 +840,21 @@
 }
 
 /*
- * 4-color stud grid: 4 separate colored stud layers on a 44px grid, each offset
- * by 22px so they interleave into a repeating red/green/blue/yellow checkerboard.
- * Shadow ring and highlight tile on the 22px sub-grid so they apply to every stud.
+ * 4-color stud grid: 4 colored layers on a 64px grid, offset 32px so they
+ * interleave into a green/red/blue/yellow checkerboard. Highlight and shadow
+ * ring tile on the 32px sub-grid so they apply uniformly to all studs.
+ * 32px sub-grid = studs are large enough to read clearly, with visible gaps.
  */
 .game-layout[data-theme="brickyard"] .table-surface {
   background:
-    /* Highlight: top-left ellipse (22px sub-grid hits every stud) */
-    radial-gradient(ellipse 48% 44% at 36% 30%, rgba(255, 255, 255, 0.30) 0%, transparent 100%) 0 0 / 22px 22px,
-    /* Shadow ring: cylinder wall (22px sub-grid) */
-    radial-gradient(circle, transparent 44%, rgba(0, 0, 0, 0.32) 45%, rgba(0, 0, 0, 0.32) 51%, transparent 52%) 0 0 / 22px 22px,
-    /* Green  */ radial-gradient(circle, #2a8c2c 22%, transparent 23%) 0    0    / 44px 44px,
-    /* Red    */ radial-gradient(circle, #c8171c 22%, transparent 23%) 22px 0    / 44px 44px,
-    /* Blue   */ radial-gradient(circle, #1255c1 22%, transparent 23%) 0    22px / 44px 44px,
-    /* Yellow */ radial-gradient(circle, #dba500 22%, transparent 23%) 22px 22px / 44px 44px,
+    /* Highlight: top-left ellipse (32px sub-grid) */
+    radial-gradient(ellipse 48% 44% at 36% 30%, rgba(255, 255, 255, 0.26) 0%, transparent 100%) 0 0 / 32px 32px,
+    /* Shadow ring (32px sub-grid) */
+    radial-gradient(circle, transparent 44%, rgba(0, 0, 0, 0.30) 45%, rgba(0, 0, 0, 0.30) 51%, transparent 52%) 0 0 / 32px 32px,
+    /* Green  */ radial-gradient(circle, #267c28 22%, transparent 23%) 0    0    / 64px 64px,
+    /* Red    */ radial-gradient(circle, #b01414 22%, transparent 23%) 32px 0    / 64px 64px,
+    /* Blue   */ radial-gradient(circle, #0e48a8 22%, transparent 23%) 0    32px / 64px 64px,
+    /* Yellow */ radial-gradient(circle, #c49200 22%, transparent 23%) 32px 32px / 64px 64px,
     var(--table-bg);
 }
 
