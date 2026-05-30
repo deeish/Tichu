@@ -820,38 +820,40 @@
   }
 }
 
-/* Brickyard — Lego green baseplate, colorful brick-light corners */
+/* Brickyard — 4-color Lego stud grid, colorful brick-light corners */
 .game-layout[data-theme="brickyard"] {
   --layout-bg: #1a1510;
-  --table-bg: #2c8c2e;
+  --table-bg: #1e1e1e;
   --table-glow:
     /* Soft overhead lamp */
-    radial-gradient(ellipse 55% 45% at 50% 50%,
-      rgba(255, 255, 230, 0.20) 0%,
-      transparent 55%),
-    /* Corner brick colors: red / blue / yellow / green */
-    radial-gradient(ellipse 38% 30% at 20% 22%,
-      rgba(220, 35,  35,  0.40) 0%,
+    radial-gradient(ellipse 60% 50% at 50% 50%,
+      rgba(255, 248, 220, 0.18) 0%,
       transparent 60%),
-    radial-gradient(ellipse 32% 27% at 80% 20%,
-      rgba(35,  75,  220, 0.36) 0%,
-      transparent 60%),
-    radial-gradient(ellipse 30% 25% at 80% 80%,
-      rgba(230, 185, 0,   0.36) 0%,
-      transparent 58%),
-    radial-gradient(ellipse 36% 28% at 20% 80%,
-      rgba(35,  165, 45,  0.30) 0%,
-      transparent 58%);
+    /* Corner ambient: red / blue / yellow / green (subdued — studs carry the color now) */
+    radial-gradient(ellipse 40% 30% at 18% 18%, rgba(220, 40,  40,  0.14) 0%, transparent 55%),
+    radial-gradient(ellipse 35% 28% at 82% 18%, rgba(40,  80,  220, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 30% 24% at 82% 82%, rgba(220, 180, 0,   0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 35% 28% at 18% 82%, rgba(40,  165, 45,  0.10) 0%, transparent 55%);
   --seat-bg: linear-gradient(145deg, rgba(18, 18, 22, 0.93) 0%, rgba(10, 10, 14, 0.97) 100%);
   --seat-border: rgba(240, 200, 30, 0.32);
   --noise-scale: 0;
 }
 
-/* Lego studs: shadow ring (cylinder wall) + top-left highlight (lit face) */
+/*
+ * 4-color stud grid: 4 separate colored stud layers on a 44px grid, each offset
+ * by 22px so they interleave into a repeating red/green/blue/yellow checkerboard.
+ * Shadow ring and highlight tile on the 22px sub-grid so they apply to every stud.
+ */
 .game-layout[data-theme="brickyard"] .table-surface {
   background:
-    radial-gradient(ellipse 60% 54% at 36% 30%, rgba(255, 255, 255, 0.28) 0%, transparent 100%) 0 0 / 22px 22px,
-    radial-gradient(circle, transparent 30%, rgba(0, 0, 0, 0.30) 31%, rgba(0, 0, 0, 0.30) 46%, transparent 47%) 0 0 / 22px 22px,
+    /* Highlight: top-left ellipse (22px sub-grid hits every stud) */
+    radial-gradient(ellipse 48% 44% at 36% 30%, rgba(255, 255, 255, 0.30) 0%, transparent 100%) 0 0 / 22px 22px,
+    /* Shadow ring: cylinder wall (22px sub-grid) */
+    radial-gradient(circle, transparent 44%, rgba(0, 0, 0, 0.32) 45%, rgba(0, 0, 0, 0.32) 51%, transparent 52%) 0 0 / 22px 22px,
+    /* Green  */ radial-gradient(circle, #2a8c2c 22%, transparent 23%) 0    0    / 44px 44px,
+    /* Red    */ radial-gradient(circle, #c8171c 22%, transparent 23%) 22px 0    / 44px 44px,
+    /* Blue   */ radial-gradient(circle, #1255c1 22%, transparent 23%) 0    22px / 44px 44px,
+    /* Yellow */ radial-gradient(circle, #dba500 22%, transparent 23%) 22px 22px / 44px 44px,
     var(--table-bg);
 }
 
