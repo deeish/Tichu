@@ -99,9 +99,8 @@
 }
 
 .card:not([style*="font-size"]) .card-special {
-  /* Scale with actual rendered card width — fits 'Mah Jong' at any size */
-  font-size: clamp(0.5rem, 16cqi, 0.78rem);
-  padding: clamp(2px, 5cqi, 6px) clamp(2px, 4cqi, 4px);
+  font-size: 0.72rem; /* fallback; JS overrides this with a fitted value */
+  padding: 4px 3px;
 }
 
 .card.red {

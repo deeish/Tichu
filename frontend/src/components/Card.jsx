@@ -64,6 +64,18 @@ function Card({ card, onClick, selected = false, playable = false, width, height
   const display = getCardDisplay();
   const isSpecial = card.type === 'special';
 
+  // For special cards not using compact height-scaling, calculate a font-size
+  // that guarantees the full name fits on one line at any card width.
+  // Uses a conservative char-width ratio (0.75) so even wide system fonts fit.
+  const specialFontStyle = isSpecial && !(compact && height != null)
+    ? (() => {
+        const contentW = (width ?? 80) - 4; // subtract 2px border each side
+        const available = contentW - 6;      // subtract 3px padding each side
+        const fitted = available / (display.length * 0.75);
+        return { fontSize: `${Math.min(12.5, Math.max(8, fitted))}px` };
+      })()
+    : null;
+
   return (
     <div
       className={`card ${selected ? 'selected' : ''} ${playable ? 'playable' : ''} ${isSpecial ? 'special' : ''} ${draggable ? 'card-draggable' : ''}`}
@@ -74,7 +86,7 @@ function Card({ card, onClick, selected = false, playable = false, width, height
       onDragEnd={handleDragEnd}
     >
       {isSpecial ? (
-        <div className="card-special">
+        <div className="card-special" style={specialFontStyle}>
           <div className="card-name">{display}</div>
         </div>
       ) : (
