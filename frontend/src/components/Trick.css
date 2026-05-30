@@ -137,9 +137,13 @@
    Scale Mah Jong / Dragon / Phoenix text down and allow long names to wrap. */
 @media (max-width: 480px) {
   .trick .play-cards .card.special .card-special {
-    font-size: 0.5rem;
+    font-size: 0.6rem;
     padding: 2px;
-    line-height: 1.05;
+    line-height: 1.1;
     overflow-wrap: anywhere;
+  }
+  .trick .play-cards .card.special .card-name {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
