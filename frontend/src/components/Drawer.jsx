@@ -10,6 +10,7 @@ const THEME_OPTIONS = [
   { value: 'crimson',    label: 'Crimson Court',  swatch: ['#1c0608', '#3d1010'] },
   { value: 'arcane',     label: 'Arcane',         swatch: ['#0d0818', '#2a1045'] },
   { value: 'brickyard',  label: 'Brickyard',      swatch: ['#2e2e2e', '#141414'] },
+  { value: 'neongrid',   label: 'Neon Grid',      swatch: ['#04090c', '#005a52'] },
 ];
 
 function getPlayerName(players, playerId) {
