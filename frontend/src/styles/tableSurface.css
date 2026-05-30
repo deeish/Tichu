@@ -717,6 +717,56 @@
   }
 }
 
+/* Crimson Court — lacquered table, lantern warmth, gold lattice */
+.game-layout[data-theme="crimson"] {
+  --layout-bg: #0e0204;
+  --table-bg: #1c0608;
+  --table-glow:
+    radial-gradient(ellipse 85% 70% at 50% 50%,
+      rgba(220, 150, 40, 0.42) 0%,
+      rgba(200, 80,  30, 0.26) 28%,
+      rgba(140, 30,  20, 0.14) 55%,
+      transparent 72%),
+    radial-gradient(ellipse 50% 40% at 55% 45%,
+      rgba(240, 190, 70, 0.16) 0%,
+      transparent 50%);
+  --seat-bg: linear-gradient(145deg, rgba(45, 8, 12, 0.93) 0%, rgba(28, 4, 8, 0.97) 100%);
+  --seat-border: rgba(200, 150, 50, 0.22);
+  --noise-scale: 1;
+}
+
+/* Gold lattice: hairline grid + 45° cross-hatching, like lacquered wood or brocade */
+.game-layout[data-theme="crimson"] .table-surface {
+  background:
+    linear-gradient(      rgba(210, 165, 55, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(210, 165, 55, 0.07) 1px, transparent 1px),
+    linear-gradient(45deg, rgba(210, 165, 55, 0.04) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(210, 165, 55, 0.04) 1px, transparent 1px),
+    var(--table-bg);
+  background-size: 28px 28px, 28px 28px, 40px 40px, 40px 40px;
+}
+
+/* Lantern flicker: organic non-uniform pulse — different rhythm and shape from Deep Space */
+@keyframes lanternFlicker {
+  0%   { opacity: 0.80; transform: scale(1);    }
+  25%  { opacity: 0.90; transform: scale(1.04); }
+  45%  { opacity: 0.76; transform: scale(1.01); }
+  65%  { opacity: 0.94; transform: scale(1.06); }
+  85%  { opacity: 0.82; transform: scale(1.02); }
+  100% { opacity: 0.80; transform: scale(1);    }
+}
+
+.game-layout[data-theme="crimson"] .table-surface::before {
+  animation: lanternFlicker 7s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-layout[data-theme="crimson"] .table-surface::before {
+    animation: none;
+  }
+}
+
 @media (pointer: coarse) {
   .seat-panel {
     backdrop-filter: none;
