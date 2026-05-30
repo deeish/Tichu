@@ -315,7 +315,7 @@ function App() {
             // Ack didn't arrive — zombie socket or very slow network. Reload so the fresh
             // page gets a clean socket (engine.close() silently fails on frozen iOS WebSockets).
             window.location.reload()
-          }, 2500)
+          }, 12_000)
         }
         console.log('Connected to server')
       },
@@ -593,7 +593,7 @@ function App() {
                 setRejoinPending(false)
                 // engine.close() silently fails on frozen iOS WebSockets; reload instead.
                 window.location.reload()
-              }, 2500)
+              }, 12_000)
               return
             }
           }
@@ -629,7 +629,7 @@ function App() {
           ? Date.now() - hiddenAtRef.current
           : Infinity
       hiddenAtRef.current = null
-      if (hiddenMs > 70_000) {
+      if (hiddenMs > 300_000) {
         window.location.reload()
         return
       }
@@ -649,7 +649,7 @@ function App() {
         ? Date.now() - hiddenAtRef.current
         : storedAt ? Date.now() - Number(storedAt) : 0
       hiddenAtRef.current = null
-      if (hiddenMs > 70_000) {
+      if (hiddenMs > 300_000) {
         // Long background — server has killed the socket and iOS WebSocket is frozen.
         // Reload is the only reliable path to a fresh connection.
         window.location.reload()
@@ -691,7 +691,7 @@ function App() {
         setRejoinPending(false)
         // engine.close() silently fails on frozen iOS WebSockets; reload instead.
         window.location.reload()
-      }, 2500)
+      }, 12_000)
     }
 
     // If device comes back online while disconnected, force reconnect so onConnect handles rejoin.
