@@ -63,9 +63,8 @@
 }
 
 .card-special .card-name {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
   text-align: center;
 }
 
@@ -99,8 +98,8 @@
 }
 
 .card:not([style*="font-size"]) .card-special {
-  font-size: 0.9rem;
-  padding: 8px;
+  font-size: 0.78rem;
+  padding: 6px 4px;
 }
 
 .card.red {
