@@ -687,13 +687,22 @@
   --noise-scale: 2.5;
 }
 
-/* Canvas crosshatch: tight diagonal lines give a fabric/felt weave texture */
+/*
+ * Old map / aged parchment:
+ *   - Corner age-stain spots (darker ellipses bleeding in from each corner)
+ *   - Two sets of off-center concentric ring "creases" — like fold lines on
+ *     an old document. Rings from two different off-center origins interleave
+ *     into a complex organic pattern; no two areas look the same.
+ */
 .game-layout[data-theme="parchment"] .table-surface {
   background:
-    linear-gradient(45deg,  rgba(70, 42, 8, 0.06) 1px, transparent 1px),
-    linear-gradient(-45deg, rgba(70, 42, 8, 0.06) 1px, transparent 1px),
+    radial-gradient(ellipse 38% 32% at  6% 10%, rgba(72, 40, 5, 0.10) 0%, transparent 70%),
+    radial-gradient(ellipse 30% 25% at 94%  8%, rgba(72, 40, 5, 0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 26% 22% at 90% 92%, rgba(72, 40, 5, 0.09) 0%, transparent 70%),
+    radial-gradient(ellipse 34% 28% at  4% 90%, rgba(72, 40, 5, 0.10) 0%, transparent 70%),
+    repeating-radial-gradient(ellipse at 32% 28%, transparent 0px, transparent 36px, rgba(58, 32, 4, 0.05) 37px, transparent 38px),
+    repeating-radial-gradient(ellipse at 70% 72%, transparent 0px, transparent 52px, rgba(58, 32, 4, 0.04) 53px, transparent 54px),
     var(--table-bg);
-  background-size: 8px 8px, 8px 8px;
 }
 
 /* Title needs dark text on a light background */
@@ -734,10 +743,20 @@
   --noise-scale: 1.5;
 }
 
-/* Subtle dot grid: small blue-tinted points, like rain on a window */
+/*
+ * Still-water wave interference:
+ *   Layer 1 — repeating rings centered far below (50% 300%): nearly-horizontal
+ *             bands with a gentle upward curve, like ripples on a calm fjord.
+ *   Layer 2 — rings from far above (50% -200%) at different spacing: opposing
+ *             curves. Where the two sets cross they create a subtle moiré-like
+ *             interference pattern — no regular tiling, feels alive.
+ *   Layer 3 — very faint horizontal lines to reinforce the water-surface read.
+ */
 .game-layout[data-theme="nordic"] .table-surface {
   background:
-    radial-gradient(circle, rgba(180, 215, 245, 0.14) 1px, transparent 1px) 0 0 / 18px 18px,
+    repeating-radial-gradient(ellipse 200% 100% at 50%  300%, transparent 0px, transparent 30px, rgba(170, 210, 245, 0.07) 31px, transparent 32px),
+    repeating-radial-gradient(ellipse 200% 100% at 50% -200%, transparent 0px, transparent 44px, rgba(140, 195, 238, 0.05) 45px, transparent 46px),
+    repeating-linear-gradient(180deg, transparent 0px, transparent 7px, rgba(190, 222, 252, 0.04) 8px, transparent 9px),
     var(--table-bg);
 }
 
