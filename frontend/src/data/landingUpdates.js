@@ -29,6 +29,15 @@ export function landingUpdateKindLabel(kind) {
  */
 export const LANDING_UPDATE_DAYS = [
   {
+    date: '2026-05-30',
+    items: [
+      {
+        kind: 'bugfix',
+        text: 'Fixed special card names (Dragon, Phoenix, Mah Jong) overflowing their card on mobile.',
+      },
+    ],
+  },
+  {
     date: '2026-05-21',
     items: [
       {
