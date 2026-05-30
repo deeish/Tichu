@@ -1086,14 +1086,6 @@ function App() {
           )}
 
           {landingMode == null && (
-            <div className="landing-secondary">
-              <button type="button" className="landing-link" onClick={() => { setShowEndGameTest(true); setShowStatsPopup(true); }}>
-                Test end game screen
-              </button>
-            </div>
-          )}
-
-          {landingMode == null && (
             <footer className="landing-footer">
               <Link to="/how-to-play" className="landing-footer-link landing-footer-btn">
                 How to play
