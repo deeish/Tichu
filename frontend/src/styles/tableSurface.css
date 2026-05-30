@@ -820,6 +820,60 @@
   }
 }
 
+/* Brickyard — Lego green baseplate, colorful brick-light corners */
+.game-layout[data-theme="brickyard"] {
+  --layout-bg: #1a1510;
+  --table-bg: #2c8c2e;
+  --table-glow:
+    /* Soft overhead lamp */
+    radial-gradient(ellipse 55% 45% at 50% 50%,
+      rgba(255, 255, 230, 0.20) 0%,
+      transparent 55%),
+    /* Corner brick colors: red / blue / yellow / green */
+    radial-gradient(ellipse 38% 30% at 20% 22%,
+      rgba(220, 35,  35,  0.40) 0%,
+      transparent 60%),
+    radial-gradient(ellipse 32% 27% at 80% 20%,
+      rgba(35,  75,  220, 0.36) 0%,
+      transparent 60%),
+    radial-gradient(ellipse 30% 25% at 80% 80%,
+      rgba(230, 185, 0,   0.36) 0%,
+      transparent 58%),
+    radial-gradient(ellipse 36% 28% at 20% 80%,
+      rgba(35,  165, 45,  0.30) 0%,
+      transparent 58%);
+  --seat-bg: linear-gradient(145deg, rgba(18, 18, 22, 0.93) 0%, rgba(10, 10, 14, 0.97) 100%);
+  --seat-border: rgba(240, 200, 30, 0.32);
+  --noise-scale: 0;
+}
+
+/* Lego studs: shadow ring (cylinder wall) + top-left highlight (lit face) */
+.game-layout[data-theme="brickyard"] .table-surface {
+  background:
+    radial-gradient(ellipse 60% 54% at 36% 30%, rgba(255, 255, 255, 0.28) 0%, transparent 100%) 0 0 / 22px 22px,
+    radial-gradient(circle, transparent 30%, rgba(0, 0, 0, 0.30) 31%, rgba(0, 0, 0, 0.30) 46%, transparent 47%) 0 0 / 22px 22px,
+    var(--table-bg);
+}
+
+/* Brick-light hue shift: corner colors slowly cycle through Lego primaries */
+@keyframes brickHueShift {
+  0%   { filter: hue-rotate(0deg);   opacity: 0.80; }
+  30%  { filter: hue-rotate(24deg);  opacity: 0.95; }
+  65%  { filter: hue-rotate(-20deg); opacity: 0.86; }
+  100% { filter: hue-rotate(0deg);   opacity: 0.80; }
+}
+
+.game-layout[data-theme="brickyard"] .table-surface::before {
+  animation: brickHueShift 13s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-layout[data-theme="brickyard"] .table-surface::before {
+    animation: none;
+    filter: none;
+  }
+}
+
 @media (pointer: coarse) {
   .seat-panel {
     backdrop-filter: none;

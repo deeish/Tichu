@@ -9,6 +9,7 @@ const THEME_OPTIONS = [
   { value: 'deepspace',  label: 'Deep Space',     swatch: ['#050508', '#100a28'] },
   { value: 'crimson',    label: 'Crimson Court',  swatch: ['#1c0608', '#3d1010'] },
   { value: 'arcane',     label: 'Arcane',         swatch: ['#0d0818', '#2a1045'] },
+  { value: 'brickyard',  label: 'Brickyard',      swatch: ['#2c8c2e', '#1a5c1c'] },
 ];
 
 function getPlayerName(players, playerId) {
