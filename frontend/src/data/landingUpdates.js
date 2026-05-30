@@ -32,10 +32,6 @@ export const LANDING_UPDATE_DAYS = [
     date: '2026-05-30',
     items: [
       {
-        kind: 'improvement',
-        text: 'Redesigned table themes — new Deep Space and Crimson Court themes with animated glows, star fields, and textured patterns.',
-      },
-      {
         kind: 'feature',
         text: 'Added invite link — copy a shareable URL from the lobby to send friends directly to your game.',
       },
