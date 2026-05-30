@@ -611,7 +611,25 @@ body {
   font-weight: 600;
   color: rgba(255, 255, 255, 0.95);
   letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+}
+
+.lobby-invite-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  display: inline-block;
   margin-bottom: 0.15rem;
+}
+
+.lobby-invite-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 .lobby-card {

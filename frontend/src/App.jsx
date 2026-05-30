@@ -171,11 +171,13 @@ function App() {
   const [lobbyStartingTeam1, setLobbyStartingTeam1] = useState('')
   const [lobbyStartingTeam2, setLobbyStartingTeam2] = useState('')
   const [showLandingUpdates, setShowLandingUpdates] = useState(false)
+  const [inviteCopied, setInviteCopied] = useState(false)
 
   useEffect(() => {
     setLobbyCustomScoreOpen(false)
     setLobbyStartingTeam1('')
     setLobbyStartingTeam2('')
+    setInviteCopied(false)
   }, [gameState?.id])
 
   useEffect(() => {
@@ -190,6 +192,15 @@ function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [showLandingUpdates])
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('join')
+    if (code) {
+      setGameId(code.toUpperCase())
+      setLandingMode('join')
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
 
   const dismissToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -1114,6 +1125,19 @@ function App() {
           <header className="lobby-header">
             <h1 className="lobby-title">Tichu</h1>
             <p className="lobby-code">{gameState.id}</p>
+            <button
+              type="button"
+              className="lobby-invite-btn"
+              onClick={() => {
+                const url = `${window.location.origin}/?join=${gameState.id}`
+                navigator.clipboard.writeText(url).then(() => {
+                  setInviteCopied(true)
+                  setTimeout(() => setInviteCopied(false), 2000)
+                })
+              }}
+            >
+              {inviteCopied ? 'Copied!' : 'Copy invite link'}
+            </button>
           </header>
 
           <section className="lobby-card lobby-players-card">

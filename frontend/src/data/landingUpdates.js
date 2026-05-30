@@ -32,6 +32,10 @@ export const LANDING_UPDATE_DAYS = [
     date: '2026-05-30',
     items: [
       {
+        kind: 'feature',
+        text: 'Added invite link — copy a shareable URL from the lobby to send friends directly to your game.',
+      },
+      {
         kind: 'bugfix',
         text: 'Fixed special card names (Dragon, Phoenix, Mah Jong) overflowing their card on mobile.',
       },
