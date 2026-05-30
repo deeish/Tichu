@@ -36,6 +36,24 @@
     bottom: calc(140px + env(safe-area-inset-bottom));
     width: min(80vw, 280px);
   }
+
+  /* Lobby player rows: reclaim horizontal space so name + role + team buttons fit */
+  .lobby-player {
+    padding: 0.45rem 0.6rem;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+  .lobby-player-right {
+    gap: 0.3rem;
+  }
+  .lobby-player-role {
+    font-size: 0.72rem;
+  }
+  .lobby-team-btn {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.72rem;
+    min-height: 24px;
+  }
 }
 
 .toast {
