@@ -15,6 +15,7 @@
   user-select: none;
   touch-action: manipulation;
   overflow: hidden;
+  container-type: inline-size;
 }
 
 .card-draggable {
@@ -98,8 +99,9 @@
 }
 
 .card:not([style*="font-size"]) .card-special {
-  font-size: 0.78rem;
-  padding: 6px 4px;
+  /* Scale with actual rendered card width — fits 'Mah Jong' at any size */
+  font-size: clamp(0.5rem, 16cqi, 0.78rem);
+  padding: clamp(2px, 5cqi, 6px) clamp(2px, 4cqi, 4px);
 }
 
 .card.red {
