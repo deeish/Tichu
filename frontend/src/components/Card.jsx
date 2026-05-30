@@ -30,9 +30,15 @@ function Card({ card, onClick, selected = false, playable = false, width, height
     }
   };
 
+  const SPECIAL_ABBREV = { 'Mah Jong': 'MJ', 'Phoenix': 'Ph', 'Dragon': 'Dr', 'Dog': 'Dog' };
+
   const getCardDisplay = () => {
     if (card.type === 'special') {
-      return card.display || card.name;
+      const fullName = card.display || card.name;
+      if (compact && width != null && width <= 40) {
+        return SPECIAL_ABBREV[fullName] ?? fullName;
+      }
+      return fullName;
     }
     const suitSymbols = {
       hearts: '♥',
