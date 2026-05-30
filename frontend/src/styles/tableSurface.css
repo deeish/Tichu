@@ -671,7 +671,7 @@
 
 /* ========== Themes ========== */
 
-/* Deep Space — starfield void, nebula center glow */
+/* Deep Space — starfield void, animated nebula glow */
 .game-layout[data-theme="deepspace"] {
   --layout-bg: #050508;
   --table-bg: #08091a;
@@ -686,7 +686,35 @@
       transparent 55%);
   --seat-bg: linear-gradient(145deg, rgba(14, 16, 48, 0.93) 0%, rgba(8, 9, 30, 0.97) 100%);
   --seat-border: rgba(90, 100, 220, 0.2);
-  --noise-scale: 3;
+  --noise-scale: 1.5;
+}
+
+/* Star field: layered dot grids at coprime sizes so they never perfectly align */
+.game-layout[data-theme="deepspace"] .table-surface {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.82) 1px, transparent 1px) 15px 22px / 67px 67px,
+    radial-gradient(circle, rgba(200, 215, 255, 0.55) 1px, transparent 1px) 38px  5px / 43px 43px,
+    radial-gradient(circle, rgba(180, 200, 255, 0.38) 1px, transparent 1px)  8px 55px / 89px 89px,
+    radial-gradient(circle, rgba(255, 255, 255, 0.42) 1px, transparent 1px) 55px 31px / 53px 53px,
+    radial-gradient(circle, rgba(220, 225, 255, 0.22) 1px, transparent 1px) 28px 40px / 31px 31px,
+    var(--table-bg);
+}
+
+/* Nebula breathes: slow scale + opacity pulse anchored to the glow center */
+@keyframes deepSpaceNebula {
+  0%,  100% { opacity: 0.82; transform: scale(1);    }
+  50%       { opacity: 1;    transform: scale(1.07); }
+}
+
+.game-layout[data-theme="deepspace"] .table-surface::before {
+  animation: deepSpaceNebula 11s ease-in-out infinite;
+  transform-origin: 52% 48%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-layout[data-theme="deepspace"] .table-surface::before {
+    animation: none;
+  }
 }
 
 @media (pointer: coarse) {
