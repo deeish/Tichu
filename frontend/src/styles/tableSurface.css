@@ -22,6 +22,7 @@
   inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
   pointer-events: none;
+  opacity: var(--noise-scale, 1);
 }
 
 /* Table header: title + current action above top seat */
@@ -196,7 +197,7 @@
 .seat-panel {
   position: absolute;
   background: var(--seat-bg, linear-gradient(145deg, rgba(10, 50, 28, 0.85) 0%, rgba(5, 28, 18, 0.9) 100%));
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--seat-border, rgba(255, 255, 255, 0.1));
   border-radius: var(--radius-dock);
   padding: 6px var(--s12);
   display: flex;
@@ -668,94 +669,24 @@
   }
 }
 
-/* ========== Theme: try one at a time by setting data-theme on .game-layout ========== */
+/* ========== Themes ========== */
 
-/* Style 1: Velvet — rich forest green with warm golden center glow (classic premium felt) */
-.game-layout[data-theme="velvet"] {
-  --layout-bg: #0f1419;
-  --table-bg: #0c2d1a;
-  --table-glow: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(50, 120, 60, 0.45) 0%, rgba(200, 160, 70, 0.12) 45%, transparent 65%);
-  --seat-bg: linear-gradient(145deg, rgba(18, 58, 35, 0.88) 0%, rgba(10, 38, 22, 0.92) 100%);
-}
-
-/* Style 2: Midnight — deep blue felt, soft blue-white glow (card room at night) */
-.game-layout[data-theme="midnight"] {
-  --layout-bg: #0f172a;
-  --table-bg: #0f1d2e;
-  --table-glow: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(30, 64, 120, 0.5) 0%, rgba(100, 140, 200, 0.15) 45%, transparent 65%);
-  --seat-bg: linear-gradient(145deg, rgba(20, 45, 75, 0.88) 0%, rgba(12, 28, 50, 0.92) 100%);
-}
-
-/* Style 3: Ember — dark burgundy/wine with soft orange glow (fireside game) */
-.game-layout[data-theme="ember"] {
-  --layout-bg: #1a0f0f;
-  --table-bg: #2d1515;
-  --table-glow: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(120, 40, 40, 0.5) 0%, rgba(200, 100, 60, 0.15) 45%, transparent 65%);
-  --seat-bg: linear-gradient(145deg, rgba(55, 22, 22, 0.88) 0%, rgba(35, 12, 12, 0.92) 100%);
-}
-
-/* Style 4: Forest — mossy woodland, deep green with soft earth glow */
-.game-layout[data-theme="forest"] {
-  --layout-bg: #0d120d;
-  --table-bg: #142618;
-  --table-glow: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(45, 90, 50, 0.5) 0%, rgba(80, 60, 40, 0.1) 50%, transparent 70%);
-  --seat-bg: linear-gradient(145deg, rgba(25, 48, 28, 0.9) 0%, rgba(18, 35, 20, 0.94) 100%);
-}
-
-/* Style 5: Ocean — deep teal, underwater glow */
-.game-layout[data-theme="ocean"] {
-  --layout-bg: #0a1418;
-  --table-bg: #0d2228;
-  --table-glow: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(20, 100, 110, 0.5) 0%, rgba(60, 160, 180, 0.12) 45%, transparent 65%);
-  --seat-bg: linear-gradient(145deg, rgba(15, 55, 62, 0.88) 0%, rgba(10, 35, 42, 0.92) 100%);
-}
-
-/* Style 6: Sunset — warm coral and amber glow */
-.game-layout[data-theme="sunset"] {
-  --layout-bg: #1a1210;
-  --table-bg: #2a1a14;
-  --table-glow: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(180, 80, 50, 0.4) 0%, rgba(240, 140, 80, 0.2) 45%, transparent 65%);
-  --seat-bg: linear-gradient(145deg, rgba(65, 35, 25, 0.88) 0%, rgba(45, 22, 15, 0.92) 100%);
-}
-
-/* Style 7: Royal — deep purple, violet glow */
-.game-layout[data-theme="royal"] {
-  --layout-bg: #120f1a;
-  --table-bg: #1a1428;
-  --table-glow: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(80, 50, 130, 0.5) 0%, rgba(140, 100, 200, 0.15) 45%, transparent 65%);
-  --seat-bg: linear-gradient(145deg, rgba(40, 28, 65, 0.88) 0%, rgba(28, 18, 48, 0.92) 100%);
-}
-
-/* Style 8: Slate — cool grey-blue, minimal */
-.game-layout[data-theme="slate"] {
-  --layout-bg: #0f1215;
-  --table-bg: #1a2025;
-  --table-glow: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(60, 80, 100, 0.4) 0%, rgba(100, 130, 160, 0.1) 50%, transparent 70%);
-  --seat-bg: linear-gradient(145deg, rgba(35, 45, 55, 0.88) 0%, rgba(22, 30, 40, 0.92) 100%);
-}
-
-/* Style 9: Autumn — burnt orange, amber, copper */
-.game-layout[data-theme="autumn"] {
-  --layout-bg: #161008;
-  --table-bg: #221408;
-  --table-glow: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(140, 70, 20, 0.5) 0%, rgba(220, 140, 60, 0.15) 45%, transparent 65%);
-  --seat-bg: linear-gradient(145deg, rgba(55, 32, 15, 0.88) 0%, rgba(38, 22, 10, 0.92) 100%);
-}
-
-/* Style 10: Jade — jewel-tone green, luxe */
-.game-layout[data-theme="jade"] {
-  --layout-bg: #081210;
-  --table-bg: #0a1e18;
-  --table-glow: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(30, 130, 100, 0.45) 0%, rgba(80, 180, 140, 0.12) 50%, transparent 68%);
-  --seat-bg: linear-gradient(145deg, rgba(18, 55, 45, 0.88) 0%, rgba(12, 38, 30, 0.92) 100%);
-}
-
-/* Style 11: Noir — near-black, subtle silver glow */
-.game-layout[data-theme="noir"] {
-  --layout-bg: #0a0a0a;
-  --table-bg: #141414;
-  --table-glow: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(80, 85, 95, 0.35) 0%, rgba(120, 130, 150, 0.08) 50%, transparent 70%);
-  --seat-bg: linear-gradient(145deg, rgba(28, 28, 32, 0.9) 0%, rgba(18, 18, 22, 0.94) 100%);
+/* Deep Space — starfield void, nebula center glow */
+.game-layout[data-theme="deepspace"] {
+  --layout-bg: #050508;
+  --table-bg: #08091a;
+  --table-glow:
+    radial-gradient(ellipse 80% 65% at 52% 48%,
+      rgba(110, 60, 220, 0.55) 0%,
+      rgba(50, 90, 210, 0.32) 22%,
+      rgba(20, 40, 130, 0.18) 48%,
+      transparent 68%),
+    radial-gradient(ellipse 60% 45% at 38% 58%,
+      rgba(30, 80, 180, 0.2) 0%,
+      transparent 55%);
+  --seat-bg: linear-gradient(145deg, rgba(14, 16, 48, 0.93) 0%, rgba(8, 9, 30, 0.97) 100%);
+  --seat-border: rgba(90, 100, 220, 0.2);
+  --noise-scale: 3;
 }
 
 @media (pointer: coarse) {

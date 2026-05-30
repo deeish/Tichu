@@ -5,18 +5,8 @@ import { setClientCorrelation } from '../clientErrorReport';
 const TABS = ['Chat', 'Players', 'Log', 'Theme', 'Settings'];
 
 const THEME_OPTIONS = [
-  { value: 'classic', label: 'Classic' },
-  { value: 'velvet', label: 'Velvet' },
-  { value: 'midnight', label: 'Midnight' },
-  { value: 'ember', label: 'Ember' },
-  { value: 'forest', label: 'Forest' },
-  { value: 'ocean', label: 'Ocean' },
-  { value: 'sunset', label: 'Sunset' },
-  { value: 'royal', label: 'Royal' },
-  { value: 'slate', label: 'Slate' },
-  { value: 'autumn', label: 'Autumn' },
-  { value: 'jade', label: 'Jade' },
-  { value: 'noir', label: 'Noir' },
+  { value: 'classic', label: 'Classic', swatch: ['#0a4a24', '#1a6b3a'] },
+  { value: 'deepspace', label: 'Deep Space', swatch: ['#050508', '#100a28'] },
 ];
 
 function getPlayerName(players, playerId) {
@@ -428,7 +418,7 @@ function Drawer({
               <section className="drawer-settings-section" aria-labelledby="theme-label">
                 <h3 id="theme-label" className="drawer-settings-heading">Table theme</h3>
                 <div className="drawer-theme-options" role="group">
-                  {THEME_OPTIONS.map(({ value, label }) => (
+                  {THEME_OPTIONS.map(({ value, label, swatch }) => (
                     <button
                       key={value}
                       type="button"
@@ -436,6 +426,12 @@ function Drawer({
                       onClick={() => onTableThemeChange(value)}
                       aria-pressed={tableTheme === value}
                     >
+                      {swatch && (
+                        <span className="drawer-theme-swatch" aria-hidden="true">
+                          <span style={{ background: swatch[0] }} />
+                          <span style={{ background: swatch[1] }} />
+                        </span>
+                      )}
                       {label}
                     </button>
                   ))}
