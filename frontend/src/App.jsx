@@ -613,12 +613,20 @@ function App() {
       },
     }
 
+    // iOS Safari freezes WebSockets when the app is backgrounded — requires explicit
+    // disconnect/reconnect. Desktop browsers and Android keep the socket alive across
+    // tab switches, so we must NOT force-disconnect there or we cause the very bug
+    // we're trying to prevent.
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
     const handlePageHide = () => {
+      if (!isIOS) return
       socket.disconnect()
       try { localStorage.setItem('tichu_hidden_at', String(Date.now())) } catch(_) {}
     }
 
-    // pageshow(persisted=true) fires reliably on iOS bfcache restore — more reliable than visibilitychange.
+    // pageshow(persisted=true) fires on bfcache restore on all platforms — safe to reconnect here.
     const handlePageShow = (e) => {
       if (!e.persisted) return
       const storedAt = localStorage.getItem('tichu_hidden_at')
@@ -639,8 +647,16 @@ function App() {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         hiddenAtRef.current = Date.now()
+        // Desktop tab switches: just record the time, leave the socket alone.
+        // iOS: disconnect so the frozen WebSocket can be cleanly replaced on return.
+        if (!isIOS) return
         try { localStorage.setItem('tichu_hidden_at', String(hiddenAtRef.current)) } catch(_) {}
         socket.disconnect()
+        return
+      }
+      // Becoming visible — only act on iOS; desktop socket is still live.
+      if (!isIOS) {
+        hiddenAtRef.current = null
         return
       }
       const storedAt = localStorage.getItem('tichu_hidden_at')
@@ -650,8 +666,6 @@ function App() {
         : storedAt ? Date.now() - Number(storedAt) : 0
       hiddenAtRef.current = null
       if (hiddenMs > 300_000) {
-        // Long background — server has killed the socket and iOS WebSocket is frozen.
-        // Reload is the only reliable path to a fresh connection.
         window.location.reload()
         return
       }
@@ -689,7 +703,6 @@ function App() {
         pendingRejoinRef.current.resolved = true
         pendingRejoinRef.current.timerId = null
         setRejoinPending(false)
-        // engine.close() silently fails on frozen iOS WebSockets; reload instead.
         window.location.reload()
       }, 12_000)
     }
