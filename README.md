@@ -10,19 +10,26 @@ This repository contains:
 ## Features
 
 - Real-time multiplayer game rooms via Socket.IO
+- **Mobile and desktop friendly** — responsive layout, touch support, and iOS WebSocket handling
 - Full Tichu flow:
   - Grand Tichu declaration
   - card exchange
   - trick-taking play with special cards (Mah Jong, Dog, Phoenix, Dragon)
 - Team scoring with Tichu/Grand Tichu call outcomes
+- End-game stats popup (special cards played, bombs, Tichu/Grand Tichu outcomes)
 - In-game sidebar (chat, players, log/theme panels)
-- Responsive board/dock/sidebar layout improvements
+- "How to Play" rules page at `/how-to-play`
+- Lobby features: player name editing, team randomization, custom starting scores
+- Invite/share links via `?join=` URL parameter
+- Reconnect/rejoin system with token-based recovery and exponential backoff
 - Quick local test-game utilities from the landing page
+- Landing page changelog strip
 
 ## Tech Stack
 
-- **Frontend:** React 18, Vite, Vitest
+- **Frontend:** React 18, React Router DOM, Vite, Vitest
 - **Backend:** Node.js, Express, Socket.IO, Jest
+- **Persistence:** Redis (optional — game-state snapshots for reconnect recovery)
 - **Deployment:** Vercel (frontend) + Render (backend)
 
 ## Repository Structure
@@ -30,17 +37,22 @@ This repository contains:
 ```text
 Tichu/
 ├── backend/
+│   ├── config/                # Game constants (gameRules.js)
 │   ├── game/                  # Core game/scoring/validation logic
+│   ├── server/                # Socket handlers, game manager, persistence
 │   ├── tests/                 # Backend unit/integration tests
-│   ├── server.js              # Express + Socket.IO server
+│   ├── server.js              # Express + Socket.IO entry point
 │   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   ├── styles/
-│   │   └── socket.js
+│   │   ├── components/        # React UI components
+│   │   ├── data/              # Landing page changelog data
+│   │   ├── styles/            # CSS + layout tokens
+│   │   ├── utils/             # Card utils, state normalization, touch utils
+│   │   └── socket.js          # Socket.IO client init
 │   └── package.json
 ├── docs/
+│   ├── BUGS.md
 │   ├── DEPLOY.md
 │   ├── FRONTEND_BACKEND_STABILITY_NOTES.md
 │   └── FUTURE.md
@@ -136,7 +148,7 @@ Supported combination types include:
 - singles
 - pairs
 - triples
-- sequencials
+- sequences
 - full houses
 - straights
 - bombs (four-of-a-kind, straight flush)
@@ -148,5 +160,6 @@ Scoring includes:
 
 ## Notes
 
-- For current known issues and future ideas, see `docs/FUTURE.md`.
+- For current known issues, see `docs/BUGS.md`.
+- For future ideas and roadmap, see `docs/FUTURE.md`.
 - For stability and debugging notes, see `docs/FRONTEND_BACKEND_STABILITY_NOTES.md`.
