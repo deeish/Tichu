@@ -164,6 +164,9 @@ function GameBoard({ game, socket, playerId, isConnected = true, rejoinPending =
   const turnLastInteractionAtRef = useRef(0);
   const turnPrevLevelRef = useRef(0);
   const wasMyTurnRef = useRef(false);
+  const prevTichuDeclRef      = useRef({});
+  const prevGrandTichuDeclRef = useRef({});
+  const seatPanelRefsMap      = useRef({});
 
   const isMyTurn = useMemo(() => {
     if (!game?.turnOrder) return false;
@@ -579,7 +582,64 @@ function GameBoard({ game, socket, playerId, isConnected = true, rejoinPending =
     dragonSelectionPrevRef.current = null;
     prevStackSnapshotRef.current = {};
     dragonPassSigRef.current = null;
+    prevTichuDeclRef.current      = {};
+    prevGrandTichuDeclRef.current = {};
   }, [game?.id]);
+
+  useEffect(() => {
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+    const tichu      = game?.tichuDeclarations      ?? {};
+    const grandTichu = game?.grandTichuDeclarations ?? {};
+
+    const playerToPos = {};
+    for (const pos of ['top', 'left', 'right']) {
+      const p = opponentsByPosition[pos];
+      if (p) playerToPos[p.id] = pos;
+    }
+
+    const pulse = (el, cls) => {
+      if (!el || reduced) return;
+      el.classList.remove('seat--tichu-pulse', 'seat--grand-tichu-pulse');
+      void el.offsetWidth;
+      el.classList.add(cls);
+      const cleanup = () => el.classList.remove(cls);
+      el.addEventListener('animationend', cleanup, { once: true });
+      window.setTimeout(() => el.classList.remove(cls), 1300);
+
+      const avatarCls = cls === 'seat--grand-tichu-pulse'
+        ? 'seat-avatar--grand-tichu-pulse'
+        : 'seat-avatar--tichu-pulse';
+      const avatar = el.querySelector('.seat-avatar');
+      if (avatar) {
+        avatar.classList.remove('seat-avatar--tichu-pulse', 'seat-avatar--grand-tichu-pulse');
+        void avatar.offsetWidth;
+        avatar.classList.add(avatarCls);
+        const avatarCleanup = () => avatar.classList.remove(avatarCls);
+        avatar.addEventListener('animationend', avatarCleanup, { once: true });
+        window.setTimeout(() => avatar.classList.remove(avatarCls), 3100);
+      }
+    };
+
+    for (const [pid, declared] of Object.entries(grandTichu)) {
+      if (declared && !prevGrandTichuDeclRef.current[pid]) {
+        prevGrandTichuDeclRef.current[pid] = true;
+        const pos = playerToPos[pid];
+        if (pos) pulse(seatPanelRefsMap.current[pos], 'seat--grand-tichu-pulse');
+      }
+    }
+
+    for (const [pid, declared] of Object.entries(tichu)) {
+      const confirmed = declared && game?.firstCardPlayed?.[pid];
+      if (confirmed && !prevTichuDeclRef.current[pid] && !prevGrandTichuDeclRef.current[pid]) {
+        prevTichuDeclRef.current[pid] = true;
+        const pos = playerToPos[pid];
+        if (pos) pulse(seatPanelRefsMap.current[pos], 'seat--tichu-pulse');
+      }
+    }
+  }, [game?.tichuDeclarations, game?.grandTichuDeclarations, game?.firstCardPlayed, opponentsByPosition]);
 
   useEffect(() => {
     const sig =
@@ -1521,6 +1581,7 @@ function GameBoard({ game, socket, playerId, isConnected = true, rejoinPending =
                 <Fragment key={`seat-${pos}-${player.id}`}>
                   <div
                     className={`seat-panel seat--${pos} seat--team-${player.team ?? 1} ${isActing ? 'seat--acting' : ''} ${isDisconnected ? 'seat--disconnected' : ''} ${isExchangeDropTarget ? 'seat--exchange-drop' : ''} ${isDragOverThisSeat ? 'seat--exchange-drag-over' : ''} ${isTouchExchangeTarget ? 'seat--exchange-touch-target' : ''} ${isMobileSide ? 'seat--mobile-side' : ''}`}
+                    ref={(el) => { seatPanelRefsMap.current[pos] = el; }}
                     style={{
                       left: `${posObj.x}px`,
                       top: `${posObj.y}px`,
@@ -1544,7 +1605,8 @@ function GameBoard({ game, socket, playerId, isConnected = true, rejoinPending =
                       } catch (_) {}
                     } : undefined}
                   >
-                    {(game.grandTichuDeclarations?.[player.id] || game.tichuDeclarations?.[player.id]) && (
+                    {(game.grandTichuDeclarations?.[player.id] ||
+                      (game.tichuDeclarations?.[player.id] && game.firstCardPlayed?.[player.id])) && (
                       <div className="seat-declaration-float">
                         <span className={`seat-declaration-pill ${game.grandTichuDeclarations?.[player.id] ? 'seat-declaration-pill--grand' : ''}`}>
                           {game.grandTichuDeclarations?.[player.id] ? 'Grand' : 'Tichu'}

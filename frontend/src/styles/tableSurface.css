@@ -381,12 +381,54 @@
   color: rgba(253, 224, 71, 1);
   border: 1px solid rgba(250, 204, 21, 0.45);
   white-space: nowrap;
+  animation: seatPillBounceIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: center bottom;
 }
 
 .seat-declaration-pill--grand {
   background: rgba(251, 146, 60, 0.3);
   color: rgba(253, 186, 116, 1);
   border-color: rgba(251, 146, 60, 0.5);
+}
+
+@keyframes seatPillBounceIn {
+  0%   { opacity: 0; transform: scale(0);    }
+  60%  { opacity: 1; transform: scale(1.15); }
+  80%  {             transform: scale(0.9);  }
+  100% {             transform: scale(1);    }
+}
+
+@keyframes avatarDeclarationPulse {
+  0%   { box-shadow: 0 0 0 0px rgba(255,255,255,0.9);  }
+  13%  { box-shadow: 0 0 0 8px rgba(255,255,255,0);    }
+  33%  { box-shadow: 0 0 0 0px rgba(255,255,255,0.7);  }
+  46%  { box-shadow: 0 0 0 8px rgba(255,255,255,0);    }
+  66%  { box-shadow: 0 0 0 0px rgba(255,255,255,0.5);  }
+  79%  { box-shadow: 0 0 0 8px rgba(255,255,255,0);    }
+  100% { box-shadow: 0 0 0 0px rgba(255,255,255,0);    }
+}
+
+.seat-avatar--tichu-pulse,
+.seat-avatar--grand-tichu-pulse {
+  animation: avatarDeclarationPulse 3s ease-out forwards;
+}
+
+@keyframes seatTichuGlow {
+  0%   { box-shadow: 0 0 0 2px rgba(252,211,77,0.7),  0 0 22px 6px rgba(252,211,77,0.5),  0 2px 12px rgba(0,0,0,0.25); }
+  100% { box-shadow: 0 0 0 0px rgba(252,211,77,0),    0 0  0px 0px rgba(252,211,77,0),    0 2px 12px rgba(0,0,0,0.25); }
+}
+
+@keyframes seatGrandTichuGlow {
+  0%   { box-shadow: 0 0 0 2px rgba(251,146,60,0.75), 0 0 26px 8px rgba(251,146,60,0.55), 0 2px 12px rgba(0,0,0,0.25); }
+  100% { box-shadow: 0 0 0 0px rgba(251,146,60,0),    0 0  0px 0px rgba(251,146,60,0),    0 2px 12px rgba(0,0,0,0.25); }
+}
+
+.seat-panel.seat--tichu-pulse {
+  animation: seatTichuGlow 1.2s ease-out forwards;
+}
+
+.seat-panel.seat--grand-tichu-pulse {
+  animation: seatGrandTichuGlow 1.2s ease-out forwards;
 }
 
 .seat-meta {
@@ -1077,5 +1119,13 @@
   .seat-panel .seat-badges {
     display: none;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat-declaration-pill { animation: none; }
+  .seat-panel.seat--tichu-pulse,
+  .seat-panel.seat--grand-tichu-pulse { animation: none; }
+  .seat-avatar--tichu-pulse,
+  .seat-avatar--grand-tichu-pulse { animation: none !important; }
 }
 
