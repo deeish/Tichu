@@ -7,6 +7,8 @@ This repository contains:
 - a Node.js + Express + Socket.IO backend
 - automated tests for game logic and UI token/layout behavior
 
+**Live:** [calltichu.com](https://calltichu.com)
+
 ## Features
 
 - Real-time multiplayer game rooms via Socket.IO
