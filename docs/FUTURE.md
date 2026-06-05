@@ -1,5 +1,4 @@
 ***Next things i want to work on, if i'd like ***
--Some form of notice when a play calls tichu/grand(animated or some notice)
 -make the text under "tichu" actually mean something i guess with more information?
 -fix the "copy link to join game" currently takes the player to the lobby, but kicks out the other player.
 

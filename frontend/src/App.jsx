@@ -19,6 +19,10 @@ const REJOIN_GAME_KEY = 'tichu_rejoin_gameId'
 const REJOIN_TOKEN_KEY = 'tichu_rejoin_token'
 const EXPECTED_PROTOCOL_VERSION = 1
 
+// Read synchronously at module load — before React effects or the socket fire — so that
+// onConnect can skip auto-rejoin when the user landed from an invite link.
+const INVITE_JOIN_CODE = new URLSearchParams(window.location.search).get('join') || null
+
 /** Prefer socket match: token-based find(p => p.token) can mis-identify when multiple tokens leak or order differs. */
 function findMyPlayerInWireSnapshot(players, socketId) {
   if (!Array.isArray(players) || !socketId) return undefined
@@ -194,9 +198,8 @@ function App() {
   }, [showLandingUpdates])
 
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get('join')
-    if (code) {
-      setGameId(code.toUpperCase())
+    if (INVITE_JOIN_CODE) {
+      setGameId(INVITE_JOIN_CODE)
       setLandingMode('join')
       window.history.replaceState(null, '', window.location.pathname)
     }
@@ -285,7 +288,7 @@ function App() {
         setIsConnected(true)
         const savedGameId = localStorage.getItem(REJOIN_GAME_KEY)
         const savedToken = localStorage.getItem(REJOIN_TOKEN_KEY)
-        if (savedGameId && savedToken) {
+        if (savedGameId && savedToken && !INVITE_JOIN_CODE) {
           // Token-based reconnect: if `rejoin` response doesn't arrive (or is dropped),
           // fall back to explicit `get-game-state` so recovery is deterministic.
           if (pendingRejoinRef.current.timerId) clearTimeout(pendingRejoinRef.current.timerId)

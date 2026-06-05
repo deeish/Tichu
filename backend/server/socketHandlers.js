@@ -332,7 +332,27 @@ function setupSocketHandlers(io, games, players) {
       }
 
       const name = playerName.trim();
-      const disconnectedSlot = game.players.find((p) => p.disconnected);
+
+      // Guard: the socket may already be registered in this game via the handshake-auth
+      // session restore that fires before onConnect (and before any events). If the client
+      // then emits join-game (e.g. after landing on an invite link with stored creds and
+      // submitting the join form), we must NOT add a duplicate player slot. Instead, just
+      // re-send the current game view so the client transitions to the lobby correctly.
+      const alreadyInGame = players.get(socket.id);
+      if (alreadyInGame && alreadyInGame.gameId === gameId) {
+        const existingPlayer = game.players.find((p) => p.id === alreadyInGame.playerId);
+        if (existingPlayer) {
+          const view = getPlayerView(game, socket.id);
+          socket.emit('player-joined', { player: existingPlayer, game: view, playerToken: existingPlayer.token });
+          return;
+        }
+      }
+
+      // Only fill a disconnected slot when the name matches — prevents a new player from
+      // accidentally replacing a temporarily-disconnected player via an invite link.
+      const disconnectedSlot = game.players.find(
+        (p) => p.disconnected && p.name.toLowerCase() === name.toLowerCase()
+      );
 
       if (game.players.length >= 4 && !disconnectedSlot) {
         socket.emit('error', { code: 'game_full', message: 'Game is full', requestId });
@@ -340,7 +360,7 @@ function setupSocketHandlers(io, games, players) {
       }
 
       if (disconnectedSlot) {
-        // Fill the disconnected slot so they can rejoin with the code (e.g. after accidentally leaving or losing token)
+        // Fill the matching disconnected slot (same name, lost token — e.g. accidentally left)
         const token = generateId();
         disconnectedSlot.socketId = socket.id;
         disconnectedSlot.token = token;

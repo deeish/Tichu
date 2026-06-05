@@ -29,6 +29,19 @@ export function landingUpdateKindLabel(kind) {
  */
 export const LANDING_UPDATE_DAYS = [
   {
+    date: '2026-06-05',
+    items: [
+      {
+        kind: 'feature',
+        text: 'Tichu/Grand Tichu declarations now animate with a seat glow and avatar pulse when called.',
+      },
+      {
+        kind: 'bugfix',
+        text: 'Fixed invite link — now routes to the join screen with the code pre-filled instead of dropping you into the party.',
+      },
+    ],
+  },
+  {
     date: '2026-05-30',
     items: [
       {
