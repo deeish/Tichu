@@ -1,29 +1,21 @@
 ***Next things i want to work on, if i'd like ***
--make the text under "tichu" actually mean something i guess with more information?
--fix the "copy link to join game" currently takes the player to the lobby, but kicks out the other player.
-
+-clear for now
 
 ***Fix these in the rules***
+-Fix trick and trun flow steps(maybe)
 
--Fix trick and trun flow steps
 
-
-*Road Map after i get mobile working*:
 *Others to work on eventually*
 
 2. Cards
 Card visuals
 Right now cards are rank + suit only. Consider:
 Option A: Keep CSS but improve design (corners, subtle borders, clearer typography, distinct special-card styling for Mah Jong, Phoenix, Dragon, Dog).
-Option B: Use card images (e.g. standard deck + custom art for specials) for a more "real deck" feel.
+<!-- Option B: Use card images (e.g. standard deck + custom art for specials) for a more "real deck" feel.
 Hand layout
--Make the hand feel like a hand: slight fan or arc, and/or a small overlap so cards don't look like a flat list. Selection can "lift" the card out of the fan.
+-Make the hand feel like a hand: slight fan or arc, and/or a small overlap so cards don't look like a flat list. Selection can "lift" the card out of the fan. -->
 Playing a card
 -When the user plays, animate the selected card(s) from hand → center (e.g. short move + scale), instead of them disappearing and reappearing in the trick. Same idea when opponents play: cards animate from their area into the center.
-Trick layout
--Show the current trick as cards in the center of the table (e.g. in a small pile or by position per player), not as a vertical list. Optionally show who led and who followed.
--Do i want to change the look of passing dragon
--Player card count a bit too small
 
 3. Feedback & timing
 Sound (optional but high impact)
