@@ -33,11 +33,11 @@ export const LANDING_UPDATE_DAYS = [
     items: [
       {
         kind: 'bugfix',
-        text: 'Fixed Dog being playable as part of a straight — Dog can only be played as a single to pass priority to your teammate.',
+        text: 'Fixed Dog being playable as part of a straight.',
       },
       {
         kind: 'bugfix',
-        text: 'Fixed straights of different lengths being treated as the same type — a straight can only be beaten by a straight of the same length.',
+        text: 'Fixed straights of different lengths being treated as the same type.',
       },
     ],
   },
