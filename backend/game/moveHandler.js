@@ -569,7 +569,13 @@ function makeMove(game, playerId, cards, action = 'play', mahJongWish = null) {
     if (currentWinningCombo.type === 'bomb' && validation.type !== 'bomb') {
       return { success: false, error: 'Only a bomb can beat a bomb. You must play a bomb or pass' };
     }
-    
+
+    // Straight must match the length of the current play
+    if (validation.type === 'straight' && currentWinningCombo.type === 'straight' &&
+        validation.length !== currentWinningCombo.length) {
+      return { success: false, error: `Straight must be the same length as the current play (${currentWinningCombo.length} cards)` };
+    }
+
     const comparison = compareCombinations(validation, currentWinningCombo);
     
     if (comparison === null || comparison <= 0) {

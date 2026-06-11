@@ -91,15 +91,16 @@ function validatePair(cards) {
   if (cards.length !== 2) return { valid: false };
   
   const ranks = cards.map(c => c.rank || c.name);
-  if (ranks[0] === ranks[1] || (cards[0].type === 'special' && cards[1].type === 'special')) {
+  if (ranks[0] === ranks[1]) {
     return { valid: true, type: 'pair', cards, rank: ranks[0] };
   }
   
-  // Check for Phoenix wild card
+  // Check for Phoenix wild card (can only pair with a standard card)
   const phoenix = cards.find(c => c.name === 'phoenix');
   if (phoenix) {
     const otherCard = cards.find(c => c.name !== 'phoenix');
-    return { valid: true, type: 'pair', cards, rank: otherCard.rank || otherCard.name, hasPhoenix: true };
+    if (!otherCard || otherCard.type !== 'standard') return { valid: false, error: 'Not a valid pair' };
+    return { valid: true, type: 'pair', cards, rank: otherCard.rank, hasPhoenix: true };
   }
   
   return { valid: false, error: 'Not a valid pair' };
@@ -284,11 +285,11 @@ function validateFullHouse(cards) {
 function validateStraight(cards) {
   if (cards.length < 5) return { valid: false };
   
-  // Dragon cannot be part of a sequence (rulebook)
-  if (cards.some(c => c.name === 'dragon')) {
+  // Dragon and Dog cannot be part of a sequence (rulebook)
+  if (cards.some(c => c.name === 'dragon' || c.name === 'dog')) {
     return { valid: false };
   }
-  
+
   // Filter out special cards (except Phoenix and Mah Jong which can be in straights)
   const standardCards = cards.filter(c => 
     c.type === 'standard' || c.name === 'phoenix' || c.name === 'mahjong'
@@ -384,8 +385,8 @@ function validateBomb(cards) {
 function validateStraightFlush(cards) {
   if (cards.length < 5) return { valid: false };
   
-  // Phoenix and Mah Jong cannot form a straight-flush bomb (no suit / special-card rules).
-  if (cards.some(c => c.name === 'phoenix' || c.name === 'mahjong')) {
+  // Phoenix, Mah Jong, and Dog cannot form a straight-flush bomb.
+  if (cards.some(c => c.name === 'phoenix' || c.name === 'mahjong' || c.name === 'dog')) {
     return { valid: false };
   }
   
