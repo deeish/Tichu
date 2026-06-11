@@ -29,6 +29,19 @@ export function landingUpdateKindLabel(kind) {
  */
 export const LANDING_UPDATE_DAYS = [
   {
+    date: '2026-06-11',
+    items: [
+      {
+        kind: 'bugfix',
+        text: 'Fixed Dog being playable as part of a straight — Dog can only be played as a single to pass priority to your teammate.',
+      },
+      {
+        kind: 'bugfix',
+        text: 'Fixed straights of different lengths being treated as the same type — a straight can only be beaten by a straight of the same length.',
+      },
+    ],
+  },
+  {
     date: '2026-06-05',
     items: [
       {
