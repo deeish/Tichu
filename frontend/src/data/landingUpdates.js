@@ -29,6 +29,15 @@ export function landingUpdateKindLabel(kind) {
  */
 export const LANDING_UPDATE_DAYS = [
   {
+    date: '2026-06-29',
+    items: [
+      {
+        kind: 'bugfix',
+        text: 'Fixed scrolling on the How to Play page on mobile.',
+      },
+    ],
+  },
+  {
     date: '2026-06-11',
     items: [
       {

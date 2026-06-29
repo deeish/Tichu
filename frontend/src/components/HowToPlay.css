@@ -1,8 +1,8 @@
 /* Keep background exactly as-is */
 .how-to-play {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: center;
   padding: 1.5rem 1rem 2rem;
   background: linear-gradient(165deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
@@ -82,7 +82,9 @@
 .how-to-play-body {
   padding: 1.1rem 1.25rem 1.35rem;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.96rem;
   line-height: 1.6;
